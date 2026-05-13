@@ -25,12 +25,12 @@ export default function manifest(): ExtendedManifest {
   const appName =
     process.env.APP_NAME ||
     process.env.NEXT_PUBLIC_APP_NAME ||
-    "Bulwark Webmail";
+    "OrdoNuntius";
 
   const shortName = process.env.APP_SHORT_NAME || appName;
   const description =
     process.env.APP_DESCRIPTION ||
-    "A modern webmail client built for Stalwart Mail Server";
+    "OrdoNuntius — the messenger for OrdoEpistola. A JMAP-native webmail in the Ordo ecosystem.";
   const themeColor = process.env.PWA_THEME_COLOR || "#ffffff";
   const backgroundColor = process.env.PWA_BACKGROUND_COLOR || "#ffffff";
 

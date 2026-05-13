@@ -1,15 +1,28 @@
-# Bulwark Webmail fork notice
+# OrdoNuntius — fork notice
 
 This repository is distributed under the GNU Affero General Public License,
-version 3 only. It also includes material derived from earlier MIT-licensed
-work in the fork lineage.
+version 3 only. It is a fork of Bulwark Webmail, adapted for the Ordo ecosystem
+(OrdoEpistola mail server backed by OrdoDB).
 
-Fork lineage:
+## Fork lineage (most recent first)
+
+- https://github.com/ordokr/OrdoNuntius (this repository)
+  - Copyright (c) 2026 Salt & Light LLC
+  - AGPL-3.0-only
+
+- https://github.com/bulwarkmail/webmail
+  - Copyright (c) 2025-2026 Bulwark Project Authors
+  - AGPL-3.0-only
 
 - https://github.com/root-fr/jmap-webmail
-- https://github.com/bulwarkmail/webmail
+  - Copyright (c) 2025 Matthieu MALVACHE
+  - MIT License (text reproduced below)
 
-Original MIT attribution notice preserved from the earlier forked codebase:
+The earlier MIT-licensed work is incorporated under its MIT terms, with the
+combined work distributed under AGPL-3.0-only as permitted by MIT's
+compatibility with AGPL.
+
+## Original MIT attribution notice preserved from the earlier forked codebase
 
 MIT License
 

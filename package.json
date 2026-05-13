@@ -1,21 +1,23 @@
 {
-  "name": "bulwark-webmail",
+  "name": "ordo-nuntius",
   "version": "1.6.5",
-  "description": "Bulwark Webmail - a modern webmail client built for Stalwart Mail Server",
-  "author": "Bulwark Webmail <bulwark@rbm.systems>",
+  "description": "OrdoNuntius - the messenger client for OrdoEpistola, a JMAP-native webmail in the Ordo ecosystem",
+  "author": "Salt & Light LLC",
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bulwarkmail/webmail.git"
+    "url": "git+https://github.com/ordokr/OrdoNuntius.git"
   },
-  "homepage": "https://github.com/bulwarkmail/webmail",
+  "homepage": "https://github.com/ordokr/OrdoNuntius",
   "bugs": {
-    "url": "https://github.com/bulwarkmail/webmail/issues"
+    "url": "https://github.com/ordokr/OrdoNuntius/issues"
   },
   "keywords": [
     "jmap",
     "webmail",
-    "stalwart",
+    "ordo",
+    "ordoepistola",
+    "ordodb",
     "email",
     "nextjs",
     "react",
