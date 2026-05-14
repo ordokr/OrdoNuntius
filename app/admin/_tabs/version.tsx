@@ -133,8 +133,8 @@ export function VersionTab() {
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-foreground">Version</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Hourly check against the Bulwark version server. Severity is decided server-side and
-            disable with <code>BULWARK_UPDATE_CHECK=off</code>.
+            Hourly check against the OrdoNuntius version server. Severity is decided server-side and
+            disable with <code>ORDO_NUNTIUS_UPDATE_CHECK=off</code>.
           </p>
         </div>
         <button
@@ -226,7 +226,7 @@ export function VersionTab() {
             {data.endpoint} <ExternalLink className="w-3 h-3 shrink-0" />
           </a>
         </SettingItem>
-        <SettingItem label="Disabled by env" description="Set BULWARK_UPDATE_CHECK=off to disable.">
+        <SettingItem label="Disabled by env" description="Set ORDO_NUNTIUS_UPDATE_CHECK=off to disable.">
           <span className={`text-sm font-medium ${data.disabledByEnv ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
             {data.disabledByEnv ? 'Yes' : 'No'}
           </span>

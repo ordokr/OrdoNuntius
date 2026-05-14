@@ -49,7 +49,7 @@ async function createJitsiJwt(options: {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: 'HS256', typ: 'JWT' };
   const payload: Record<string, unknown> = {
-    iss: 'bulwark-webmail',
+    iss: 'ordo-nuntius',
     sub: domain,
     aud: 'jitsi',
     room: roomName,
@@ -158,7 +158,7 @@ describe('createJitsiJwt', () => {
     expect(header.typ).toBe('JWT');
 
     const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    expect(payload.iss).toBe('bulwark-webmail');
+    expect(payload.iss).toBe('ordo-nuntius');
     expect(payload.sub).toBe('meet.example.com');
     expect(payload.aud).toBe('jitsi');
     expect(payload.room).toBe('test-room');

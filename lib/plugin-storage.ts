@@ -1,6 +1,6 @@
 // IndexedDB storage for plugin/theme binary blobs (JS bundles, CSS, previews)
 
-const DB_NAME = 'bulwark-plugins';
+const DB_NAME = 'ordo-nuntius-plugins';
 // Bumped to 2 to add the theme-skin store; existing stores are preserved.
 const DB_VERSION = 2;
 const STORE_PLUGINS = 'plugin-code';

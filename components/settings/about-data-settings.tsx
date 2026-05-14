@@ -123,13 +123,13 @@ export function AboutDataSettings() {
           <button onClick={handleLogoClick} className="flex items-center gap-4 flex-1 text-left focus:outline-none group/about cursor-pointer" aria-label="About">
             <div className="shrink-0">
               <img
-                src="/branding/Bulwark_Logo_Color.svg"
-                alt="Bulwark"
+                src="/branding/OrdoNuntius_Logo_Color.svg"
+                alt="OrdoNuntius"
                 className="w-12 h-12 object-contain dark:hidden group-hover/about:scale-105 group-active/about:scale-95 transition-transform"
               />
               <img
-                src="/branding/Bulwark_Logo_White.svg"
-                alt="Bulwark"
+                src="/branding/OrdoNuntius_Logo_White.svg"
+                alt="OrdoNuntius"
                 className="w-12 h-12 object-contain hidden dark:block group-hover/about:scale-105 group-active/about:scale-95 transition-transform"
               />
             </div>
@@ -144,7 +144,7 @@ export function AboutDataSettings() {
             </div>
           </button>
           <a
-            href="https://github.com/bulwarkmail/webmail"
+            href="https://github.com/ordokr/OrdoNuntius"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"

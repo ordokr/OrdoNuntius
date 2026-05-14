@@ -39,7 +39,7 @@ export interface FilterAction {
   value?: string;
 }
 
-export type FilterOrigin = 'bulwark' | 'external' | 'opaque';
+export type FilterOrigin = 'ordo-nuntius' | 'external' | 'opaque';
 
 export interface FilterRule {
   id: string;

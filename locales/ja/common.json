@@ -136,18 +136,18 @@
   },
   "protocol_handlers": {
     "title": "既定のアプリ",
-    "description": "メールとカレンダーのリンクを Bulwark で開くかどうかを選択します。技術的には、Bulwark は mailto: と webcal: リンクのプロトコル ハンドラーとして登録されます。",
+    "description": "メールとカレンダーのリンクを OrdoNuntius で開くかどうかを選択します。技術的には、OrdoNuntius は mailto: と webcal: リンクのプロトコル ハンドラーとして登録されます。",
     "unsupported": "このブラウザーまたは接続では、プロトコル ハンドラーの手動登録がサポートされていません。インストール済みの PWA は、ブラウザーまたはシステム設定から使用できる場合があります。",
     "mailto_label": "メールリンク",
-    "mailto_description": "mailto: リンクを、入力済みの作成画面で Bulwark に開きます。",
+    "mailto_description": "mailto: リンクを、入力済みの作成画面で OrdoNuntius に開きます。",
     "protocol_open_mode_label": "プロトコルリンクを開くとき",
-    "protocol_open_mode_description": "Bulwark が mailto: と webcal: のリンクを新しいタブで開くか、開いているセッションを再利用するかを選択します。アクティブなセッションのオプションでは通知の許可が必要です。ブラウザーがフォーカスをブロックした場合に、代替通知をクリックして Bulwark を前面に表示できます。",
+    "protocol_open_mode_description": "OrdoNuntius が mailto: と webcal: のリンクを新しいタブで開くか、開いているセッションを再利用するかを選択します。アクティブなセッションのオプションでは通知の許可が必要です。ブラウザーがフォーカスをブロックした場合に、代替通知をクリックして OrdoNuntius を前面に表示できます。",
     "protocol_open_mode_active_session": "可能な場合はアクティブなセッションで開く",
     "protocol_open_mode_new_tab": "常に新しいタブを開く",
-    "focus_notification_title": "Bulwark を開く",
-    "focus_notification_body": "リンクは Bulwark で開かれました。クリックするとウィンドウを前面に表示します。",
+    "focus_notification_title": "OrdoNuntius を開く",
+    "focus_notification_body": "リンクは OrdoNuntius で開かれました。クリックするとウィンドウを前面に表示します。",
     "webcal_label": "カレンダーリンク",
-    "webcal_description": "webcal: リンクを、入力済みのカレンダー購読ダイアログで Bulwark に開きます。",
+    "webcal_description": "webcal: リンクを、入力済みのカレンダー購読ダイアログで OrdoNuntius に開きます。",
     "register_mailto": "メールアプリを登録",
     "register_webcal": "カレンダーアプリを登録",
     "mailto_registered": "メール ハンドラーの登録を要求しました",
@@ -155,7 +155,7 @@
     "registration_failed": "プロトコル ハンドラーの登録に失敗しました",
     "opening_mailto": "作成画面を開いています...",
     "opening_webcal": "カレンダーを開いています...",
-    "browser_note": "ブラウザーまたはオペレーティング システムから確認を求められる場合があります。また、既定のアプリとして選択する前に Bulwark のインストールが必要な場合があります。",
+    "browser_note": "ブラウザーまたはオペレーティング システムから確認を求められる場合があります。また、既定のアプリとして選択する前に OrdoNuntius のインストールが必要な場合があります。",
     "select_account_title": "アカウントを選択",
     "select_mailto_account": "このメールリンクを開くアカウントを選択してください。",
     "select_webcal_account": "このカレンダーリンクを開くアカウントを選択してください。",
@@ -631,9 +631,9 @@
     "app_title": "ウェブメール",
     "reconnecting": "接続が切れました。再接続を試みています…",
     "rate_limited_title": "サーバー認証は一時的に制限されています。",
-    "rate_limited_detail": "ロックアウトを避けるため、Bulwark はバックグラウンド要求を一時停止しました。{seconds} 秒後に再試行します。",
+    "rate_limited_detail": "ロックアウトを避けるため、OrdoNuntius はバックグラウンド要求を一時停止しました。{seconds} 秒後に再試行します。",
     "rate_limited_action_title": "ロックアウトを避けるため要求を一時停止しました。",
-    "rate_limited_action_detail": "Bulwark はサーバーのクールダウンが終わるまで、追加の認証付きリクエストを送信しません。{seconds} 秒後に再試行してください。"
+    "rate_limited_action_detail": "OrdoNuntius はサーバーのクールダウンが終わるまで、追加の認証付きリクエストを送信しません。{seconds} 秒後に再試行してください。"
   },
   "notifications": {
     "email_sent": "メールを送信しました",
@@ -903,12 +903,12 @@
       "push": {
         "confirm_disable_message": "このデバイスは、サイトが閉じているときに通知を受信しなくなります。",
         "confirm_disable_title": "バックグラウンド通知を無効にしますか？",
-        "description": "このサイトが閉じているときに新着メールのシステム通知を受信します。Bulwark プッシュリレー経由で配信され、リレーがメール内容を見ることはありません。",
+        "description": "このサイトが閉じているときに新着メールのシステム通知を受信します。OrdoNuntius プッシュリレー経由で配信され、リレーがメール内容を見ることはありません。",
         "disable": "無効化",
         "enable": "有効化",
         "ios_hint": "iOS では、最初にサイトをホーム画面にインストールしてください。Safari はインストールされた PWA にのみ Web Push を配信します。",
         "reenable": "再登録",
-        "relay_desc": "デフォルトはホストされた Bulwark リレーです。セルフホストする場合のみ変更してください。",
+        "relay_desc": "デフォルトはホストされた OrdoNuntius リレーです。セルフホストする場合のみ変更してください。",
         "relay_label": "プッシュリレー",
         "relay_placeholder": "https://notifications.relay.example.com",
         "status_active": "このデバイスで有効",
@@ -1448,7 +1448,7 @@
         "button": "インポート"
       },
       "about": {
-        "title": "Bulwark Webmail"
+        "title": "OrdoNuntius"
       }
     },
     "sidebar_apps": {
@@ -2643,7 +2643,7 @@
     "start_tour": "ツアーを開始"
   },
   "demo_welcome": {
-    "title": "Bulwark Mail へようこそ",
+    "title": "OrdoNuntius へようこそ",
     "description": "フル機能のウェブメールクライアントをブラウザで体験できます。すべてのデータはお使いのデバイスに保存されるので、自由にお試しください。",
     "feature_email": "メールの読み書き",
     "feature_organize": "タグ・スター・フォルダ",

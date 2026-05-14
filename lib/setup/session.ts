@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { verifySetupToken } from './token';
 
-export const SETUP_COOKIE = 'bulwark_setup_token';
+export const SETUP_COOKIE = 'ordonuntius_setup_token';
 const COOKIE_MAX_AGE = 60 * 60; // 1 hour, matches token TTL
 
 /**

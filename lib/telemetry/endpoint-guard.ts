@@ -6,7 +6,7 @@ import { isIP } from 'node:net';
 // URL; without this an attacker with a session (or a hostile admin in a
 // multi-tenant deploy) could redirect heartbeats at internal hosts.
 //
-// Set BULWARK_TELEMETRY_ALLOW_PRIVATE=1 to bypass - useful only for local
+// Set ORDO_NUNTIUS_TELEMETRY_ALLOW_PRIVATE=1 to bypass - useful only for local
 // dev where the collector is on the loopback.
 
 const PRIVATE_V4: RegExp[] = [
@@ -53,7 +53,7 @@ const BAD_HOSTS = new Set([
 ]);
 
 function bypassEnabled(): boolean {
-  return process.env.BULWARK_TELEMETRY_ALLOW_PRIVATE === '1';
+  return process.env.ORDO_NUNTIUS_TELEMETRY_ALLOW_PRIVATE === '1';
 }
 
 export type EndpointCheck = { ok: true } | { ok: false; reason: string };

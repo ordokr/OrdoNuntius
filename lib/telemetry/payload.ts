@@ -23,7 +23,7 @@ function readPackage(): { version: string; build: string | null } {
     const pkg = JSON.parse(
       readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'),
     ) as { version?: string };
-    return { version: pkg.version ?? '0.0.0', build: process.env.BULWARK_BUILD ?? 'release' };
+    return { version: pkg.version ?? '0.0.0', build: process.env.ORDO_NUNTIUS_BUILD ?? 'release' };
   } catch {
     return { version: '0.0.0', build: null };
   }

@@ -25,7 +25,7 @@ describe('parseScript', () => {
     expect(result.rules).toEqual(rules);
   });
 
-  it('parses external rules when no Bulwark metadata is present', () => {
+  it('parses external rules when no OrdoNuntius metadata is present', () => {
     const result = parseScript('require ["fileinto"];\nif header :contains "From" "x" { fileinto "Y"; }');
     expect(result.isOpaque).toBe(false);
     expect(result.rules).toHaveLength(1);

@@ -208,7 +208,7 @@ class ConfigManager {
 // the same in-memory state. Without this, marking setupComplete=true in a
 // route handler is invisible to the next middleware run, and the wizard
 // redirect after finish never fires.
-const SINGLETON_KEY = Symbol.for('bulwark.admin.configManager');
+const SINGLETON_KEY = Symbol.for('ordonuntius.admin.configManager');
 type GlobalWithConfig = typeof globalThis & { [SINGLETON_KEY]?: ConfigManager };
 const g = globalThis as GlobalWithConfig;
 export const configManager: ConfigManager =

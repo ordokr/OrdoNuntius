@@ -5,10 +5,10 @@ import { parseScript } from '../parser';
 import { generateScript } from '../generator';
 import type { FilterRule } from '@/lib/jmap/sieve-types';
 
-function makeBulwarkRule(overrides: Partial<FilterRule> = {}): FilterRule {
+function makeOrdoNuntiusRule(overrides: Partial<FilterRule> = {}): FilterRule {
   return {
     id: 'bw-1',
-    name: 'Bulwark Rule',
+    name: 'OrdoNuntius Rule',
     enabled: true,
     matchType: 'all',
     conditions: [{ field: 'from', comparator: 'contains', value: 'test@example.com' }],
@@ -84,27 +84,27 @@ describe('external rule preservation (issue #201)', () => {
     });
   });
 
-  describe('parser - mixed Bulwark + external', () => {
-    it('returns Bulwark rules from metadata and external rules from the rest', () => {
-      const bulwark = [makeBulwarkRule({ name: 'Bulwark A' })];
-      const bulwarkScript = generateScript(bulwark);
-      const mixedScript = `${bulwarkScript}\n# External appended by Nextcloud\nif header :contains "List-Id" "devs" {\n    fileinto "Dev";\n}\n`;
+  describe('parser - mixed OrdoNuntius + external', () => {
+    it('returns OrdoNuntius rules from metadata and external rules from the rest', () => {
+      const ordoNuntius = [makeOrdoNuntiusRule({ name: 'OrdoNuntius A' })];
+      const ordoNuntiusScript = generateScript(ordoNuntius);
+      const mixedScript = `${ordoNuntiusScript}\n# External appended by Nextcloud\nif header :contains "List-Id" "devs" {\n    fileinto "Dev";\n}\n`;
 
       const result = parseScript(mixedScript);
       expect(result.isOpaque).toBe(false);
       expect(result.rules.length).toBeGreaterThanOrEqual(2);
 
-      const bulwarkParsed = result.rules.filter(r => !r.origin || r.origin === 'bulwark');
+      const ordoNuntiusParsed = result.rules.filter(r => !r.origin || r.origin === 'ordo-nuntius');
       const externalParsed = result.rules.filter(r => r.origin === 'external');
-      expect(bulwarkParsed).toHaveLength(1);
-      expect(bulwarkParsed[0].name).toBe('Bulwark A');
+      expect(ordoNuntiusParsed).toHaveLength(1);
+      expect(ordoNuntiusParsed[0].name).toBe('OrdoNuntius A');
       expect(externalParsed).toHaveLength(1);
       expect(externalParsed[0].originLabel).toBe('Nextcloud');
     });
 
-    it('does not return Bulwark-emitted if-blocks as external duplicates', () => {
-      const bulwark = [makeBulwarkRule({ name: 'My Bulwark Rule' })];
-      const script = generateScript(bulwark);
+    it('does not return OrdoNuntius-emitted if-blocks as external duplicates', () => {
+      const ordoNuntius = [makeOrdoNuntiusRule({ name: 'My OrdoNuntius Rule' })];
+      const script = generateScript(ordoNuntius);
       const result = parseScript(script);
 
       // Only the metadata-sourced rule, no duplicate "external" entry.
@@ -114,7 +114,7 @@ describe('external rule preservation (issue #201)', () => {
   });
 
   describe('generator - external splice', () => {
-    it('appends external rawBlocks verbatim after Bulwark-managed output', () => {
+    it('appends external rawBlocks verbatim after OrdoNuntius-managed output', () => {
       const externalRule: FilterRule = {
         id: 'ext-0',
         name: 'External',
@@ -127,19 +127,19 @@ describe('external rule preservation (issue #201)', () => {
         originLabel: 'Nextcloud',
         rawBlock: '# Nextcloud Mail\nif header :contains "List-Id" "x" {\n    fileinto "Lists";\n}\n',
       };
-      const rules: FilterRule[] = [makeBulwarkRule(), externalRule];
+      const rules: FilterRule[] = [makeOrdoNuntiusRule(), externalRule];
       const script = generateScript(rules);
 
-      expect(script).toContain('# Rule: Bulwark Rule');
+      expect(script).toContain('# Rule: OrdoNuntius Rule');
       expect(script).toContain('# Nextcloud Mail');
-      expect(script).toContain('# --- External rules (managed outside Bulwark) ---');
-      const bulwarkIdx = script.indexOf('# Rule: Bulwark Rule');
+      expect(script).toContain('# --- External rules (managed outside OrdoNuntius) ---');
+      const ordoNuntiusIdx = script.indexOf('# Rule: OrdoNuntius Rule');
       const externalIdx = script.indexOf('# Nextcloud Mail');
-      expect(bulwarkIdx).toBeLessThan(externalIdx);
+      expect(ordoNuntiusIdx).toBeLessThan(externalIdx);
     });
 
     it('unions external requires into the top-level require line', () => {
-      const script = generateScript([makeBulwarkRule()], undefined, {
+      const script = generateScript([makeOrdoNuntiusRule()], undefined, {
         externalRequires: ['fileinto', 'imap4flags', 'body'],
       });
       const requireLine = script.split('\n').find(l => l.startsWith('require'))!;
@@ -148,14 +148,14 @@ describe('external rule preservation (issue #201)', () => {
       expect(requireLine).toContain('"body"');
     });
 
-    it('strips origin/rawBlock/originLabel from Bulwark rules when writing metadata', () => {
-      const bulwarkWithJunk: FilterRule = {
-        ...makeBulwarkRule(),
-        origin: 'bulwark',
+    it('strips origin/rawBlock/originLabel from OrdoNuntius rules when writing metadata', () => {
+      const ordoNuntiusWithJunk: FilterRule = {
+        ...makeOrdoNuntiusRule(),
+        origin: 'ordo-nuntius',
         originLabel: 'shouldnotbehere',
         rawBlock: 'shouldnotbehere',
       };
-      const script = generateScript([bulwarkWithJunk]);
+      const script = generateScript([ordoNuntiusWithJunk]);
       const match = script.match(/@metadata:begin\n(.*)\n@metadata:end/);
       const metadata = JSON.parse(match![1]);
       expect(metadata.rules[0]).not.toHaveProperty('origin');
@@ -175,11 +175,11 @@ describe('external rule preservation (issue #201)', () => {
         origin: 'external',
         rawBlock: '# ext\nif header :is "From" "x@y" { keep; }',
       };
-      const script = generateScript([makeBulwarkRule(), ext]);
+      const script = generateScript([makeOrdoNuntiusRule(), ext]);
       const match = script.match(/@metadata:begin\n(.*)\n@metadata:end/);
       const metadata = JSON.parse(match![1]);
       expect(metadata.rules).toHaveLength(1);
-      expect(metadata.rules[0].name).toBe('Bulwark Rule');
+      expect(metadata.rules[0].name).toBe('OrdoNuntius Rule');
     });
   });
 
@@ -189,19 +189,19 @@ describe('external rule preservation (issue #201)', () => {
       'utf-8',
     );
 
-    it('identifies Bulwark, Roundcube, Nextcloud, External, and opaque rules', () => {
+    it('identifies OrdoNuntius, Roundcube, Nextcloud, External, and opaque rules', () => {
       const result = parseScript(fixture);
 
       expect(result.isOpaque).toBe(false);
       expect(result.vacation).toBeUndefined();
 
       const byOrigin = {
-        bulwark: result.rules.filter(r => !r.origin || r.origin === 'bulwark'),
+        ordoNuntius: result.rules.filter(r => !r.origin || r.origin === 'ordo-nuntius'),
         external: result.rules.filter(r => r.origin === 'external'),
         opaque: result.rules.filter(r => r.origin === 'opaque'),
       };
 
-      expect(byOrigin.bulwark).toHaveLength(2);
+      expect(byOrigin.ordoNuntius).toHaveLength(2);
       expect(byOrigin.external.length).toBeGreaterThanOrEqual(3);
       expect(byOrigin.opaque).toHaveLength(1);
 
@@ -224,7 +224,7 @@ describe('external rule preservation (issue #201)', () => {
       expect(regenerated).toContain(':comparator "i;ascii-numeric"');
       // Require tokens from the external content are preserved.
       expect(regenerated).toContain('"relational"');
-      // Bulwark rules are still present.
+      // OrdoNuntius rules are still present.
       expect(regenerated).toContain('# Rule: Archive newsletters');
     });
   });
@@ -246,14 +246,14 @@ describe('external rule preservation (issue #201)', () => {
       expect(names).toContain('VIP');
     });
 
-    it('does not destroy external rules when Bulwark regenerates after an edit', () => {
-      const initial = `${generateScript([makeBulwarkRule({ name: 'Mine' })])}\n# rule:[Untouchable]\nif header :is "X-Spam" "yes" {\n    discard;\n}\n`;
+    it('does not destroy external rules when OrdoNuntius regenerates after an edit', () => {
+      const initial = `${generateScript([makeOrdoNuntiusRule({ name: 'Mine' })])}\n# rule:[Untouchable]\nif header :is "X-Spam" "yes" {\n    discard;\n}\n`;
 
       const parsed = parseScript(initial);
       const externalBefore = parsed.rules.filter(r => r.origin === 'external');
       expect(externalBefore).toHaveLength(1);
 
-      // Simulate a user edit - update the Bulwark rule name
+      // Simulate a user edit - update the OrdoNuntius rule name
       const edited = parsed.rules.map(r => (r.origin === 'external' || r.origin === 'opaque' ? r : { ...r, name: 'Mine (edited)' }));
       const regenerated = generateScript(edited, parsed.vacation, { externalRequires: parsed.externalRequires });
       const reparsed = parseScript(regenerated);
@@ -317,8 +317,8 @@ describe('external rule preservation (issue #201)', () => {
     });
 
     it('round-trips a Nextcloud region verbatim through parse → generate → parse', () => {
-      const bulwark = makeBulwarkRule({ name: 'Test' });
-      const initial = `${generateScript([bulwark])}\n${nextcloudScript}`;
+      const ordoNuntius = makeOrdoNuntiusRule({ name: 'Test' });
+      const initial = `${generateScript([ordoNuntius])}\n${nextcloudScript}`;
 
       const parsed = parseScript(initial);
       const regenerated = generateScript(parsed.rules, parsed.vacation, {
@@ -339,8 +339,8 @@ describe('external rule preservation (issue #201)', () => {
     });
 
     it('does not emit duplicate "External rules" headers across repeated saves', () => {
-      const bulwark = makeBulwarkRule({ name: 'Test' });
-      const initial = `${generateScript([bulwark])}\n${nextcloudScript}`;
+      const ordoNuntius = makeOrdoNuntiusRule({ name: 'Test' });
+      const initial = `${generateScript([ordoNuntius])}\n${nextcloudScript}`;
 
       let script = initial;
       for (let i = 0; i < 3; i++) {
@@ -350,7 +350,7 @@ describe('external rule preservation (issue #201)', () => {
         });
       }
 
-      const headerCount = (script.match(/# --- External rules \(managed outside Bulwark\) ---/g) || []).length;
+      const headerCount = (script.match(/# --- External rules \(managed outside OrdoNuntius\) ---/g) || []).length;
       expect(headerCount).toBe(1);
     });
   });

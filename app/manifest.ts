@@ -35,7 +35,7 @@ export default function manifest(): ExtendedManifest {
   const backgroundColor = process.env.PWA_BACKGROUND_COLOR || "#ffffff";
 
   // If PWA_ICON_URL or FAVICON_URL is configured, serve dynamically resized PNGs
-  // via /api/pwa-icon/[size]. Otherwise fall back to the default Bulwark PNGs.
+  // via /api/pwa-icon/[size]. Otherwise fall back to the default OrdoNuntius PNGs.
   const hasCustomIcon = !!(process.env.PWA_ICON_URL || process.env.FAVICON_URL);
 
   const icons: MetadataRoute.Manifest["icons"] = hasCustomIcon

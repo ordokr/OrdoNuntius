@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     if (body.action === 'set-consent') {
       if (source === 'env') {
         return NextResponse.json(
-          { error: 'consent is overridden by BULWARK_TELEMETRY env var' },
+          { error: 'consent is overridden by ORDO_NUNTIUS_TELEMETRY env var' },
           { status: 409 },
         );
       }

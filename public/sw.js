@@ -1,6 +1,6 @@
 /* eslint-disable no-undef */
 
-// Bulwark service worker.
+// OrdoNuntius service worker.
 //
 // This SW does two jobs:
 //   1. Satisfy the PWA installability requirement (network-only fetch handler,
@@ -134,7 +134,7 @@ async function handlePush(event) {
 
   let title;
   let body;
-  let tag = "bulwark-mail";
+  let tag = "ordo-nuntius-mail";
   let data = { kind: "mail-list" };
 
   if (email) {
@@ -142,7 +142,7 @@ async function handlePush(event) {
     const senderName = (sender && sender.name) || (sender && sender.email) || "New mail";
     title = senderName + (accountLabel ? ` (${accountLabel})` : "");
     body = email.subject || email.preview || "(no subject)";
-    tag = "bulwark-mail:" + email.id;
+    tag = "ordo-nuntius-mail:" + email.id;
     data = {
       kind: "email",
       emailId: email.id,
@@ -265,9 +265,9 @@ async function handleOpenMailtoInClient(event) {
 
 async function showMailtoFocusNotification(state) {
   try {
-    await self.registration.showNotification(state.focusNotificationTitle || "Bulwark", {
-      body: state.focusNotificationBody || "The request was opened in Bulwark. Click to bring it to the front.",
-      tag: "bulwark-mailto-focus",
+    await self.registration.showNotification(state.focusNotificationTitle || "OrdoNuntius", {
+      body: state.focusNotificationBody || "The request was opened in OrdoNuntius. Click to bring it to the front.",
+      tag: "ordo-nuntius-mailto-focus",
       icon: `${BASE_PATH}/icon-192x192.png`,
       badge: `${BASE_PATH}/icon-192x192.png`,
       data: { kind: "protocol-mailto-focus" },

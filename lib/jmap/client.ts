@@ -5231,7 +5231,7 @@ export class JMAPClient implements IJMAPClient {
     }
 
     this.lastRateLimitNoticeAt = now;
-    window.dispatchEvent(new CustomEvent('bulwark:rate-limit-blocked', {
+    window.dispatchEvent(new CustomEvent('ordonuntius:rate-limit-blocked', {
       detail: { retryAfterMs },
     }));
   }

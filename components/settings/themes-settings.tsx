@@ -60,7 +60,7 @@ export function ThemesSettings() {
         {/* Default theme card */}
         <ThemeCard
           name="Default"
-          author="Bulwark"
+          author="OrdoNuntius"
           isActive={activeThemeId === null}
           isBuiltIn
           isDefault={!themePolicy.defaultThemeId}

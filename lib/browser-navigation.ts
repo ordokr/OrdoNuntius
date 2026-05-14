@@ -49,7 +49,7 @@ export function getPathPrefix(locale?: string): string {
 /**
  * Mount-prefix-aware wrapper around `fetch()`.
  *
- * When Bulwark is served behind a reverse proxy at a sub-path (e.g. `/bulwark`),
+ * When OrdoNuntius is served behind a reverse proxy at a sub-path (e.g. `/ordoNuntius`),
  * `fetch('/api/foo')` would target the browser origin at `/api/foo`, which the
  * proxy doesn't route. `apiFetch` detects the mount prefix from
  * `window.location.pathname` via `getPathPrefix()` at call time, so the same

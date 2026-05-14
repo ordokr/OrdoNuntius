@@ -118,17 +118,9 @@ export function TelemetryTab() {
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold">Anonymous Usage Stats</h1>
         <p className="text-sm text-muted-foreground">
-          Bulwark sends one anonymous heartbeat per day so we can see how many instances are
-          running, on what platforms, and which features they use. <strong>Enabled by default</strong>;
-          one click below disables it. No email addresses, no hostnames, no IPs are sent.{' '}
-          <a
-            href="https://bulwarkmail.org/docs/legal/privacy/telemetry"
-            target="_blank"
-            rel="noreferrer"
-            className="underline inline-flex items-center gap-1"
-          >
-            Full schema and policy <ExternalLink className="h-3 w-3" />
-          </a>
+          OrdoNuntius does not phone home. Telemetry is <strong>disabled by default</strong> and
+          ships with no default endpoint. An operator who wants to point telemetry at a
+          self-hosted endpoint can configure it here.
         </p>
       </header>
 
@@ -141,7 +133,7 @@ export function TelemetryTab() {
               {status.consent === 'on' && 'Heartbeats are enabled (default).'}
               {status.consent === 'off' && 'Heartbeats are off.'}
               {envOverridden && (
-                <> Locked by <code>BULWARK_TELEMETRY</code> env var.</>
+                <> Locked by <code>ORDO_NUNTIUS_TELEMETRY</code> env var.</>
               )}
             </div>
           </div>
@@ -193,7 +185,7 @@ export function TelemetryTab() {
         <div className="font-medium">Endpoint</div>
         <p className="text-sm text-muted-foreground">
           Where heartbeats are sent. Defaults to the project&apos;s collector. Point at your own collector
-          (open source at <code>bulwarkmail/dashboard</code>) or clear this field to disable sending.
+          (open source at <code>ordokr/OrdoNuntius</code>) or clear this field to disable sending.
         </p>
         <div className="flex flex-col sm:flex-row gap-2">
           <input

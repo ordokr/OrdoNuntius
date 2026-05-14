@@ -1,5 +1,6 @@
-// Update-status payload returned by the version server. Mirrors
-// repos/dashboard/version-server/src/registry.ts LookupResult.
+// Update-status payload returned by the version server.
+// OrdoNuntius does NOT poll for updates: the scheduler is disabled at boot
+// (see instrumentation.node.ts) and DEFAULT_VERSION_ENDPOINT is empty.
 
 export type UpdateSeverity = 'normal' | 'security' | 'deprecated' | 'none' | 'unknown';
 
@@ -22,4 +23,4 @@ export interface VersionCheckStateFile {
   status: UpdateStatus | null;
 }
 
-export const DEFAULT_VERSION_ENDPOINT = 'https://version.telemetry.bulwarkmail.org/';
+export const DEFAULT_VERSION_ENDPOINT = '';

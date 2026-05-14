@@ -1,9 +1,9 @@
 import type { ParsedMailto } from "./mailto";
 import type { ParsedWebcal } from "./webcal";
 
-const MAILTO_KEY = "bulwark:pending-mailto";
-const WEBCAL_KEY = "bulwark:pending-webcal";
-const PROTOCOL_CHANNEL = "bulwark:protocol-handlers";
+const MAILTO_KEY = "ordonuntius:pending-mailto";
+const WEBCAL_KEY = "ordonuntius:pending-webcal";
+const PROTOCOL_CHANNEL = "ordonuntius:protocol-handlers";
 const PENDING_TTL_MS = 5 * 60 * 1000;
 const MAILTO_REQUEST = "mailto-request";
 const MAILTO_CANDIDATE = "mailto-candidate";
@@ -11,8 +11,8 @@ const MAILTO_ACK = "mailto-ack";
 const OPEN_MAILTO_IN_CLIENT = "open-mailto-in-client";
 const MAILTO_CLIENT_READY = "mailto-client-ready";
 const MAILTO_CLIENT_GONE = "mailto-client-gone";
-const PENDING_MAILTO_EVENT = "bulwark:pending-mailto";
-const PENDING_WEBCAL_EVENT = "bulwark:pending-webcal";
+const PENDING_MAILTO_EVENT = "ordonuntius:pending-mailto";
+const PENDING_WEBCAL_EVENT = "ordonuntius:pending-webcal";
 
 type PendingValue<T> = T & { createdAt: number };
 type PendingMailtoRequest = { type: typeof MAILTO_REQUEST; id: string; value: ParsedMailto; clientId?: string };

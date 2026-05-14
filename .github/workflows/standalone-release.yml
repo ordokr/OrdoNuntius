@@ -42,14 +42,14 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           VERSION="${REF_NAME#v}"
-          TARBALL="bulwark-standalone-${VERSION}-linux-${ARCH}.tar.gz"
+          TARBALL="ordo-nuntius-standalone-${VERSION}-linux-${ARCH}.tar.gz"
 
-          mkdir -p bulwark-standalone
-          cp -r .next/standalone/. bulwark-standalone/
-          cp -r .next/static bulwark-standalone/.next/static
-          cp -r public bulwark-standalone/public
+          mkdir -p ordo-nuntius-standalone
+          cp -r .next/standalone/. ordo-nuntius-standalone/
+          cp -r .next/static ordo-nuntius-standalone/.next/static
+          cp -r public ordo-nuntius-standalone/public
 
-          tar -czf "$TARBALL" bulwark-standalone/
+          tar -czf "$TARBALL" ordo-nuntius-standalone/
           echo "TARBALL=$TARBALL" >> "$GITHUB_ENV"
 
       - name: Upload release asset

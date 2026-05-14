@@ -137,12 +137,12 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
   },
 
   addRule: (rule) => {
-    // Insert new bulwark rules before external/opaque rules so Bulwark's
+    // Insert new ordoNuntius rules before external/opaque rules so OrdoNuntius's
     // managed section stays contiguous.
     set((state) => {
-      const bulwark = state.rules.filter(r => !r.origin || r.origin === 'bulwark');
+      const ordoNuntius = state.rules.filter(r => !r.origin || r.origin === 'ordo-nuntius');
       const external = state.rules.filter(r => r.origin === 'external' || r.origin === 'opaque');
-      return { rules: [...bulwark, rule, ...external] };
+      return { rules: [...ordoNuntius, rule, ...external] };
     });
   },
 
@@ -166,14 +166,14 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
   },
 
   reorderRules: (ruleIds) => {
-    // Only reorder bulwark rules; external rules always stay at the end in
+    // Only reorder ordoNuntius rules; external rules always stay at the end in
     // their original order.
     set((state) => {
-      const bulwarkMap = new Map(
-        state.rules.filter(r => !r.origin || r.origin === 'bulwark').map(r => [r.id, r]),
+      const ordoNuntiusMap = new Map(
+        state.rules.filter(r => !r.origin || r.origin === 'ordo-nuntius').map(r => [r.id, r]),
       );
       const external = state.rules.filter(r => r.origin === 'external' || r.origin === 'opaque');
-      const reordered = ruleIds.map(id => bulwarkMap.get(id)).filter(Boolean) as FilterRule[];
+      const reordered = ruleIds.map(id => ordoNuntiusMap.get(id)).filter(Boolean) as FilterRule[];
       return { rules: [...reordered, ...external] };
     });
   },

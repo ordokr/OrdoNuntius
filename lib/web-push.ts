@@ -6,18 +6,20 @@
 
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
 
-const DEVICE_CLIENT_ID_KEY = 'bulwark.push.deviceClientId.v1';
-const SUBSCRIPTION_ID_KEY = 'bulwark.push.subscriptionId.v1';
+const DEVICE_CLIENT_ID_KEY = 'ordonuntius.push.deviceClientId.v1';
+const SUBSCRIPTION_ID_KEY = 'ordonuntius.push.subscriptionId.v1';
 
 const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/+$/, '');
 const SW_SCOPE = `${BASE_PATH}/`;
 const SW_URL = `${BASE_PATH}/sw.js`;
 
-// Hosted relay so self-hosters don't need their own VAPID + Firebase setup.
-// Override at build time via NEXT_PUBLIC_PUSH_RELAY_URL or at runtime by
-// calling enableWebPush({ relayBaseUrl }) from the settings UI.
+// OrdoNuntius ships with no default Web Push relay. An operator who wants
+// browser push notifications must point NEXT_PUBLIC_PUSH_RELAY_URL at their
+// own relay (or call enableWebPush({ relayBaseUrl }) from the settings UI).
+// Empty default means push is opt-in, not silently routed through a
+// third-party relay.
 export const DEFAULT_RELAY_BASE_URL =
-  process.env.NEXT_PUBLIC_PUSH_RELAY_URL || 'https://notifications.relay.bulwarkmail.org';
+  process.env.NEXT_PUBLIC_PUSH_RELAY_URL || '';
 
 // Match the mobile app's lifetime hint. The JMAP server may clamp this down.
 const SUBSCRIPTION_EXPIRES_DAYS = 90;

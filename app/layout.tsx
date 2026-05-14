@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 
 export async function generateMetadata(): Promise<Metadata> {
   await configManager.ensureLoaded();
-  const faviconUrl = configManager.get<string>("faviconUrl", "/branding/Bulwark_Favicon.svg");
+  const faviconUrl = configManager.get<string>("faviconUrl", "/branding/OrdoNuntius_Favicon.svg");
 
   return {
     title: process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Webmail",

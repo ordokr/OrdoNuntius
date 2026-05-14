@@ -1,5 +1,7 @@
-// Schema v1 of the anonymous heartbeat. Documented at
-// https://bulwarkmail.org/docs/legal/privacy/telemetry
+// Schema v1 of the anonymous heartbeat.
+// OrdoNuntius does NOT phone home: the scheduler is disabled at boot
+// (see instrumentation.node.ts) and DEFAULT_ENDPOINT is empty. The types
+// and API routes remain so the admin UI can render a "disabled" state.
 
 export type ConsentState = 'pending' | 'on' | 'off';
 
@@ -44,4 +46,4 @@ export interface TelemetryStateFile {
   nextScheduledAt: string | null;
 }
 
-export const DEFAULT_ENDPOINT = 'https://telemetry.bulwarkmail.org/v1/heartbeat';
+export const DEFAULT_ENDPOINT = '';

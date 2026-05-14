@@ -23,7 +23,14 @@ const METADATA_END = '@metadata:end */';
 
 const NEXTCLOUD_BLOCK_MARKER = "### Nextcloud Mail: Filters ### DON'T EDIT ###";
 
-const BULWARK_EXTERNAL_HEADER_RE =
+const ORDO_NUNTIUS_EXTERNAL_HEADER_RE =
+  /^[ \t]*#[ \t]*---[ \t]*External rules \(managed outside OrdoNuntius\)[ \t]*---[ \t]*\r?\n/m;
+
+// Backward-compat: sieve scripts written by upstream Bulwark carry the old
+// marker. Recognize it on read so existing user scripts keep parsing; the
+// generator only writes the new OrdoNuntius marker, so any re-saved script
+// converges on the new form.
+const LEGACY_BULWARK_EXTERNAL_HEADER_RE =
   /^[ \t]*#[ \t]*---[ \t]*External rules \(managed outside Bulwark\)[ \t]*---[ \t]*\r?\n/m;
 
 const FIELD_FROM_HEADER: Record<string, FilterConditionField> = {
@@ -594,8 +601,10 @@ function extractNextcloudRegions(content: string): {
   return { cleaned, rules, requires };
 }
 
-function stripBulwarkExternalHeader(content: string): string {
-  return content.replace(BULWARK_EXTERNAL_HEADER_RE, '');
+function stripOrdoNuntiusExternalHeader(content: string): string {
+  return content
+    .replace(ORDO_NUNTIUS_EXTERNAL_HEADER_RE, '')
+    .replace(LEGACY_BULWARK_EXTERNAL_HEADER_RE, '');
 }
 
 function parseExternalRules(
@@ -660,41 +669,42 @@ export function parseScript(content: string): ParseResult {
     }
 
     // Scan the portion AFTER the metadata block for external rules. A prior
-    // Bulwark save may have emitted its "External rules" header here; strip
+    // OrdoNuntius save may have emitted its "External rules" header here; strip
     // it so it does not get re-attached to the first external rule's rawBlock
     // and written out twice on the next save.
-    const afterMetadata = stripBulwarkExternalHeader(
+    const afterMetadata = stripOrdoNuntiusExternalHeader(
       content.slice(endIdx + METADATA_END.length),
     );
     const nextcloud = extractNextcloudRegions(afterMetadata);
     const external = parseExternalRules(nextcloud.cleaned, 'ext');
 
-    // Parsed bulwark rules intentionally omit an explicit `origin` field so
-    // round-trip equality with metadata-only callers holds. Absence of origin
-    // is treated as 'bulwark' everywhere downstream.
-    const bulwarkRules: FilterRule[] = metadata.rules;
+    // OrdoNuntius-managed rules intentionally omit an explicit `origin` field
+    // so round-trip equality with metadata-only callers holds. Absence of
+    // origin is treated as the OrdoNuntius-managed default downstream.
+    const ordoNuntiusRules: FilterRule[] = metadata.rules;
 
     const externalRequires = [
       ...external.externalRequires,
       ...nextcloud.requires.filter(r => !external.externalRequires.includes(r)),
     ];
 
-    // Drop any external "rules" that are really the bulwark-managed if-blocks or vacation.
+    // Drop any external "rules" that are really OrdoNuntius-managed if-blocks
+    // or vacation entries (re-discovered after the metadata block).
     // Recognizable by the leading comment "# Rule: <name>" or "# Vacation auto-reply".
     const filteredExternal = external.rules.filter(r => {
       const raw = r.rawBlock || '';
       if (/#\s*Rule:\s*/.test(raw) && r.origin === 'external') {
-        // If the name matches a bulwark rule name exactly, treat as bulwark-emitted
+        // If the name matches an OrdoNuntius rule name exactly, treat as managed
         const match = raw.match(/#\s*Rule:\s*(.+?)\s*$/m);
         const name = match ? match[1].trim() : '';
-        if (bulwarkRules.some(b => b.name === name)) return false;
+        if (ordoNuntiusRules.some(b => b.name === name)) return false;
       }
       if (/#\s*Vacation auto-reply/i.test(raw)) return false;
       return true;
     });
 
     return {
-      rules: [...bulwarkRules, ...nextcloud.rules, ...filteredExternal],
+      rules: [...ordoNuntiusRules, ...nextcloud.rules, ...filteredExternal],
       isOpaque: false,
       vacation: metadata.vacation,
       externalRequires,

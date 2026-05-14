@@ -6,8 +6,8 @@ export function createDemoIdentities(): Identity[] {
       id: 'demo-identity-primary',
       name: 'Demo User',
       email: 'demo@example.com',
-      textSignature: 'Best regards,\nDemo User\nBulwark Mail Demo',
-      htmlSignature: '<p>Best regards,<br><b>Demo User</b><br>Bulwark Mail Demo</p>',
+      textSignature: 'Best regards,\nDemo User\nOrdoNuntius Demo',
+      htmlSignature: '<p>Best regards,<br><b>Demo User</b><br>OrdoNuntius Demo</p>',
       mayDelete: false,
     },
     {

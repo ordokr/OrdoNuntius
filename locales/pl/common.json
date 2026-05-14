@@ -136,18 +136,18 @@
   },
   "protocol_handlers": {
     "title": "Aplikacje domyślne",
-    "description": "Wybierz, czy linki e-mail i kalendarza mają otwierać się w Bulwark. Technicznie Bulwark rejestruje się jako obsługa protokołu dla linków mailto: i webcal:.",
+    "description": "Wybierz, czy linki e-mail i kalendarza mają otwierać się w OrdoNuntius. Technicznie OrdoNuntius rejestruje się jako obsługa protokołu dla linków mailto: i webcal:.",
     "unsupported": "Ta przeglądarka lub to połączenie nie obsługuje ręcznej rejestracji obsługi protokołu. Nadal możesz mieć możliwość użycia zainstalowanej aplikacji PWA w ustawieniach przeglądarki lub systemu.",
     "mailto_label": "Linki e-mail",
-    "mailto_description": "Otwiera linki mailto: w Bulwark z wstępnie wypełnionym edytorem wiadomości.",
+    "mailto_description": "Otwiera linki mailto: w OrdoNuntius z wstępnie wypełnionym edytorem wiadomości.",
     "protocol_open_mode_label": "Podczas otwierania linków protokołu",
-    "protocol_open_mode_description": "Wybierz, czy Bulwark ma otwierać linki mailto: i webcal: w nowej karcie, czy ponownie używać otwartej sesji. Opcja aktywnej sesji wymaga uprawnienia do powiadomień, aby można było kliknąć powiadomienie awaryjne i przenieść Bulwark na pierwszy plan, jeśli przeglądarka blokuje fokus.",
+    "protocol_open_mode_description": "Wybierz, czy OrdoNuntius ma otwierać linki mailto: i webcal: w nowej karcie, czy ponownie używać otwartej sesji. Opcja aktywnej sesji wymaga uprawnienia do powiadomień, aby można było kliknąć powiadomienie awaryjne i przenieść OrdoNuntius na pierwszy plan, jeśli przeglądarka blokuje fokus.",
     "protocol_open_mode_active_session": "Jeśli to możliwe, otwórz w aktywnej sesji",
     "protocol_open_mode_new_tab": "Zawsze otwieraj nową kartę",
-    "focus_notification_title": "Otwórz Bulwark",
-    "focus_notification_body": "Link został otwarty w Bulwark. Kliknij, aby przenieść okno na pierwszy plan.",
+    "focus_notification_title": "Otwórz OrdoNuntius",
+    "focus_notification_body": "Link został otwarty w OrdoNuntius. Kliknij, aby przenieść okno na pierwszy plan.",
     "webcal_label": "Linki kalendarza",
-    "webcal_description": "Otwiera linki webcal: w Bulwark z wstępnie wypełnionym oknem subskrypcji kalendarza.",
+    "webcal_description": "Otwiera linki webcal: w OrdoNuntius z wstępnie wypełnionym oknem subskrypcji kalendarza.",
     "register_mailto": "Zarejestruj aplikację e-mail",
     "register_webcal": "Zarejestruj aplikację kalendarza",
     "mailto_registered": "Zażądano rejestracji obsługi e-mail",
@@ -155,7 +155,7 @@
     "registration_failed": "Rejestracja obsługi protokołu nie powiodła się",
     "opening_mailto": "Otwieranie edytora...",
     "opening_webcal": "Otwieranie kalendarza...",
-    "browser_note": "Przeglądarka lub system operacyjny może poprosić o potwierdzenie i może wymagać zainstalowania Bulwark, zanim będzie można wybrać go jako aplikację domyślną.",
+    "browser_note": "Przeglądarka lub system operacyjny może poprosić o potwierdzenie i może wymagać zainstalowania OrdoNuntius, zanim będzie można wybrać go jako aplikację domyślną.",
     "select_account_title": "Wybierz konto",
     "select_mailto_account": "Wybierz konto, które ma otworzyć ten link e-mail.",
     "select_webcal_account": "Wybierz konto, które ma otworzyć ten link kalendarza.",
@@ -631,9 +631,9 @@
     "app_title": "Webmail",
     "reconnecting": "Utracono połączenie. Próba ponownego połączenia…",
     "rate_limited_title": "Uwierzytelnianie serwera jest tymczasowo ograniczone.",
-    "rate_limited_detail": "Bulwark wstrzymał żądania w tle, aby uniknąć blokady. Ponowna próba za {seconds}s.",
+    "rate_limited_detail": "OrdoNuntius wstrzymał żądania w tle, aby uniknąć blokady. Ponowna próba za {seconds}s.",
     "rate_limited_action_title": "Żądanie wstrzymane, aby uniknąć blokady.",
-    "rate_limited_action_detail": "Bulwark czeka na zakończenie okresu blokady serwera przed wysłaniem kolejnych uwierzytelnionych żądań. Spróbuj ponownie za {seconds}s."
+    "rate_limited_action_detail": "OrdoNuntius czeka na zakończenie okresu blokady serwera przed wysłaniem kolejnych uwierzytelnionych żądań. Spróbuj ponownie za {seconds}s."
   },
   "notifications": {
     "email_sent": "Wiadomość wysłana pomyślnie",
@@ -903,12 +903,12 @@
       "push": {
         "confirm_disable_message": "To urządzenie przestanie otrzymywać powiadomienia, gdy strona jest zamknięta.",
         "confirm_disable_title": "Wyłączyć powiadomienia w tle?",
-        "description": "Otrzymuj powiadomienia systemowe o nowych wiadomościach, gdy ta strona jest zamknięta. Dostarczane przez przekaźnik push Bulwark; przekaźnik nigdy nie widzi treści wiadomości.",
+        "description": "Otrzymuj powiadomienia systemowe o nowych wiadomościach, gdy ta strona jest zamknięta. Dostarczane przez przekaźnik push OrdoNuntius; przekaźnik nigdy nie widzi treści wiadomości.",
         "disable": "Wyłącz",
         "enable": "Włącz",
         "ios_hint": "W systemie iOS najpierw zainstaluj stronę na ekranie głównym – Safari dostarcza Web Push tylko zainstalowanym PWA.",
         "reenable": "Zarejestruj ponownie",
-        "relay_desc": "Domyślnie używa hostowanego przekaźnika Bulwark. Zmień tylko jeśli hostujesz samodzielnie.",
+        "relay_desc": "Domyślnie używa hostowanego przekaźnika OrdoNuntius. Zmień tylko jeśli hostujesz samodzielnie.",
         "relay_label": "Przekaźnik push",
         "relay_placeholder": "https://notifications.relay.example.com",
         "status_active": "Aktywne na tym urządzeniu",
@@ -1448,7 +1448,7 @@
         "button": "Importuj"
       },
       "about": {
-        "title": "Bulwark Webmail"
+        "title": "OrdoNuntius"
       }
     },
     "sidebar_apps": {
@@ -2643,7 +2643,7 @@
     "start_tour": "Rozpocznij przewodnik"
   },
   "demo_welcome": {
-    "title": "Witaj w Bulwark Mail",
+    "title": "Witaj w OrdoNuntius",
     "description": "Poznaj w pełni funkcjonalnego klienta poczty webowej - bezpośrednio w przeglądarce. Wszystkie dane pozostają na Twoim urządzeniu, więc możesz śmiało wszystko przetestować.",
     "feature_email": "Czytaj i pisz wiadomości e-mail",
     "feature_organize": "Etykiety, gwiazdki i foldery",

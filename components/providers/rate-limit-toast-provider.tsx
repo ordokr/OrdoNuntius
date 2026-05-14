@@ -22,8 +22,8 @@ export function RateLimitToastProvider({ children }: { children: React.ReactNode
       );
     };
 
-    window.addEventListener('bulwark:rate-limit-blocked', onRateLimitBlocked);
-    return () => window.removeEventListener('bulwark:rate-limit-blocked', onRateLimitBlocked);
+    window.addEventListener('ordonuntius:rate-limit-blocked', onRateLimitBlocked);
+    return () => window.removeEventListener('ordonuntius:rate-limit-blocked', onRateLimitBlocked);
   }, [tCommon]);
 
   return <>{children}</>;

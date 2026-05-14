@@ -48,7 +48,7 @@ export async function saveState(state: VersionCheckStateFile): Promise<void> {
 }
 
 export function disabledByEnv(): boolean {
-  const v = (process.env.BULWARK_UPDATE_CHECK ?? '').toLowerCase();
+  const v = (process.env.ORDO_NUNTIUS_UPDATE_CHECK ?? '').toLowerCase();
   if (v === 'off' || v === 'false' || v === '0' || v === 'no') return true;
   return false;
 }
@@ -56,7 +56,7 @@ export function disabledByEnv(): boolean {
 export function effectiveEndpoint(state: VersionCheckStateFile): string {
   // Env var wins over state file so an operator can override at runtime
   // without editing on-disk state. An explicit empty value disables the check.
-  const envUrl = process.env.BULWARK_UPDATE_CHECK_URL;
+  const envUrl = process.env.ORDO_NUNTIUS_UPDATE_CHECK_URL;
   if (envUrl !== undefined) return envUrl.trim();
   return state.endpoint || DEFAULT_VERSION_ENDPOINT;
 }

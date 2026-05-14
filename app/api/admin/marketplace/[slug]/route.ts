@@ -8,7 +8,9 @@ import {
 import JSZip from 'jszip';
 import { MAX_PLUGIN_SIZE, MAX_THEME_SIZE } from '@/lib/plugin-types';
 
-const DIRECTORY_URL = process.env.EXTENSION_DIRECTORY_URL || 'https://extensions.bulwarkmail.org';
+// No default extension directory. Operators who want to enable the
+// marketplace tab point EXTENSION_DIRECTORY_URL at their own directory.
+const DIRECTORY_URL = process.env.EXTENSION_DIRECTORY_URL || '';
 
 const MAX_PREVIEW_SOURCE_LEN = 100_000;
 

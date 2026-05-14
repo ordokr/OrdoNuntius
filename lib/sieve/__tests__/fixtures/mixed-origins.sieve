@@ -31,12 +31,12 @@ if header :contains "Subject" "[Support]" {
 # Nextcloud Mail - end
 
 # A handwritten rule without a tool-specific marker.
-# Bulwark should recognize this as generic "External" and preserve it.
+# OrdoNuntius should recognize this as generic "External" and preserve it.
 if not header :is "X-Spam-Status" "No" {
     fileinto "Junk";
 }
 
-# A rule using a Sieve construct Bulwark's visual editor does not understand.
+# A rule using a Sieve construct OrdoNuntius's visual editor does not understand.
 # It must survive round-trips verbatim, shown to the user as read-only.
 if header :value "ge" :comparator "i;ascii-numeric" "X-Priority" ["3"] {
     fileinto "LowPriority";

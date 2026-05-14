@@ -15,10 +15,10 @@ function statePath(): string { return path.join(getDir(), 'state.json'); }
 function idPath(): string { return path.join(getDir(), '.telemetry-id'); }
 
 function envOverride(): ConsentState | null {
-  const v = (process.env.BULWARK_TELEMETRY ?? '').toLowerCase();
+  const v = (process.env.ORDO_NUNTIUS_TELEMETRY ?? '').toLowerCase();
   if (v === 'off' || v === 'false' || v === '0' || v === 'no') return 'off';
-  if (process.env.BULWARK_TELEMETRY_DISABLED) {
-    const d = process.env.BULWARK_TELEMETRY_DISABLED.toLowerCase();
+  if (process.env.ORDO_NUNTIUS_TELEMETRY_DISABLED) {
+    const d = process.env.ORDO_NUNTIUS_TELEMETRY_DISABLED.toLowerCase();
     if (d === '1' || d === 'true' || d === 'yes') return 'off';
   }
   return null;
@@ -41,11 +41,13 @@ export async function getInstanceId(): Promise<string> {
   return fresh;
 }
 
-// Default consent is 'on' - telemetry is anonymous and enabled by default.
-// Admins can disable via the UI, the BULWARK_TELEMETRY env var, or by clearing
-// the endpoint. See https://bulwarkmail.org/docs/legal/privacy/telemetry.
+// Default consent is 'off' - OrdoNuntius does not phone home. The scheduler
+// is also disabled at boot in instrumentation.node.ts. Endpoint is empty
+// (see DEFAULT_ENDPOINT in ./types). An operator who wants to enable a
+// self-hosted telemetry endpoint can set both consent and endpoint via the
+// admin UI or the ORDO_NUNTIUS_TELEMETRY env var.
 const DEFAULTS: TelemetryStateFile = {
-  consent: 'on',
+  consent: 'off',
   endpoint: DEFAULT_ENDPOINT,
   consentedAt: null,
   lastSentAt: null,

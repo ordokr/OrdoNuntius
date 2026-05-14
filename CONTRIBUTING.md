@@ -1,28 +1,25 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="public/branding/Bulwark_Logo_with_Lettering_White_and_Color.svg" />
-  <source media="(prefers-color-scheme: light)" srcset="public/branding/Bulwark_Logo_with_Lettering_Dark_Color.svg" />
-  <img src="public/branding/Bulwark_Logo_with_Lettering_Dark_Color.svg" alt="Bulwark Webmail" width="280" />
+  <source media="(prefers-color-scheme: dark)" srcset="public/branding/OrdoNuntius_Logo_with_Lettering_White_and_Color.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="public/branding/OrdoNuntius_Logo_with_Lettering_Dark_Color.svg" />
+  <img src="public/branding/OrdoNuntius_Logo_with_Lettering_Dark_Color.svg" alt="OrdoNuntius" width="280" />
 </picture>
 
 </div>
 
-# Contributing to Bulwark Webmail
+# Contributing to OrdoNuntius
 
-We're writing the webmail we wanted in 2026 and didn't find. Modern protocol, modern tooling, modern UI. Not a SaaS. Not a startup. Not for sale.
+OrdoNuntius is the messenger client for OrdoEpistola — a JMAP-native webmail in the Ordo ecosystem, forked from [Bulwark Webmail](https://github.com/bulwarkmail/webmail). The Ordo adaptation layer is small today; most of the architecture and conventions documented below come from upstream Bulwark.
 
 If that resonates with you, we'd love your help. This guide covers how to get the project running, the conventions we follow, and how to land your first change.
 
-## Join the Community
+## Where to ask
 
-You don't need to be an expert to contribute. Whether you're setting up your dev environment for the first time, filing a bug, or translating a string, the Discord is the fastest way to get unstuck and meet the people working on this.
+OrdoNuntius is a small-team fork; we don't run our own community channels. Best places to ask:
 
-- **Get support** - real-time help with development hurdles
-- **Share ideas** - feature suggestions, design feedback, doc improvements
-- **Collaborate** - meet the team and other contributors
-
-[**Join the Bulwark Discord Server**](https://discord.gg/tYCujymGrT)
+- **OrdoNuntius questions** - open an issue at <https://github.com/ordokr/OrdoNuntius/issues>
+- **Upstream Bulwark questions** (anything we haven't touched, which is most of the code) - the upstream Bulwark Discord and issue tracker remain the best resource. See the upstream [Bulwark Webmail](https://github.com/bulwarkmail/webmail) repository.
 
 ---
 
@@ -33,8 +30,8 @@ You don't need to be an expert to contribute. Whether you're setting up your dev
 1. **Fork and clone** the repository:
 
    ```bash
-   git clone https://github.com/bulwarkmail/webmail.git
-   cd webmail
+   git clone https://github.com/ordokr/OrdoNuntius.git
+   cd OrdoNuntius
    ```
 
 2. **Install dependencies**:
@@ -203,7 +200,7 @@ webmail/
 - **Never commit secrets** — API keys, passwords, tokens, `.env*` files
 - **Sanitize user input** and email content
 - **Block external content** by default — privacy is the point
-- **Report vulnerabilities privately** to bulwark@rbm.systems, not via public issues
+- **Report vulnerabilities privately** to security@saltnlightllc.com, not via public issues
 
 ## Questions?
 

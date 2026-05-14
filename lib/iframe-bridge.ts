@@ -15,7 +15,7 @@ export function notifyParent(type: string, payload: Record<string, unknown> = {}
 
   const targetOrigin = PARENT_ORIGIN || '*';
   try {
-    window.parent.postMessage({ source: 'bulwark', type, ...payload }, targetOrigin);
+    window.parent.postMessage({ source: 'ordo-nuntius', type, ...payload }, targetOrigin);
   } catch {
     // Cross-origin postMessage may fail in restricted contexts
   }

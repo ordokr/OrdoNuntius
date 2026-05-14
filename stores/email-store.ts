@@ -1990,8 +1990,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         receivedAt: new Date().toISOString(),
         from: [{ name: "GitHub", email: "notifications@github.com" }],
         to: [{ email: "you@example.com" }],
-        subject: "[bulwark-webmail] New pull request #42: Add OAuth2 module",
-        preview: "dependabot[bot] opened a pull request in bulwarkmail/webmail. This PR adds a comprehensive authentication module with OAuth2 PKCE support...",
+        subject: "[ordo-nuntius] New pull request #42: Add OAuth2 module",
+        preview: "dependabot[bot] opened a pull request in ordokr/OrdoNuntius. This PR adds a comprehensive authentication module with OAuth2 PKCE support...",
         hasAttachment: false,
       },
       {
@@ -2068,8 +2068,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         receivedAt: new Date(Date.now() - 172800000).toISOString(),
         from: [{ name: "Vercel", email: "notifications@vercel.com" }],
         to: [{ email: "you@example.com" }],
-        subject: "Deployment successful: bulwark-webmail \u2192 Production",
-        preview: "Your project bulwark-webmail has been deployed to production. Build completed in 47s. All checks passed. Preview: https://bulwark-webmail.vercel.app...",
+        subject: "Deployment successful: ordo-nuntius \u2192 Production",
+        preview: "Your project ordo-nuntius has been deployed to production. Build completed in 47s. All checks passed. Preview: https://ordo-nuntius.vercel.app...",
         hasAttachment: false,
       },
       {
