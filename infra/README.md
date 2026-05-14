@@ -83,10 +83,15 @@ infra/
 
 ### Each release (operator)
 
+Use the local xtask runner — it gates `verify → build → pack` before the
+network roundtrip, so a broken release fails fast on your workstation
+instead of halfway through scp.
+
 ```sh
 # From the OrdoNuntius repo root, with ~/.ssh/config aliasing 'ordo-epistola'
 # to the email-lab box.
-infra/scripts/deploy-ec2.sh email-lab ordo-epistola
+npm run xtask -- release            # local gate only (no deploy)
+npm run xtask -- deploy email-lab   # release + scp + remote install
 
 # Then on the host:
 ssh ordo-epistola
@@ -96,6 +101,10 @@ sudo systemctl reload nginx
 # Run the canary checklist.
 cat /opt/ordonuntius/current/install/restart-canary-webmail.md
 ```
+
+`infra/scripts/deploy-ec2.sh` is still the underlying mechanism and may be
+invoked directly. The xtask wrapper adds the typecheck + lint + i18n test
+gate around it and is the canonical entry point.
 
 ## SSM parameters consumed
 

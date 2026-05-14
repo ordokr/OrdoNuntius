@@ -31,7 +31,8 @@
     "lint:fix": "next lint --fix",
     "test:translations": "vitest run lib/__tests__/translations.test.ts",
     "prepare": "husky",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "xtask": "node xtask/index.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.24",

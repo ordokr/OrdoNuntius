@@ -104,9 +104,10 @@ per-deploy canary checklist.
 
 **Layer 4:** Ordo-themed component library to standardize look-and-feel across the ecosystem.
 
-**CI:** Eventually replace operator-laptop `deploy-ec2.sh` with a GitHub Action
-that builds the Next.js standalone tarball and uploads to S3. Deferred until
-post-launch when deploy cadence justifies the pipeline.
+**CI:** Local xtask runner — see [`xtask/README.md`](./xtask/README.md). Run
+`npm run xtask -- release` to gate typecheck + lint + i18n + build + pack
+locally, `npm run xtask -- deploy email-lab` to release and ship to the
+email-lab EC2. No GitHub Actions — the shipping lane is operator-local.
 
 ---
 
