@@ -1,0 +1,149 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  OrdoNuntius additive AWS resources for the Salt & Light email lane. This
+  stack does NOT create an EC2 instance — OrdoNuntius is co-located on the
+  existing email-lab EC2 instance that already runs OrdoEpistola. The
+  template only adds:
+    1. An IAM managed policy granting the OrdoEpistola instance role
+       permission to read /saltnlight/webmail/<env>/* SSM parameters.
+    2. A CloudWatch log group for OrdoNuntius journal shipping.
+    3. CloudWatch alarms mirroring the OrdoEpistola alarm posture.
+  Attach the managed policy to the existing OrdoEpistola instance role out
+  of band (the IAM role ARN is an input parameter).
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [email-lab, staging, prod]
+    Default: email-lab
+    Description: Deployment environment — used as the SSM parameter prefix segment.
+
+  OrdoEpistolaInstanceRoleName:
+    Type: String
+    Description: Name of the existing IAM role attached to the email-lab EC2 instance.
+      The new managed policy is attached to this role so OrdoNuntius (running
+      on the same host) inherits SSM read access.
+
+  InstanceId:
+    Type: String
+    Description: ID of the existing OrdoEpistola EC2 instance that hosts OrdoNuntius.
+      Used as a dimension on the CloudWatch alarms.
+
+  AlertSnsTopicArn:
+    Type: String
+    Default: ''
+    Description: SNS topic ARN that receives alarm notifications. Optional —
+      if empty, alarms are created without notification routing and only show
+      in the console.
+
+Conditions:
+  HasAlertTopic: !Not [!Equals [!Ref AlertSnsTopicArn, '']]
+
+Resources:
+
+  ###########################################################################
+  # IAM — additive managed policy for the OrdoEpistola instance role
+  ###########################################################################
+
+  WebmailSsmReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub ordo-nuntius-${Environment}-ssm-read
+      Description: !Sub Read /saltnlight/webmail/${Environment}/* parameters from SSM.
+      Roles:
+        - !Ref OrdoEpistolaInstanceRoleName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+              - ssm:GetParametersByPath
+            Resource:
+              - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/saltnlight/webmail/${Environment}/*
+          - Effect: Allow
+            Action:
+              - kms:Decrypt
+            Resource: '*'
+            Condition:
+              StringEquals:
+                kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - logs:DescribeLogStreams
+            Resource:
+              - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/saltnlight/webmail/${Environment}/ordo-nuntius:*
+
+  ###########################################################################
+  # CloudWatch — log group for journalctl shipping
+  ###########################################################################
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /saltnlight/webmail/${Environment}/ordo-nuntius
+      RetentionInDays: 30
+
+  ###########################################################################
+  # CloudWatch — alarms (mirror OrdoEpistola alarm posture)
+  ###########################################################################
+
+  # Custom metric `OrdoNuntiusServiceActive` published by a unified
+  # cloudwatch-agent rule on the host. Value 1 when active, 0 when down.
+  # The publisher config lives in the unified-cloudwatch-agent config on
+  # the email-lab box, alongside the existing OrdoEpistola publisher.
+  ServiceInactiveAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ordonuntius-${Environment}-service-inactive
+      AlarmDescription: OrdoNuntius systemd unit is not active
+      Namespace: Saltnlight/Webmail
+      MetricName: OrdoNuntiusServiceActive
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref InstanceId
+        - Name: Environment
+          Value: !Ref Environment
+      Statistic: Minimum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: !If [HasAlertTopic, [!Ref AlertSnsTopicArn], !Ref 'AWS::NoValue']
+      OKActions:     !If [HasAlertTopic, [!Ref AlertSnsTopicArn], !Ref 'AWS::NoValue']
+
+  # Composite alarm: webmail is degraded when CPU is high AND the webmail
+  # systemd unit is down. CPU-only or service-only can be a transient.
+  # Mirrors `ordoepistola-email-lab-degraded`.
+  DegradedComposite:
+    Type: AWS::CloudWatch::CompositeAlarm
+    Properties:
+      AlarmName: !Sub ordonuntius-${Environment}-degraded
+      AlarmDescription: >-
+        Webmail is degraded — composite of high CPU AND service inactive.
+        The OrdoEpistola CPU alarm is reused as the CPU signal since both
+        services share the host.
+      AlarmRule: !Sub
+        - 'ALARM("${CpuAlarmName}") AND ALARM("${ServiceAlarmName}")'
+        - CpuAlarmName: !Sub ordoepistola-${Environment}-cpu-high
+          ServiceAlarmName: !Ref ServiceInactiveAlarm
+      ActionsEnabled: true
+      AlarmActions: !If [HasAlertTopic, [!Ref AlertSnsTopicArn], !Ref 'AWS::NoValue']
+      OKActions:     !If [HasAlertTopic, [!Ref AlertSnsTopicArn], !Ref 'AWS::NoValue']
+
+Outputs:
+  WebmailSsmReadPolicyArn:
+    Description: ARN of the managed policy granting SSM read for /saltnlight/webmail/<env>/*.
+    Value: !Ref WebmailSsmReadPolicy
+
+  LogGroupName:
+    Description: CloudWatch log group for OrdoNuntius journal shipping.
+    Value: !Ref LogGroup
+
+  SsmPrefix:
+    Description: SSM parameter prefix the install script reads.
+    Value: !Sub /saltnlight/webmail/${Environment}

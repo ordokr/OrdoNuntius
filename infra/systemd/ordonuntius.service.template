@@ -1,0 +1,51 @@
+# /etc/systemd/system/ordonuntius.service
+#
+# OrdoNuntius — Next.js standalone Node service.
+# Rendered from this template by install-ordo-nuntius.sh:
+#   __NODE__       absolute path to node binary (e.g. /usr/bin/node)
+#   __APP_DIR__    install directory (e.g. /opt/ordonuntius/current)
+#   __USER__       system user (ordonuntius)
+#   __GROUP__      system group (ordonuntius)
+#   __ENV_FILE__   environment file rendered from SSM (e.g. /etc/ordonuntius/ordonuntius.env)
+#   __LOG_DIR__    log directory (e.g. /var/log/ordonuntius)
+
+[Unit]
+Description=OrdoNuntius webmail (Next.js standalone)
+Documentation=https://github.com/ordokr/OrdoNuntius
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__GROUP__
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__ENV_FILE__
+ExecStart=__NODE__ __APP_DIR__/server.js
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+
+# Stdout/stderr to systemd-journal. CloudWatch shipping is configured
+# separately via the awslogs / unified-cloudwatch-agent path on this host.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ordonuntius
+
+# Hardening — matches the OrdoEpistola unit posture.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+ReadWritePaths=__LOG_DIR__ /var/lib/ordonuntius
+
+[Install]
+WantedBy=multi-user.target

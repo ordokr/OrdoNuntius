@@ -88,13 +88,25 @@ npm run dev
 
 ## Roadmap
 
-**Layer 1 (done):** Rebrand — package metadata, manifest defaults, README, NOTICE, fork lineage.
+**Layer 1 (done):** Rebrand — package metadata, manifest defaults, README, NOTICE, fork lineage, Bulwark Docker packaging removed in favor of native systemd on EC2.
 
-**Layer 2 (next):** OrdoEpistola JMAP `x:` extension support — surface admin features unique to the OrdoEpistola fork (`x:BlockedIp`, `x:Domain` management, etc.).
+**AWS launch (Salt & Light email-lab):** Webmail co-located with OrdoEpistola
+on the email-lab EC2 at `mail.saltnlightllc.com`. nginx terminates TLS and
+routes JMAP/.well-known/dav/metrics to OrdoEpistola on loopback :8443;
+everything else to the Next.js standalone server on :3000. See
+[`infra/README.md`](./infra/README.md) for the deploy procedure and the
+[`infra/runbooks/`](./infra/runbooks) for the nginx cutover and the
+per-deploy canary checklist.
 
-**Layer 3 (later):** Shared authentication with OrdoAffine via OAuth/OIDC; cross-app navigation.
+**Layer 2:** OrdoEpistola JMAP `x:` extension support — surface admin features unique to the OrdoEpistola fork (`x:BlockedIp`, `x:Domain` management, etc.).
 
-**Layer 4 (longer-term):** Ordo-themed component library to standardize look-and-feel across the ecosystem.
+**Layer 3:** Shared authentication with OrdoAffine via OAuth/OIDC; cross-app navigation.
+
+**Layer 4:** Ordo-themed component library to standardize look-and-feel across the ecosystem.
+
+**CI:** Eventually replace operator-laptop `deploy-ec2.sh` with a GitHub Action
+that builds the Next.js standalone tarball and uploads to S3. Deferred until
+post-launch when deploy cadence justifies the pipeline.
 
 ---
 
