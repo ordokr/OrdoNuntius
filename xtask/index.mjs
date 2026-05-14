@@ -72,7 +72,10 @@ See xtask/README.md for the gate contract.
 function verify() {
     section("verify");
     runStep("typecheck", "npx", ["tsc", "--noEmit"]);
-    runStep("lint",      "npx", ["next", "lint"]);
+    // Match the husky pre-commit invocation. `next lint` was removed/broken
+    // in Next 16 — eslint directly is the working path. The eslint config
+    // (eslint.config.mjs) ignores xtask/, .next/, dist/, e2e/, etc.
+    runStep("lint",      "npx", ["eslint", ".", "--ext", ".ts,.tsx"]);
     runStep("test:translations", "npx",
         ["vitest", "run", "lib/__tests__/translations.test.ts"]);
 }
@@ -127,8 +130,10 @@ function pack(restArgs = []) {
         node: process.version,
     }, null, 2));
 
+    // --force-local: stop GNU tar from interpreting "C:\..." as host:path
+    // (Windows-only quirk; harmless on Linux/macOS GNU tar).
     runStep("tar", "tar",
-        ["-czf", outfile, "-C", stage, "."]);
+        ["--force-local", "-czf", outfile, "-C", stage, "."]);
     rmSync(stage, { recursive: true, force: true });
 
     const size = (statSync(outfile).size / 1024 / 1024).toFixed(1);
