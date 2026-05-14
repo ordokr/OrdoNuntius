@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promises as dns } from "node:dns";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist");
@@ -20,7 +21,7 @@ const args = process.argv.slice(2);
 const command = args[0] || "help";
 
 const COMMANDS = {
-    help, verify, build, pack, release, deploy,
+    help, verify, build, pack, release, deploy, "check-dns": checkDns,
 };
 
 main();
@@ -59,6 +60,10 @@ Commands:
   deploy <env> [ssh-alias]        release + scp + remote install
                                   env: email-lab | staging | prod
                                   ssh-alias default: ordo-epistola
+  check-dns [mail-domain] [host]  verify SES outbound DNS (SPF, DMARC, DKIM,
+                                  MX) for the Salt & Light mail lane.
+                                  default mail-domain: saltnlightllc.com
+                                  default host:        mail.saltnlightllc.com
 
 See xtask/README.md for the gate contract.
 `);
@@ -184,5 +189,118 @@ function gitShortSha() {
             .toString().trim();
     } catch {
         return "unknown";
+    }
+}
+
+// ---------------------------------------------------------------------------
+// check-dns — verify SES outbound DNS posture
+// ---------------------------------------------------------------------------
+
+async function checkDns(restArgs = []) {
+    const mailDomain = restArgs[0] || "saltnlightllc.com";
+    const mailHost   = restArgs[1] || `mail.${mailDomain}`;
+    section(`check-dns ${mailDomain} (host: ${mailHost})`);
+
+    const results = [];
+    const record = (name, ok, detail) => {
+        results.push({ name, ok, detail });
+        const tag = ok === true ? "ok  " : ok === null ? "skip" : "FAIL";
+        console.log(`  ${tag} ${name}: ${detail}`);
+    };
+
+    // 1. MX -> mail host
+    try {
+        const mx = await dns.resolveMx(mailDomain);
+        const hosts = mx.map((r) => r.exchange.replace(/\.$/, ""));
+        const hasTarget = hosts.some((h) => h === mailHost);
+        record("MX",
+            hasTarget,
+            hasTarget ? `${hosts.join(", ")}` : `expected ${mailHost}, got [${hosts.join(", ")}]`);
+    } catch (e) {
+        record("MX", false, `lookup failed: ${e.code || e.message}`);
+    }
+
+    // 2. SPF (apex TXT containing v=spf1 ... amazonses.com ... -all/~all)
+    try {
+        const txt = (await dns.resolveTxt(mailDomain)).map((parts) => parts.join(""));
+        const spf = txt.find((s) => s.startsWith("v=spf1"));
+        if (!spf) {
+            record("SPF", false, "no v=spf1 record on apex");
+        } else {
+            const includes = spf.includes("amazonses.com");
+            const strict = /[\s]-all\b/.test(spf);
+            record("SPF",
+                includes && strict,
+                strict ? spf : `${spf}  (missing -all)`);
+        }
+    } catch (e) {
+        record("SPF", false, `lookup failed: ${e.code || e.message}`);
+    }
+
+    // 3. DMARC (_dmarc.<domain> TXT with v=DMARC1 and p=quarantine|reject)
+    try {
+        const txt = (await dns.resolveTxt(`_dmarc.${mailDomain}`)).map((p) => p.join(""));
+        const dmarc = txt.find((s) => s.startsWith("v=DMARC1"));
+        if (!dmarc) {
+            record("DMARC", false, "no v=DMARC1 record at _dmarc");
+        } else {
+            const policy = (dmarc.match(/\bp=([a-zA-Z]+)/) || [, "none"])[1];
+            const adequate = policy === "quarantine" || policy === "reject";
+            record("DMARC",
+                adequate,
+                adequate ? dmarc : `p=${policy} (recommend quarantine or reject)`);
+        }
+    } catch (e) {
+        record("DMARC", false, `lookup failed: ${e.code || e.message}`);
+    }
+
+    // 4. DKIM tokens (SES Easy DKIM publishes 3 CNAMEs of the form
+    //    <token>._domainkey.<domain> -> <token>.dkim.amazonses.com).
+    //    We can't enumerate tokens blindly; instead, query the 3 SES-issued
+    //    tokens that the operator should supply. If unset, just probe whether
+    //    ANY <something>._domainkey CNAMEs exist by trying the first character
+    //    of each base32 alphabet — too noisy. Instead, document and skip.
+    const tokens = (process.env.SES_DKIM_TOKENS || "").split(",")
+        .map((t) => t.trim()).filter(Boolean);
+    if (tokens.length === 0) {
+        record("DKIM",
+            null,
+            "SKIP — set SES_DKIM_TOKENS=t1,t2,t3 (from SES console) to check");
+    } else {
+        let ok = true; const detail = [];
+        for (const token of tokens) {
+            try {
+                const cname = await dns.resolveCname(`${token}._domainkey.${mailDomain}`);
+                const target = (cname[0] || "").replace(/\.$/, "");
+                const expected = `${token}.dkim.amazonses.com`;
+                if (target !== expected) {
+                    ok = false;
+                    detail.push(`${token}: -> ${target} (expected ${expected})`);
+                } else {
+                    detail.push(`${token}: ok`);
+                }
+            } catch (e) {
+                ok = false;
+                detail.push(`${token}: lookup failed (${e.code || e.message})`);
+            }
+        }
+        record("DKIM", ok, detail.join("; "));
+    }
+
+    // 5. A record for the mail host
+    try {
+        const a = await dns.resolve4(mailHost);
+        record("A", a.length > 0, a.join(", "));
+    } catch (e) {
+        record("A", false, `${mailHost} A lookup failed: ${e.code || e.message}`);
+    }
+
+    // Summary
+    const failed = results.filter((r) => r.ok === false).length;
+    const skipped = results.filter((r) => r.ok === null).length;
+    const passed = results.filter((r) => r.ok === true).length;
+    console.log(`\n  passed=${passed} failed=${failed} skipped=${skipped}`);
+    if (failed > 0) {
+        throw new Error("check-dns: one or more records failed");
     }
 }
