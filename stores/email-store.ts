@@ -336,18 +336,20 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const selectionValid = currentSelectedMailbox && mailboxes.some(m => m.id === currentSelectedMailbox);
       const loadingPatch = isInitialLoad ? { isLoading: false } : {};
       if (!selectionValid) {
-        // Find inbox in the primary account. Stalwart and some other JMAP
-        // backends do not always populate the `role` field even though the
-        // mailbox is functionally the inbox (RFC 8621 makes role optional
-        // and some setups omit it). Mirror the sidebar's lenient match —
-        // strict role first, name fallback second — so post-login we
-        // actually land on a populated mailbox instead of an empty
-        // "selectedMailbox=''" state that renders the inbox as
-        // "No messages found".
+        // Find inbox in the primary account. Mirror the sidebar's icon
+        // logic (`role === "inbox" || name.toLowerCase() === "inbox"`)
+        // so the auto-select and the visible folder list agree on which
+        // mailbox is the inbox. The name fallback runs regardless of
+        // whether `role` is null or some unexpected value, because some
+        // JMAP backends (Stalwart included, in certain account setups)
+        // omit or non-standardize the role field even when the mailbox
+        // is functionally the inbox. Without this, fetchMailboxes would
+        // leave selectedMailbox='' and the follow-up fetchEmails would
+        // query without a mailbox constraint, returning empty.
         const primary = mailboxes.filter(m => !m.isShared);
         const inboxMailbox =
           primary.find(m => m.role === 'inbox') ||
-          primary.find(m => m.role == null && /(^|[^a-z])inbox([^a-z]|$)/i.test(m.name || ''));
+          primary.find(m => (m.name || '').trim().toLowerCase() === 'inbox');
         if (inboxMailbox) {
           set({ mailboxes, selectedMailbox: inboxMailbox.id, ...loadingPatch });
         } else {
@@ -413,7 +415,18 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
       // When filtering by tag, omit the mailbox constraint so emails across
       // all folders that carry the tag are returned.
+      const t0 = performance.now();
       const result = await client.getEmails(selectedKeyword ? undefined : jmapMailboxId, accountId, emailsPerPage, 0, keywordFilter);
+      // Prod-visible breadcrumb. Triggered for every fetchEmails. If a
+      // user reports "inbox empty after login", the most recent line of
+      // this log tells us: which mailbox was queried, with what filter,
+      // and what came back. Cheap (one console line per ~3-sec user
+      // action) and easier than reading the JMAP wire log.
+      console.info(
+        `[fetchEmails] mailbox="${mailbox?.name ?? '<not-in-store>'}" id=${jmapMailboxId} ` +
+        `keyword=${selectedKeyword ?? '<none>'} acct=${accountId ?? '<primary>'} ` +
+        `-> ${result.emails.length}/${result.total} emails in ${Math.round(performance.now() - t0)}ms`,
+      );
       set({
         emails: result.emails,
         hasMoreEmails: result.hasMore,
