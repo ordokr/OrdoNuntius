@@ -5,6 +5,33 @@ import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import { generateUUID } from '@/lib/utils';
 import { debug } from '@/lib/debug';
 
+// Search index — lazy WeakMap cache of pre-lowercased name + emails per
+// contact. getAutocomplete walks every contact on every keystroke; without
+// this it allocates and lowercases the display name + every email address
+// per contact per call. WeakMap entries are GC'd automatically when a
+// contact is no longer referenced (e.g. after a refresh that swaps the
+// list), so no eviction is needed.
+interface ContactSearchIndex {
+  lowerName: string;
+  lowerEmails: readonly string[];
+}
+const _contactSearchIndex = new WeakMap<ContactCard, ContactSearchIndex>();
+
+function getContactSearchIndex(contact: ContactCard): ContactSearchIndex {
+  const cached = _contactSearchIndex.get(contact);
+  if (cached) return cached;
+  const lowerName = getContactDisplayName(contact).toLowerCase();
+  // Index-aligned with Object.values(contact.emails). Entries without an
+  // address get an empty string so callers can index directly without
+  // having to filter twice.
+  const lowerEmails: string[] = contact.emails
+    ? Object.values(contact.emails).map(e => e.address ? e.address.toLowerCase() : '')
+    : [];
+  const entry: ContactSearchIndex = { lowerName, lowerEmails };
+  _contactSearchIndex.set(contact, entry);
+  return entry;
+}
+
 export function getContactDisplayName(contact: ContactCard): string {
   if (contact.name) {
     // Try given + surname from components first
@@ -329,16 +356,23 @@ export const useContactStore = create<ContactStore>()(
 
         const lower = query.toLowerCase();
         const results: Array<{ name: string; email: string }> = [];
+        const MAX_RESULTS = 10;
 
         for (const contact of contacts) {
+          if (results.length >= MAX_RESULTS) break;
+
           if (contact.kind === 'group') {
-            const groupName = getContactDisplayName(contact);
-            if (groupName.toLowerCase().includes(lower)) {
+            // Lowercase the group name via the search index so we don't
+            // re-allocate on every keystroke.
+            const groupIdx = getContactSearchIndex(contact);
+            if (groupIdx.lowerName.includes(lower)) {
               const members = get().getGroupMembers(contact.id);
               for (const member of members) {
+                if (results.length >= MAX_RESULTS) break;
                 const memberName = getContactDisplayName(member);
                 const memberEmails = member.emails ? Object.values(member.emails) : [];
                 for (const emailEntry of memberEmails) {
+                  if (results.length >= MAX_RESULTS) break;
                   if (!emailEntry.address) continue;
                   results.push({ name: memberName, email: emailEntry.address });
                 }
@@ -347,20 +381,21 @@ export const useContactStore = create<ContactStore>()(
             continue;
           }
 
-          const name = getContactDisplayName(contact);
+          // Pre-lowercased name + emails (cached in WeakMap per contact).
+          const idx = getContactSearchIndex(contact);
+          const nameMatches = idx.lowerName.includes(lower);
           const emails = contact.emails ? Object.values(contact.emails) : [];
-
-          for (const emailEntry of emails) {
+          for (let i = 0; i < emails.length; i++) {
+            if (results.length >= MAX_RESULTS) break;
+            const emailEntry = emails[i];
             if (!emailEntry.address) continue;
-            if (
-              name.toLowerCase().includes(lower) ||
-              emailEntry.address.toLowerCase().includes(lower)
-            ) {
+            if (nameMatches || idx.lowerEmails[i]?.includes(lower)) {
+              // Compute the display name lazily — only when we have a hit,
+              // not for every contact we scan past.
+              const name = getContactDisplayName(contact);
               results.push({ name, email: emailEntry.address });
             }
           }
-
-          if (results.length >= 10) break;
         }
 
         return results;
@@ -378,14 +413,20 @@ export const useContactStore = create<ContactStore>()(
         const { contacts } = get();
         const group = contacts.find(c => c.id === groupId);
         if (!group?.members) return [];
-        const memberKeys = Object.keys(group.members).filter(k => group.members![k]);
-        // Normalize: strip urn:uuid: prefix for matching
-        const normalizedKeys = memberKeys.map(k => k.startsWith('urn:uuid:') ? k.slice(9) : k);
+        // Sets give O(1) membership checks. Was O(M × K) with two
+        // Array.includes per contact; now O(M + K).
+        const memberKeys = new Set(
+          Object.keys(group.members).filter(k => group.members![k])
+        );
+        const normalizedKeys = new Set<string>();
+        for (const k of memberKeys) {
+          normalizedKeys.add(k.startsWith('urn:uuid:') ? k.slice(9) : k);
+        }
         return contacts.filter(c => {
-          if (memberKeys.includes(c.id) || normalizedKeys.includes(c.id)) return true;
+          if (memberKeys.has(c.id) || normalizedKeys.has(c.id)) return true;
           if (c.uid) {
             const bareUid = c.uid.startsWith('urn:uuid:') ? c.uid.slice(9) : c.uid;
-            return memberKeys.includes(c.uid) || normalizedKeys.includes(bareUid);
+            return memberKeys.has(c.uid) || normalizedKeys.has(bareUid);
           }
           return false;
         });

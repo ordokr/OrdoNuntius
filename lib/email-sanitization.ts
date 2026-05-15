@@ -109,8 +109,15 @@ const HTML_ESCAPES: Record<string, string> = {
 };
 
 function escapeHtml(str: string): string {
-  return str.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+  return str.replace(ESCAPE_HTML_REGEX, (c) => HTML_ESCAPES[c]);
 }
+
+// Module-level compiled regexes — local `const re = /.../g` inside
+// hot functions recompiles per call in spec terms (V8 may cache, but
+// don't rely on it). plainTextToSafeHtml is called per inline email body
+// rendered, so this matters at mailbox-load time.
+const ESCAPE_HTML_REGEX = /[&<>"']/g;
+const URL_REGEX = /(https?:\/\/[^\s<>"']+)/g;
 
 /**
  * Render a plain-text email body as HTML, HTML-escaping all content and
@@ -119,12 +126,12 @@ function escapeHtml(str: string): string {
  * enforced even if escaping has bugs.
  */
 export function plainTextToSafeHtml(text: string, linkClass = ''): string {
-  const urlRegex = /(https?:\/\/[^\s<>"']+)/g;
+  URL_REGEX.lastIndex = 0; // /g regex carries state; reset before reuse
   const classAttr = linkClass ? ` class="${escapeHtml(linkClass)}"` : '';
   let result = '';
   let lastIndex = 0;
   let match: RegExpExecArray | null;
-  while ((match = urlRegex.exec(text)) !== null) {
+  while ((match = URL_REGEX.exec(text)) !== null) {
     result += escapeHtml(text.slice(lastIndex, match.index));
     const url = escapeHtml(match[0]);
     result += `<a href="${url}" target="_blank" rel="noopener noreferrer"${classAttr}>${url}</a>`;
