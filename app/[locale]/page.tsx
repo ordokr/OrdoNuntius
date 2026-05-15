@@ -4,17 +4,36 @@ import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Sidebar } from "@/components/layout/sidebar";
+import dynamic from "next/dynamic";
 import { EmailList } from "@/components/email/email-list";
 import { EmailViewer } from "@/components/email/email-viewer";
-import { EmailComposer } from "@/components/email/email-composer";
 import type { ComposerDraftData } from "@/components/email/email-composer";
-import { ProtocolAccountPicker } from "@/components/protocol/protocol-account-picker";
+
+// EmailComposer bundles TipTap + extensions + ~2.2k LOC of composer code.
+// It's never visible on page load — only mounted when the user clicks
+// Compose / Reply / Forward. Loading it dynamically defers ~200-300KB
+// compressed off the initial inbox bundle without UX cost: the composer
+// only appears after explicit user action, masking the small chunk-fetch
+// delay behind the click itself.
+const EmailComposer = dynamic(
+  () => import("@/components/email/email-composer").then(m => ({ default: m.EmailComposer })),
+  { ssr: false, loading: () => null }
+);
+// Lazy modal: only mounted when handling a mailto:/webcal: link.
+const ProtocolAccountPicker = dynamic(
+  () => import("@/components/protocol/protocol-account-picker").then(m => ({ default: m.ProtocolAccountPicker })),
+  { ssr: false, loading: () => null }
+);
 import { ThreadConversationView } from "@/components/email/thread-conversation-view";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { ThreadGroup, Email, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID } from "@/lib/jmap/types";
 import { useAccountStore } from "@/stores/account-store";
 import type { UnifiedAccountClient } from "@/lib/unified-mailbox";
-import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
+// Lazy modal: opens only on `?` keypress.
+const KeyboardShortcutsModal = dynamic(
+  () => import("@/components/keyboard-shortcuts-modal").then(m => ({ default: m.KeyboardShortcutsModal })),
+  { ssr: false, loading: () => null }
+);
 import { useEmailStore } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
@@ -40,17 +59,29 @@ import {
 } from "@/components/error";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PromptDialog } from "@/components/ui/prompt-dialog";
-import { TotpReauthDialog } from "@/components/totp-reauth-dialog";
+// Lazy modal: opens only when re-authentication is required (rare).
+const TotpReauthDialog = dynamic(
+  () => import("@/components/totp-reauth-dialog").then(m => ({ default: m.TotpReauthDialog })),
+  { ssr: false, loading: () => null }
+);
 import { DragDropProvider } from "@/contexts/drag-drop-context";
 import { isFilterEmpty, activeFilterCount } from "@/lib/jmap/search-utils";
 import { WelcomeBanner } from "@/components/ui/welcome-banner";
 import { NavigationRail } from "@/components/layout/navigation-rail";
-import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
+// Lazy modal: opens only on sidebar-apps reorder.
+const SidebarAppsModal = dynamic(
+  () => import("@/components/layout/sidebar-apps-modal").then(m => ({ default: m.SidebarAppsModal })),
+  { ssr: false, loading: () => null }
+);
 import { InlineAppView } from "@/components/layout/inline-app-view";
 import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { useIdentitySync } from "@/hooks/use-identity-sync";
 import { Input } from "@/components/ui/input";
-import { FilePreviewModal } from "@/components/files/file-preview-modal";
+// Lazy modal: opens only when previewing a file attachment.
+const FilePreviewModal = dynamic(
+  () => import("@/components/files/file-preview-modal").then(m => ({ default: m.FilePreviewModal })),
+  { ssr: false, loading: () => null }
+);
 import { isFilePreviewable } from "@/lib/file-preview";
 import { appendPlainTextSignature } from "@/lib/signature-utils";
 import { computeReplyThreadingHeaders } from "@/lib/email-threading";

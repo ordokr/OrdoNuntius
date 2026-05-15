@@ -58,19 +58,28 @@ interface SingleEmailItemProps {
   onMarkAsSpam?: () => void;
 }
 
-const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
+const SingleEmailItemImpl = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
   function SingleEmailItem({ email, selected, onClick, onContextMenu, showPreview, colorTag, currentMailboxRole: currentMailboxRoleProp, emailKeywordsById, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetColorTag, onMarkAsSpam }, ref) {
     const isUnread = !email.keywords?.$seen;
     const isStarred = email.keywords?.$flagged;
     const isAnswered = email.keywords?.$answered;
     const isForwarded = email.keywords?.$forwarded;
-    const { selectedMailbox, mailboxes, selectedEmailIds, toggleEmailSelection, selectRangeEmails, clearSelection } = useEmailStore();
+    // Granular selectors instead of `useEmailStore()` whole-store subscription.
+    // Each subscription returns a primitive (boolean / string / number), so
+    // Zustand's default ref-equality check correctly skips re-renders when
+    // THIS email's selectedness / mailbox didn't change — defeating the
+    // store-mutation avalanche that bypassed React.memo.
+    // Actions are pulled inline via getState() in handlers (stable refs).
+    const isChecked = useEmailStore(s => s.selectedEmailIds.has(email.id));
+    const hasSelection = useEmailStore(s => s.selectedEmailIds.size > 0);
+    const selectedMailbox = useEmailStore(s => s.selectedMailbox);
+    // Mailboxes is only consulted as a fallback for the role prop; cheap.
+    const mailboxes = useEmailStore(s => s.mailboxes);
     // Prefer the hoisted prop (computed once in EmailList for the whole virtual
     // list); fall back to a local scan only if a caller didn't pass it through.
     const currentMailboxRole = currentMailboxRoleProp ?? mailboxes.find(mb => mb.id === selectedMailbox)?.role;
     const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
     const sender = showRecipient ? (email.to?.[0] ?? email.from?.[0]) : email.from?.[0];
-    const emailKeywords = useSettingsStore((state) => state.emailKeywords);
     const density = useSettingsStore((state) => state.density);
     const mailLayout = useSettingsStore((state) => state.mailLayout);
     const showAvatarsInJunk = useSettingsStore((state) => state.showAvatarsInJunk);
@@ -78,17 +87,18 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
     const isUnifiedView = useEmailStore((state) => state.isUnifiedView);
     const getAccountById = useAccountStore((state) => state.getAccountById);
     const accountColor = email.accountId ? getAccountById(email.accountId)?.avatarColor : undefined;
-    const isChecked = selectedEmailIds.has(email.id);
+    // isChecked already computed above via selector — drop the duplicate.
     const isFocusedMailLayout = mailLayout === 'focus';
     const trimmedPreview = stripInvisibleLeading(email.preview ?? '');
     const inlinePreview = showPreview && trimmedPreview ? ` ${trimmedPreview}` : '';
 
-    // Resolve color tags using keyword definitions; unknown tags fall back to gray.
-    // Map lookup is O(1); falling back to .find() only when the Map wasn't hoisted.
+    // Resolve color tags via the hoisted Map (built once per render of
+    // EmailList for the whole list). Standalone consumers that don't
+    // thread the prop through get a gray fallback — acceptable trade-off
+    // for skipping the per-row settings-store subscription.
     const tagIds = getEmailColorTags(email.keywords);
     const resolvedKeywordDefs = tagIds.map(id =>
       emailKeywordsById?.get(id)
-        ?? emailKeywords.find(k => k.id === id)
         ?? { id, label: id, color: 'gray' }
     );
     const resolvedKeywordDef = resolvedKeywordDefs[0] ?? null;
@@ -117,7 +127,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
 
     const handleCheckboxClick = (e: React.MouseEvent) => {
       e.stopPropagation();
-      toggleEmailSelection(email.id);
+      useEmailStore.getState().toggleEmailSelection(email.id);
     };
 
     const handleContextMenu = (e: React.MouseEvent) => {
@@ -125,14 +135,15 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
     };
 
     const handleClick = (e: React.MouseEvent) => {
+      const store = useEmailStore.getState();
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        toggleEmailSelection(email.id);
+        store.toggleEmailSelection(email.id);
       } else if (e.shiftKey) {
         e.preventDefault();
-        selectRangeEmails(email.id);
+        store.selectRangeEmails(email.id);
       } else {
-        if (selectedEmailIds.size > 0) clearSelection();
+        if (hasSelection) store.clearSelection();
         onClick();
       }
     };
@@ -168,7 +179,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
           style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-item-py)' }}
         >
           {/* Checkbox - only visible when in selection mode */}
-          {selectedEmailIds.size > 0 && (
+          {hasSelection && (
             <button
               onClick={handleCheckboxClick}
               className={cn(
@@ -358,6 +369,10 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
   }
 );
 
+// Memoized so single-email threads also benefit when ThreadListItem's
+// outer re-render decisions don't change the SingleEmailItem props.
+const SingleEmailItem = React.memo(SingleEmailItemImpl);
+
 // React.memo wraps the forwardRef'd component so that non-emails parent
 // re-renders (theme toggle, selection change, scroll) skip all visible
 // rows when their props haven't changed. The default shallow compare is
@@ -399,7 +414,14 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
     const trimmedPreview = stripInvisibleLeading(latestEmail.preview ?? '');
     const inlinePreview = showPreview && trimmedPreview ? ` ${trimmedPreview}` : '';
 
-    const { selectedMailbox, mailboxes, selectedEmailIds, toggleEmailSelection, selectRangeEmails, clearSelection, isUnifiedView } = useEmailStore();
+    // Same granular-selector pattern as SingleEmailItem above. Whole-store
+    // subscription was bypassing the outer React.memo because every store
+    // mutation re-rendered the row regardless of whether its inputs changed.
+    const isChecked = useEmailStore(s => thread.emails.some(e => s.selectedEmailIds.has(e.id)));
+    const hasSelection = useEmailStore(s => s.selectedEmailIds.size > 0);
+    const selectedMailbox = useEmailStore(s => s.selectedMailbox);
+    const mailboxes = useEmailStore(s => s.mailboxes);
+    const isUnifiedView = useEmailStore(s => s.isUnifiedView);
     const getAccountById = useAccountStore((state) => state.getAccountById);
     const threadAccountColor = latestEmail.accountId ? getAccountById(latestEmail.accountId)?.avatarColor : undefined;
     // Prefer the hoisted prop; fall back to a scan only if a caller didn't
@@ -432,10 +454,10 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
     const threadLongPressHandlers = { onTouchStart: threadOnTouchStart, onTouchEnd: threadOnTouchEnd, onTouchMove: threadOnTouchMove, onTouchCancel: threadOnTouchCancel };
 
     const threadColor = getThreadColorTag(thread.emails);
-    const emailKeywordDefs = useSettingsStore((state) => state.emailKeywords);
+    // emailKeywordsById prop replaces the per-row settings-store subscription
+    // for keyword resolution.
     const keywordDef = threadColor
       ? (emailKeywordsById?.get(threadColor)
-          ?? emailKeywordDefs.find(k => k.id === threadColor)
           ?? { id: threadColor, label: threadColor, color: 'gray' })
       : null;
     const colorTag = keywordDef ? KEYWORD_PALETTE[keywordDef.color]?.bg ?? null : null;
@@ -443,7 +465,7 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
     const isSelected = selectedEmailId === latestEmail.id ||
       thread.emails.some(e => e.id === selectedEmailId);
 
-    const isChecked = thread.emails.some(e => selectedEmailIds.has(e.id));
+    // isChecked already computed above via selector — drop the duplicate.
 
     if (emailCount === 1) {
       return (
@@ -471,9 +493,13 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
 
     const handleThreadCheckboxClick = (e: React.MouseEvent) => {
       e.stopPropagation();
-      // Toggle selection for all emails in this thread
-      const allSelected = thread.emails.every(em => selectedEmailIds.has(em.id));
-      const newSelection = new Set(selectedEmailIds);
+      // Toggle selection for all emails in this thread. Read live snapshot
+      // via getState() so the handler doesn't need to subscribe to
+      // selectedEmailIds (subscription would trigger re-render on every
+      // selection change anywhere in the app).
+      const currentIds = useEmailStore.getState().selectedEmailIds;
+      const allSelected = thread.emails.every(em => currentIds.has(em.id));
+      const newSelection = new Set(currentIds);
       thread.emails.forEach(em => {
         if (allSelected) {
           newSelection.delete(em.id);
@@ -485,15 +511,16 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
     };
 
     const handleHeaderClick = (e: React.MouseEvent) => {
+      const store = useEmailStore.getState();
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         // Ctrl+Click: toggle selection for all thread emails
-        thread.emails.forEach(em => toggleEmailSelection(em.id));
+        thread.emails.forEach(em => store.toggleEmailSelection(em.id));
         return;
       }
       if (e.shiftKey) {
         e.preventDefault();
-        selectRangeEmails(latestEmail.id);
+        store.selectRangeEmails(latestEmail.id);
         return;
       }
 
@@ -506,7 +533,7 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
       if (target.closest('[data-expand-toggle]')) {
         onToggleExpand(thread.threadId);
       } else {
-        if (selectedEmailIds.size > 0) clearSelection();
+        if (hasSelection) store.clearSelection();
         if (!isExpanded) {
           onToggleExpand(thread.threadId);
         }
@@ -548,7 +575,7 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
             style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-item-py)' }}
           >
             {/* Checkbox for thread selection - only visible when in selection mode */}
-            {selectedEmailIds.size > 0 && (
+            {hasSelection && (
               <button
                 onClick={handleThreadCheckboxClick}
                 className={cn(
