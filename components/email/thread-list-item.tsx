@@ -29,7 +29,7 @@ interface ThreadListItemProps {
   // local computation when absent.
   currentMailboxRole?: string;
   emailKeywordsById?: Map<string, KeywordDefinition>;
-  onToggleExpand: () => void;
+  onToggleExpand: (threadId: string) => void;
   onEmailSelect: (email: Email) => void;
   onContextMenu?: (e: React.MouseEvent, email: Email) => void;
   onOpenConversation?: (thread: ThreadGroup) => void;
@@ -358,7 +358,17 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
   }
 );
 
-export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemProps>(
+// React.memo wraps the forwardRef'd component so that non-emails parent
+// re-renders (theme toggle, selection change, scroll) skip all visible
+// rows when their props haven't changed. The default shallow compare is
+// sufficient because:
+//   - thread is a memoized ThreadGroup from useMemo(groupEmailsByThread)
+//   - emailKeywordsById is memoized in EmailList
+//   - currentMailboxRole is a primitive
+//   - all callbacks are useCallback-stabilized in EmailList
+// Without this, every row re-rendered on every parent state change,
+// even though its inputs were identical.
+const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>(
   function ThreadListItem({
     thread,
     isExpanded,
@@ -494,11 +504,11 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
 
       const target = e.target as HTMLElement;
       if (target.closest('[data-expand-toggle]')) {
-        onToggleExpand();
+        onToggleExpand(thread.threadId);
       } else {
         if (selectedEmailIds.size > 0) clearSelection();
         if (!isExpanded) {
-          onToggleExpand();
+          onToggleExpand(thread.threadId);
         }
         onEmailSelect(latestEmail);
       }
@@ -563,7 +573,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                 data-expand-toggle
                 onClick={(e) => {
                   e.stopPropagation();
-                  onToggleExpand();
+                  onToggleExpand(thread.threadId);
                 }}
                 className={cn(
                   "p-1 rounded mt-2 flex-shrink-0 transition-all duration-200",
@@ -799,3 +809,6 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
     );
   }
 );
+
+
+export const ThreadListItem = React.memo(ThreadListItemImpl);

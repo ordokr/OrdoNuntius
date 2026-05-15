@@ -205,6 +205,30 @@ export function EmailList({
     [emailKeywordsList]
   );
 
+  // Stable callback wrappers so React.memo on ThreadListItem can skip
+  // row renders when only unrelated state changed (selection, theme,
+  // scroll). Without useCallback, each inline arrow created a fresh
+  // function reference per parent render, defeating the memo's shallow
+  // compare and re-rendering all visible rows.
+  const handleEmailSelect = useCallback((email: Email) => {
+    onEmailSelect?.(email);
+  }, [onEmailSelect]);
+  const handleToggleStar = useCallback((email: Email) => {
+    onToggleStar?.(email);
+  }, [onToggleStar]);
+  const handleMarkAsRead = useCallback((email: Email, read: boolean) => {
+    onMarkAsRead?.(email, read);
+  }, [onMarkAsRead]);
+  const handleDelete = useCallback((email: Email) => {
+    onDelete?.(email);
+  }, [onDelete]);
+  const handleArchive = useCallback((email: Email) => {
+    onArchive?.(email);
+  }, [onArchive]);
+  const handleMarkAsSpam = useCallback((email: Email) => {
+    onMarkAsSpam?.(email);
+  }, [onMarkAsSpam]);
+
   const handleEmptyFolder = async () => {
     if (!client || isProcessing || !currentMailbox) return;
 
@@ -458,16 +482,16 @@ export function EmailList({
                       expandedEmails={threadEmailsCache.get(thread.threadId)}
                       currentMailboxRole={currentMailboxRole}
                       emailKeywordsById={emailKeywordsById}
-                      onToggleExpand={() => handleToggleThreadExpansion(thread.threadId)}
-                      onEmailSelect={(email) => onEmailSelect?.(email)}
+                      onToggleExpand={handleToggleThreadExpansion}
+                      onEmailSelect={handleEmailSelect}
                       onContextMenu={openContextMenu}
                       onOpenConversation={onOpenConversation}
-                      onToggleStar={onToggleStar ? (email) => onToggleStar(email) : undefined}
-                      onMarkAsRead={onMarkAsRead ? (email, read) => onMarkAsRead(email, read) : undefined}
-                      onDelete={onDelete ? (email) => onDelete(email) : undefined}
-                      onArchive={onArchive ? (email) => onArchive(email) : undefined}
+                      onToggleStar={onToggleStar ? handleToggleStar : undefined}
+                      onMarkAsRead={onMarkAsRead ? handleMarkAsRead : undefined}
+                      onDelete={onDelete ? handleDelete : undefined}
+                      onArchive={onArchive ? handleArchive : undefined}
                       onSetColorTag={onSetColorTag}
-                      onMarkAsSpam={onMarkAsSpam ? (email) => onMarkAsSpam(email) : undefined}
+                      onMarkAsSpam={onMarkAsSpam ? handleMarkAsSpam : undefined}
                     />
                   </div>
                 );
