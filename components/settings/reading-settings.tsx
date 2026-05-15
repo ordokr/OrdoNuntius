@@ -54,39 +54,77 @@ export function ReadingSettings() {
     try {
       const archiveId = archiveMailbox.originalId || archiveMailbox.id;
       const emails = await client.getEmailsInMailbox(archiveId);
-      let movedCount = 0;
 
-      for (const email of emails) {
-        const emailDate = new Date(email.receivedAt);
-        const year = emailDate.getFullYear().toString();
-        const month = (emailDate.getMonth() + 1).toString().padStart(2, '0');
+      // Pass 1: compute each email's target (year or year/month) and
+      // collect the unique target paths. Was O(N) sequential moveEmail
+      // requests — for a typical archive with thousands of messages,
+      // that's thousands of network round-trips. New shape: bucket by
+      // target, then issue one batchMoveEmails per bucket (typically
+      // 5-30 buckets for a multi-year archive).
+      type Target = { year: string; month?: string };
+      const targets: Target[] = emails.map((email) => {
+        const d = new Date(email.receivedAt);
+        const year = d.getFullYear().toString();
+        if (archiveMode === 'year') return { year };
+        return { year, month: (d.getMonth() + 1).toString().padStart(2, '0') };
+      });
 
-        let currentMailboxes = useEmailStore.getState().mailboxes;
-
-        let yearMailbox = currentMailboxes.find(
-          m => m.name === year && m.parentId === archiveId
+      // Pass 2: ensure all year (and month) mailboxes exist. We must
+      // serialize creation so we don't race for the same folder twice.
+      // createMailbox + fetchMailboxes are bounded by the number of
+      // unique year/month combinations (≤ ~120 for 10 years × 12 months).
+      const ensureFolder = async (name: string, parentId: string) => {
+        const existing = useEmailStore.getState().mailboxes.find(
+          (m) => m.name === name && m.parentId === parentId
         );
-        if (!yearMailbox) {
-          yearMailbox = await client.createMailbox(year, archiveId);
-          await fetchMailboxes(client);
-          currentMailboxes = useEmailStore.getState().mailboxes;
-        }
+        if (existing) return existing;
+        const created = await client.createMailbox(name, parentId);
+        await fetchMailboxes(client);
+        return created;
+      };
 
-        if (archiveMode === 'year') {
-          await client.moveEmail(email.id, yearMailbox.id);
-          movedCount++;
-        } else {
-          const yearId = yearMailbox.originalId || yearMailbox.id;
-          let monthMailbox = currentMailboxes.find(
-            m => m.name === month && m.parentId === yearId
-          );
-          if (!monthMailbox) {
-            monthMailbox = await client.createMailbox(month, yearId);
-            await fetchMailboxes(client);
-          }
-          await client.moveEmail(email.id, monthMailbox.id);
-          movedCount++;
+      const yearMailboxes = new Map<string, { id: string; originalId?: string }>();
+      const monthMailboxes = new Map<string, { id: string }>(); // key: "year/month"
+      const uniqueYears = Array.from(new Set(targets.map((t) => t.year)));
+      for (const year of uniqueYears) {
+        const ym = await ensureFolder(year, archiveId);
+        yearMailboxes.set(year, ym);
+      }
+      if (archiveMode !== 'year') {
+        const uniqueMonths = Array.from(new Set(
+          targets.map((t) => `${t.year}/${t.month}`)
+        ));
+        for (const key of uniqueMonths) {
+          const [year, month] = key.split('/');
+          const ym = yearMailboxes.get(year)!;
+          const yearId = ym.originalId || ym.id;
+          const mm = await ensureFolder(month, yearId);
+          monthMailboxes.set(key, mm);
         }
+      }
+
+      // Pass 3: bucket email IDs by destination mailbox id, then fire
+      // one batchMoveEmails per bucket. JMAP accepts a single Email/set
+      // with a destroy/update map of arbitrary size, so the entire
+      // reorganize collapses to ~uniqueBuckets requests (often << N).
+      const buckets = new Map<string, string[]>();
+      emails.forEach((email, i) => {
+        const t = targets[i];
+        let destId: string;
+        if (archiveMode === 'year') {
+          destId = yearMailboxes.get(t.year)!.id;
+        } else {
+          destId = monthMailboxes.get(`${t.year}/${t.month}`)!.id;
+        }
+        const list = buckets.get(destId);
+        if (list) list.push(email.id);
+        else buckets.set(destId, [email.id]);
+      });
+
+      let movedCount = 0;
+      for (const [destId, ids] of buckets) {
+        await client.batchMoveEmails(ids, destId);
+        movedCount += ids.length;
       }
 
       setReorganizeResult(t('archive_mode.reorganize_success', { count: movedCount }));

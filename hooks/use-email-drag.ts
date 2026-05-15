@@ -45,11 +45,17 @@ function createDragPreview(count: number): HTMLElement {
 }
 
 export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailDragOptions): UseEmailDragReturn {
-  const { selectedEmailIds, emails } = useEmailStore();
+  // NOTE: do NOT subscribe to selectedEmailIds / emails here. This hook
+  // runs per row of the virtual list; subscribing would re-render every
+  // visible row on every keyword flip, new email arrival, or selection
+  // change. The drag-start handler only needs these values AT THE MOMENT
+  // OF DRAG START — read them via getState() then.
   const { startDrag, endDrag, isDragging, draggedEmails } = useDragDropContext();
   const isMobile = useUIStore((state) => state.isMobile);
 
   const handleDragStart = useCallback((e: DragEvent<HTMLDivElement>) => {
+    // Read the current selection + emails snapshot only when drag fires.
+    const { selectedEmailIds, emails } = useEmailStore.getState();
     // Determine which emails to drag:
     // - If current email is selected, drag all selected
     // - If threadEmails provided (thread header), drag all thread emails
@@ -80,7 +86,7 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
     });
 
     startDrag(emailsToDrag, sourceMailboxId);
-  }, [email, selectedEmailIds, emails, sourceMailboxId, startDrag, threadEmails]);
+  }, [email, sourceMailboxId, startDrag, threadEmails]);
 
   const handleDragEnd = useCallback(() => {
     endDrag();

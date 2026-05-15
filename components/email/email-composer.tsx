@@ -421,6 +421,10 @@ export function EmailComposer({
     if (nextHtml !== currentHtml) {
       editor.commands.setContent(nextHtml, { emitUpdate: true });
     }
+    // signatureIdentity is re-derived via .find() on every render — depending
+    // on the object reference would re-fire this DOM-manipulating effect
+    // unnecessarily. The granular property deps cover every read inside.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signatureIdentity?.id, signatureIdentity?.htmlSignature, signatureIdentity?.textSignature, signatureSeparatorEnabled, signaturePosition, mode, plainTextMode]);
 
   useEffect(() => {

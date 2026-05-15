@@ -1210,6 +1210,9 @@ export function EmailViewer({
     }, markAsReadDelay);
 
     return () => clearTimeout(timeout);
+    // Granular deps intentional — `email` object identity changes on every
+    // keyword flip; we only care about id + seen status here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email?.id, email?.keywords?.$seen, onMarkAsRead]);
 
   // Reset external content permission and quick reply when email changes
@@ -2136,6 +2139,9 @@ export function EmailViewer({
       }));
 
     return [...jmapAttachments, ...tnefExtracted, ...embeddedExtracted];
+    // Granular deps intentional — `email.attachments` is the meaningful
+    // input; full `email` reference changes on every keyword flip.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email?.attachments, smimeDecryptedAttachments, tnefHtml, tnefText, tnefAttachments, embeddedEmailUnwrapped, embeddedEmailAttachments, calendarInvitationParsingEnabled, hideInlineImageAttachments]);
 
   // Measure attachment chips in the below-header row to determine how many fit
@@ -2788,7 +2794,7 @@ export function EmailViewer({
   ${wordHtmlCSS}
   ${darkModeCSS}
 </style></head><body>${effectiveEmailContent.html}</body></html>`;
-  }, [effectiveEmailContent.html, effectiveEmailContent.isHtml, isDark, emailHasNativeDarkMode]);
+  }, [effectiveEmailContent.html, effectiveEmailContent.isHtml, effectiveEmailContent.hasStyleTag, isDark, emailHasNativeDarkMode]);
 
   // Imperatively restore blocked external content inside the iframe document.
   // Avoids re-rendering the iframe srcDoc (which would reload and flash) when
