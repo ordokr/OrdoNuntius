@@ -831,69 +831,44 @@ export default function Home() {
     return subscribeToPendingMailto(openPendingMailto);
   }, [isAuthenticated, client, handleMailtoProtocolRequest]);
 
-  // Fallback fetch for paths that didn't go through login()'s prefetch
-  // (notably checkAuth on page refresh). The prefetch in auth-store/login()
-  // populates mailboxes before this effect first runs, so on the post-login
-  // path this block is a no-op.
-  //
-  // The empty-mailbox retry budget below targets the "fresh account, server
-  // still provisioning" case from upstream issue #217. It is *not* meant to
-  // paper over a generic JMAP failure — those should surface to the UI. The
-  // original implementation used 1+2+3+4+5 = 15s of cumulative back-off,
-  // which is why returning-user refreshes against a not-yet-warm JMAP path
-  // could feel like a 15-second freeze. Tightened to ~750ms worst case;
-  // legitimate empty-mailbox states (truly zero folders) settle into the
-  // empty-inbox UI quickly instead of hanging on a retry loop.
+  // Initial data load for paths that didn't go through login()'s prefetch
+  // (notably checkAuth on page refresh). On the post-login path this is a
+  // no-op: login() already kicked off prefetchInitialData and stashed its
+  // promise on the client. Calling prefetchInitialData again returns the
+  // same promise — promise-coalescing prevents two concurrent fetch chains
+  // racing and stomping on each other's email/mailbox state, which was the
+  // cause of the "after login the inbox defaults to 'No messages found'"
+  // bug: the fallback effect's late fetchEmails could land while the
+  // prefetch's was still in flight and the second response could clobber
+  // the first with stale or differently-keyed results.
   useEffect(() => {
-    if (isAuthenticated && client && mailboxes.length === 0) {
-      let retryTimer: ReturnType<typeof setTimeout> | null = null;
-      let cancelled = false;
-      const MAX_PROVISIONING_RETRIES = 2;
-      const RETRY_DELAYS_MS = [250, 500];
-
-      const loadData = async (attempt = 1) => {
-        try {
-          const t0 = performance.now();
-          await Promise.all([
-            fetchMailboxes(client),
-            fetchQuota(client)
-          ]);
-          const tMb = performance.now() - t0;
-
-          const state = useEmailStore.getState();
-          const selectedMailboxId = state.selectedMailbox;
-
-          if (state.mailboxes.length === 0 && attempt <= MAX_PROVISIONING_RETRIES && !cancelled) {
-            const delay = RETRY_DELAYS_MS[attempt - 1] ?? 500;
-            // console.warn (not debug.log) — prod console intentionally; this
-            // path is the smoking gun for the "slow inbox" symptom and we
-            // need it visible without flipping debugMode.
-            console.warn(`[Inbox] mailboxes empty after ${Math.round(tMb)}ms (attempt ${attempt}/${MAX_PROVISIONING_RETRIES}), retrying in ${delay}ms`);
-            retryTimer = setTimeout(() => loadData(attempt + 1), delay);
-            return;
-          }
-
-          const tEmails0 = performance.now();
-          if (selectedMailboxId) {
-            await fetchEmails(client, selectedMailboxId);
-          } else {
-            await fetchEmails(client);
-          }
-          console.info(`[Inbox] fetchMailboxes=${Math.round(tMb)}ms fetchEmails=${Math.round(performance.now() - tEmails0)}ms`);
-
-          fetchTagCounts(client);
-        } catch (error) {
-          console.error('Error loading email data:', error);
-        }
-      };
-      loadData();
-
-      return () => {
-        cancelled = true;
-        if (retryTimer) clearTimeout(retryTimer);
-      };
-    }
-  }, [isAuthenticated, client, mailboxes.length, fetchMailboxes, fetchEmails, fetchQuota, fetchTagCounts]);
+    if (!isAuthenticated || !client || mailboxes.length > 0) return;
+    let cancelled = false;
+    const t0 = performance.now();
+    useEmailStore
+      .getState()
+      .prefetchInitialData(client)
+      .then(() => {
+        if (cancelled) return;
+        const ms = Math.round(performance.now() - t0);
+        const post = useEmailStore.getState();
+        // Prod-visible breadcrumb (not gated on debugMode). Mailbox count of
+        // 0 here means the JMAP server returned no folders — surface that
+        // instead of silently rendering "No messages found".
+        console.info(
+          `[Inbox] prefetch settled in ${ms}ms — ` +
+          `mailboxes=${post.mailboxes.length} emails=${post.emails.length} ` +
+          `selectedMailbox=${post.selectedMailbox || '<none>'}`,
+        );
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('[Inbox] prefetch failed:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, client, mailboxes.length]);
 
   // Push notifications: set up once per client and tear down when the client
   // goes away (logout or account switch). Kept separate from the fetch effect

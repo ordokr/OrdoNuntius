@@ -336,8 +336,18 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const selectionValid = currentSelectedMailbox && mailboxes.some(m => m.id === currentSelectedMailbox);
       const loadingPatch = isInitialLoad ? { isLoading: false } : {};
       if (!selectionValid) {
-        // Find inbox from PRIMARY account (not shared accounts)
-        const inboxMailbox = mailboxes.find(m => m.role === 'inbox' && !m.isShared);
+        // Find inbox in the primary account. Stalwart and some other JMAP
+        // backends do not always populate the `role` field even though the
+        // mailbox is functionally the inbox (RFC 8621 makes role optional
+        // and some setups omit it). Mirror the sidebar's lenient match —
+        // strict role first, name fallback second — so post-login we
+        // actually land on a populated mailbox instead of an empty
+        // "selectedMailbox=''" state that renders the inbox as
+        // "No messages found".
+        const primary = mailboxes.filter(m => !m.isShared);
+        const inboxMailbox =
+          primary.find(m => m.role === 'inbox') ||
+          primary.find(m => m.role == null && /(^|[^a-z])inbox([^a-z]|$)/i.test(m.name || ''));
         if (inboxMailbox) {
           set({ mailboxes, selectedMailbox: inboxMailbox.id, ...loadingPatch });
         } else {
