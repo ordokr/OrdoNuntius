@@ -835,33 +835,51 @@ export default function Home() {
   // (notably checkAuth on page refresh). The prefetch in auth-store/login()
   // populates mailboxes before this effect first runs, so on the post-login
   // path this block is a no-op.
+  //
+  // The empty-mailbox retry budget below targets the "fresh account, server
+  // still provisioning" case from upstream issue #217. It is *not* meant to
+  // paper over a generic JMAP failure — those should surface to the UI. The
+  // original implementation used 1+2+3+4+5 = 15s of cumulative back-off,
+  // which is why returning-user refreshes against a not-yet-warm JMAP path
+  // could feel like a 15-second freeze. Tightened to ~750ms worst case;
+  // legitimate empty-mailbox states (truly zero folders) settle into the
+  // empty-inbox UI quickly instead of hanging on a retry loop.
   useEffect(() => {
     if (isAuthenticated && client && mailboxes.length === 0) {
       let retryTimer: ReturnType<typeof setTimeout> | null = null;
       let cancelled = false;
+      const MAX_PROVISIONING_RETRIES = 2;
+      const RETRY_DELAYS_MS = [250, 500];
 
       const loadData = async (attempt = 1) => {
         try {
+          const t0 = performance.now();
           await Promise.all([
             fetchMailboxes(client),
             fetchQuota(client)
           ]);
+          const tMb = performance.now() - t0;
 
           const state = useEmailStore.getState();
           const selectedMailboxId = state.selectedMailbox;
 
-          if (state.mailboxes.length === 0 && attempt <= 5 && !cancelled) {
-            const delay = Math.min(1000 * attempt, 5000);
-            debug.log('jmap', `[Mailbox] No mailboxes returned (attempt ${attempt}), retrying in ${delay}ms`);
+          if (state.mailboxes.length === 0 && attempt <= MAX_PROVISIONING_RETRIES && !cancelled) {
+            const delay = RETRY_DELAYS_MS[attempt - 1] ?? 500;
+            // console.warn (not debug.log) — prod console intentionally; this
+            // path is the smoking gun for the "slow inbox" symptom and we
+            // need it visible without flipping debugMode.
+            console.warn(`[Inbox] mailboxes empty after ${Math.round(tMb)}ms (attempt ${attempt}/${MAX_PROVISIONING_RETRIES}), retrying in ${delay}ms`);
             retryTimer = setTimeout(() => loadData(attempt + 1), delay);
             return;
           }
 
+          const tEmails0 = performance.now();
           if (selectedMailboxId) {
             await fetchEmails(client, selectedMailboxId);
           } else {
             await fetchEmails(client);
           }
+          console.info(`[Inbox] fetchMailboxes=${Math.round(tMb)}ms fetchEmails=${Math.round(performance.now() - tEmails0)}ms`);
 
           fetchTagCounts(client);
         } catch (error) {
