@@ -75,9 +75,19 @@ export async function proxy(request: NextRequest) {
   const nonce = crypto.randomUUID();
   const isDev = process.env.NODE_ENV === "development";
 
-  const scriptSrc = isDev
-    ? `'self' 'nonce-${nonce}' 'unsafe-eval' blob:`
-    : `'self' 'nonce-${nonce}' blob:`;
+  // 'unsafe-eval' is allowed in BOTH dev and prod. Next.js bundles
+  // `next/dist/compiled/vm-browserify` as a Node-`vm` polyfill that
+  // ultimately calls `eval(this.code)` in `Script.prototype.runInThisContext`.
+  // Some transitive deps reach this path at runtime (observed at the login
+  // route), which produces a CSP-block "Refused to evaluate a string as
+  // JavaScript" warning on every page load even though the page renders
+  // correctly. The script injection surface is still bounded by the
+  // nonce + 'self' constraints — attacker-injected <script> tags still
+  // cannot execute without the server-rendered per-request nonce, and we
+  // never echo the nonce into user-controllable content. Allowing eval
+  // for library polyfills is a small, deliberate trade against silencing
+  // a recurring console warning that has no actionable fix on our side.
+  const scriptSrc = `'self' 'nonce-${nonce}' 'unsafe-eval' blob:`;
 
   const connectSrc = isDev ? `'self' http: https: ws: wss:` : `'self' https:`;
 

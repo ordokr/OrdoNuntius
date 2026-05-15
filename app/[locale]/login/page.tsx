@@ -1106,6 +1106,8 @@ export default function LoginPage() {
                     <label className="flex items-center gap-2.5 cursor-pointer group select-none pt-1">
                       <span className="relative flex items-center justify-center">
                         <input
+                          id="remember-me"
+                          name="remember-me"
                           type="checkbox"
                           checked={rememberMe}
                           onChange={(e) => setRememberMe(e.target.checked)}
