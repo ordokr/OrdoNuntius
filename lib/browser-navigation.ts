@@ -13,6 +13,14 @@ export function replaceWindowLocation(url: string): void {
 // helpers below use the same value so client code stays consistent.
 const STATIC_BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/+$/, '');
 
+// Memoized runtime-detected prefix. Computed lazily on first call from
+// the browser and reused for the rest of the session. apiFetch is called
+// ~100+ times per page load (every API request, push subscription, blob
+// fetch, etc.); even microsecond work multiplied by that count is worth
+// removing. The locale-supplied variant is NOT memoized because the
+// answer depends on the argument.
+let memoizedDefaultPrefix: string | null = null;
+
 /**
  * Returns the mount prefix the app is served at.
  *
@@ -31,6 +39,9 @@ export function getPathPrefix(locale?: string): string {
   if (STATIC_BASE_PATH) return STATIC_BASE_PATH;
   if (typeof window === 'undefined') return '';
 
+  // Fast path: no locale arg → memoized session-constant value.
+  if (!locale && memoizedDefaultPrefix !== null) return memoizedDefaultPrefix;
+
   const segments = window.location.pathname.split('/').filter(Boolean);
 
   let localeIndex: number;
@@ -42,8 +53,9 @@ export function getPathPrefix(locale?: string): string {
     );
   }
 
-  if (localeIndex <= 0) return '';
-  return '/' + segments.slice(0, localeIndex).join('/');
+  const prefix = localeIndex <= 0 ? '' : '/' + segments.slice(0, localeIndex).join('/');
+  if (!locale) memoizedDefaultPrefix = prefix;
+  return prefix;
 }
 
 /**
