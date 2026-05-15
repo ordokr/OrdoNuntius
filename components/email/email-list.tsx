@@ -62,33 +62,22 @@ export function EmailList({
 }: EmailListProps) {
   const t = useTranslations('email_list');
   const { client } = useAuthStore();
-  const {
-    selectedEmailIds,
-    selectAllEmails: _selectAllEmails,
-    clearSelection,
-    batchMarkAsRead,
-    batchDelete,
-    batchMoveToMailbox,
-    batchArchive,
-    batchMarkAsSpam,
-    batchUndoSpam,
-    loadMoreEmails,
-    hasMoreEmails,
-    isLoadingMore,
-    mailboxes,
-    selectedMailbox,
-    emptyMailbox,
-    expandedThreadIds,
-    threadEmailsCache,
-    isLoadingThread,
-    toggleThreadExpansion,
-    fetchThreadEmails,
-    searchFilters,
-    setSearchFilters,
-    clearSearchFilters,
-    advancedSearch,
-    searchQuery,
-  } = useEmailStore();
+  // Granular selectors instead of whole-store destructure. The destructure
+  // form subscribes the component to *every* store mutation (zustand returns
+  // a new state object on every set()), which would invalidate the virtual
+  // row memos on each scroll/mark-read/etc. Per-field selectors only fire
+  // on shallow equality misses for that field. Actions are stable in zustand
+  // and read via getState() inside handlers — no subscription needed.
+  const selectedEmailIds = useEmailStore(s => s.selectedEmailIds);
+  const hasMoreEmails = useEmailStore(s => s.hasMoreEmails);
+  const isLoadingMore = useEmailStore(s => s.isLoadingMore);
+  const mailboxes = useEmailStore(s => s.mailboxes);
+  const selectedMailbox = useEmailStore(s => s.selectedMailbox);
+  const expandedThreadIds = useEmailStore(s => s.expandedThreadIds);
+  const threadEmailsCache = useEmailStore(s => s.threadEmailsCache);
+  const isLoadingThread = useEmailStore(s => s.isLoadingThread);
+  const searchFilters = useEmailStore(s => s.searchFilters);
+  const searchQuery = useEmailStore(s => s.searchQuery);
 
   const disableThreading = useSettingsStore((state) => state.disableThreading);
 
@@ -149,7 +138,7 @@ export function EmailList({
     if (!client || isProcessing) return;
     setIsProcessing(true);
     try {
-      await batchMarkAsRead(client, read);
+      await useEmailStore.getState().batchMarkAsRead(client, read);
     } finally {
       setTimeout(() => setIsProcessing(false), 500);
     }
@@ -175,7 +164,7 @@ export function EmailList({
 
     setIsProcessing(true);
     try {
-      await batchDelete(client, isInTrash);
+      await useEmailStore.getState().batchDelete(client, isInTrash);
       const storeError = useEmailStore.getState().error;
       if (storeError) {
         const { toast } = await import('sonner');
@@ -242,7 +231,7 @@ export function EmailList({
 
     setIsProcessing(true);
     try {
-      await emptyMailbox(client, currentMailbox.id);
+      await useEmailStore.getState().emptyMailbox(client, currentMailbox.id);
     } finally {
       setTimeout(() => setIsProcessing(false), 500);
     }
@@ -250,20 +239,20 @@ export function EmailList({
 
   const handleLoadMore = useCallback(() => {
     if (client && hasMoreEmails && !isLoadingMore && !isLoading) {
-      loadMoreEmails(client);
+      useEmailStore.getState().loadMoreEmails(client);
     }
-  }, [client, hasMoreEmails, isLoadingMore, isLoading, loadMoreEmails]);
+  }, [client, hasMoreEmails, isLoadingMore, isLoading]);
 
   const handleToggleThreadExpansion = useCallback(async (threadId: string) => {
     const isExpanded = expandedThreadIds.has(threadId);
-
+    const { toggleThreadExpansion, fetchThreadEmails } = useEmailStore.getState();
     if (!isExpanded && client) {
       toggleThreadExpansion(threadId);
       await fetchThreadEmails(client, threadId);
     } else {
       toggleThreadExpansion(threadId);
     }
-  }, [client, expandedThreadIds, toggleThreadExpansion, fetchThreadEmails]);
+  }, [client, expandedThreadIds]);
 
   // Range-based load more: trigger when last visible item is near the end.
   // Debounce to prevent rapid cascade when thread grouping reduces item
@@ -368,7 +357,7 @@ export function EmailList({
             <Button
               variant="ghost"
               size="sm"
-              onClick={clearSelection}
+              onClick={() => useEmailStore.getState().clearSelection()}
               title={t('batch_actions.clear_selection')}
               disabled={isProcessing}
               className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
@@ -385,12 +374,14 @@ export function EmailList({
           filters={searchFilters}
           onRemoveFilter={(key) => {
             const resetValue = DEFAULT_SEARCH_FILTERS[key];
-            setSearchFilters({ [key]: resetValue });
-            if (client) advancedSearch(client);
+            const store = useEmailStore.getState();
+            store.setSearchFilters({ [key]: resetValue });
+            if (client) store.advancedSearch(client);
           }}
           onClearAll={() => {
-            clearSearchFilters();
-            if (client) advancedSearch(client);
+            const store = useEmailStore.getState();
+            store.clearSearchFilters();
+            if (client) store.advancedSearch(client);
           }}
         />
       )}
@@ -540,22 +531,22 @@ export function EmailList({
           onMarkAsSpam={() => onMarkAsSpam?.(contextMenu.data!)}
           onUndoSpam={() => onUndoSpam?.(contextMenu.data!)}
           onEditDraft={() => onEditDraft?.(contextMenu.data!)}
-          onBatchMarkAsRead={(read) => client && batchMarkAsRead(client, read)}
-          onBatchDelete={() => client && batchDelete(client)}
+          onBatchMarkAsRead={(read) => client && useEmailStore.getState().batchMarkAsRead(client, read)}
+          onBatchDelete={() => client && useEmailStore.getState().batchDelete(client)}
           onBatchArchive={async () => {
             if (!client) return;
             try {
-              await batchArchive(client);
+              await useEmailStore.getState().batchArchive(client);
             } catch (error) {
               console.error('Failed to batch archive:', error);
             }
           }}
-          onBatchMoveToMailbox={(mailboxId) => client && batchMoveToMailbox(client, mailboxId)}
+          onBatchMoveToMailbox={(mailboxId) => client && useEmailStore.getState().batchMoveToMailbox(client, mailboxId)}
           onBatchMarkAsSpam={async () => {
             if (client) {
               const emailIds = Array.from(selectedEmailIds);
               try {
-                await batchMarkAsSpam(client, emailIds);
+                await useEmailStore.getState().batchMarkAsSpam(client, emailIds);
                 const { toast } = await import('sonner');
                 toast.success(
                   t('../email_viewer.spam.toast_batch', { count: emailIds.length })
@@ -570,7 +561,7 @@ export function EmailList({
             if (client) {
               const emailIds = Array.from(selectedEmailIds);
               try {
-                await batchUndoSpam(client, emailIds);
+                await useEmailStore.getState().batchUndoSpam(client, emailIds);
                 const { toast } = await import('sonner');
                 toast.success(
                   t('../email_viewer.spam.toast_not_spam_batch', { count: emailIds.length })

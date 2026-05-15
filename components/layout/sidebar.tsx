@@ -538,7 +538,8 @@ function TagItem({
 
 function DemoBanner() {
   const t = useTranslations('sidebar');
-  const { isDemoMode, loginDemo } = useAuthStore();
+  const isDemoMode = useAuthStore((s) => s.isDemoMode);
+  const loginDemo = useAuthStore((s) => s.loginDemo);
   const { startTour, resetTourCompletion } = useTour();
   const router = useRouter();
   const [isResetting, setIsResetting] = useState(false);
@@ -642,8 +643,8 @@ export function Sidebar({
   className,
 }: SidebarProps) {
   const router = useRouter();
-  const { sidebarCollapsed: isCollapsed, toggleSidebarCollapsed } = useUIStore();
-  const { primaryIdentity: _primaryIdentity } = useAuthStore();
+  const isCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  const toggleSidebarCollapsed = useUIStore((s) => s.toggleSidebarCollapsed);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [foldersExpanded, setFoldersExpanded] = useState(() => {
     try {
@@ -683,7 +684,7 @@ export function Sidebar({
   const accounts = useAccountStore(s => s.accounts);
   const connectedAccounts = accounts.filter(a => a.isConnected);
   const showUnified = enableUnifiedMailbox && connectedAccounts.length > 1;
-  const { unifiedCounts } = useEmailStore();
+  const unifiedCounts = useEmailStore(s => s.unifiedCounts);
   const t = useTranslations('sidebar');
 
   useEffect(() => {

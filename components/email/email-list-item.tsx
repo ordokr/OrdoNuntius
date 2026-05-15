@@ -36,14 +36,19 @@ interface EmailListItemProps {
 
 export function EmailListItem({ email, selected, currentMailboxRole: currentMailboxRoleProp, emailKeywordsById, onClick, onContextMenu, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetColorTag, onMarkAsSpam }: EmailListItemProps) {
   const t = useTranslations('email_viewer');
-  const { selectedEmailIds, toggleEmailSelection, selectRangeEmails, selectedMailbox, mailboxes, clearSelection } = useEmailStore();
+  // Granular selectors: subscribing to whole store would re-render this row
+  // (rendered ~50× in the virtualizer) on every store mutation. See email-list.tsx
+  // parent for rationale. Actions are stable in zustand → read via getState().
+  const isChecked = useEmailStore(s => s.selectedEmailIds.has(email.id));
+  const hasSelection = useEmailStore(s => s.selectedEmailIds.size > 0);
+  const selectedMailbox = useEmailStore(s => s.selectedMailbox);
+  const mailboxes = useEmailStore(s => s.mailboxes);
   const showPreview = useSettingsStore((state) => state.showPreview);
   const density = useSettingsStore((state) => state.density);
   const mailLayout = useSettingsStore((state) => state.mailLayout);
   const emailKeywords = useSettingsStore((state) => state.emailKeywords);
   const showAvatarsInJunk = useSettingsStore((state) => state.showAvatarsInJunk);
-  const { identities } = useAuthStore();
-  const isChecked = selectedEmailIds.has(email.id);
+  const identities = useAuthStore((s) => s.identities);
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
   const isImportant = email.keywords?.["$important"];
@@ -92,7 +97,7 @@ export function EmailListItem({ email, selected, currentMailboxRole: currentMail
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleEmailSelection(email.id);
+    useEmailStore.getState().toggleEmailSelection(email.id);
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -126,14 +131,15 @@ export function EmailListItem({ email, selected, currentMailboxRole: currentMail
         isPressed && "bg-muted scale-[0.98] ring-2 ring-primary/30"
       )}
       onClick={(e) => {
+        const store = useEmailStore.getState();
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
-          toggleEmailSelection(email.id);
+          store.toggleEmailSelection(email.id);
         } else if (e.shiftKey) {
           e.preventDefault();
-          selectRangeEmails(email.id);
+          store.selectRangeEmails(email.id);
         } else {
-          if (selectedEmailIds.size > 0) clearSelection();
+          if (hasSelection) store.clearSelection();
           onClick?.();
         }
       }}
@@ -145,7 +151,7 @@ export function EmailListItem({ email, selected, currentMailboxRole: currentMail
         style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-item-py)' }}
       >
         {/* Checkbox - only visible when in selection mode */}
-        {selectedEmailIds.size > 0 && (
+        {hasSelection && (
           <button
             onClick={handleCheckboxClick}
             className={cn(

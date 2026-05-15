@@ -35,6 +35,7 @@ const KeyboardShortcutsModal = dynamic(
   { ssr: false, loading: () => null }
 );
 import { useEmailStore } from "@/stores/email-store";
+import { useShallow } from "zustand/react/shallow";
 import { toast } from "@/stores/toast-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -242,6 +243,12 @@ export default function Home() {
   // Mobile/tablet responsive hooks
   const { isMobile, isTablet } = useDeviceDetection();
   const { activeView, sidebarOpen, setSidebarOpen, setActiveView, tabletListVisible, setTabletListVisible, sidebarWidth, emailListWidth, emailListHeight, setSidebarWidth, setEmailListWidth, setEmailListHeight, persistColumnWidths, sidebarCollapsed, resetSidebarWidth, resetEmailListWidth, resetEmailListHeight } = useUIStore();
+  // useShallow narrows the subscription from "any store mutation" to "any of
+  // these listed fields changed (shallow equal)". Without it, zustand returns
+  // a fresh state object on every set(), so this page re-rendered on every
+  // keystroke / fetch / selection toggle — cascading into the email list,
+  // sidebar, nav rail, and viewer. Actions (stable function refs) ride along
+  // for free since shallow compare on functions is identity.
   const {
     emails,
     mailboxes,
@@ -302,7 +309,67 @@ export default function Home() {
     batchMarkAsRead,
     batchMarkAsSpam,
     batchUndoSpam,
-  } = useEmailStore();
+  } = useEmailStore(useShallow(s => ({
+    emails: s.emails,
+    mailboxes: s.mailboxes,
+    selectedEmail: s.selectedEmail,
+    selectedMailbox: s.selectedMailbox,
+    quota: s.quota,
+    isPushConnected: s.isPushConnected,
+    newEmailNotification: s.newEmailNotification,
+    selectEmail: s.selectEmail,
+    selectMailbox: s.selectMailbox,
+    selectedEmailIds: s.selectedEmailIds,
+    selectAllEmails: s.selectAllEmails,
+    clearSelection: s.clearSelection,
+    toggleEmailSelection: s.toggleEmailSelection,
+    fetchMailboxes: s.fetchMailboxes,
+    fetchEmails: s.fetchEmails,
+    fetchQuota: s.fetchQuota,
+    sendEmail: s.sendEmail,
+    deleteEmail: s.deleteEmail,
+    markAsRead: s.markAsRead,
+    toggleStar: s.toggleStar,
+    setEmailKeywordsLocal: s.setEmailKeywordsLocal,
+    moveToMailbox: s.moveToMailbox,
+    moveThreadToMailbox: s.moveThreadToMailbox,
+    searchEmails: s.searchEmails,
+    searchQuery: s.searchQuery,
+    setSearchQuery: s.setSearchQuery,
+    isLoading: s.isLoading,
+    isLoadingEmail: s.isLoadingEmail,
+    setLoadingEmail: s.setLoadingEmail,
+    setPushConnected: s.setPushConnected,
+    handleStateChange: s.handleStateChange,
+    clearNewEmailNotification: s.clearNewEmailNotification,
+    markAsSpam: s.markAsSpam,
+    undoSpam: s.undoSpam,
+    searchFilters: s.searchFilters,
+    isAdvancedSearchOpen: s.isAdvancedSearchOpen,
+    setSearchFilters: s.setSearchFilters,
+    clearSearchFilters: s.clearSearchFilters,
+    toggleAdvancedSearch: s.toggleAdvancedSearch,
+    advancedSearch: s.advancedSearch,
+    selectedKeyword: s.selectedKeyword,
+    selectKeyword: s.selectKeyword,
+    hasMoreEmails: s.hasMoreEmails,
+    fetchTagCounts: s.fetchTagCounts,
+    fetchEmailContent: s.fetchEmailContent,
+    isUnifiedView: s.isUnifiedView,
+    fetchUnifiedEmails: s.fetchUnifiedEmails,
+    refreshUnifiedCounts: s.refreshUnifiedCounts,
+    exitUnifiedView: s.exitUnifiedView,
+    emptyMailbox: s.emptyMailbox,
+    markMailboxAsRead: s.markMailboxAsRead,
+    createMailbox: s.createMailbox,
+    renameMailbox: s.renameMailbox,
+    deleteMailbox: s.deleteMailbox,
+    batchDelete: s.batchDelete,
+    batchArchive: s.batchArchive,
+    batchMarkAsRead: s.batchMarkAsRead,
+    batchMarkAsSpam: s.batchMarkAsSpam,
+    batchUndoSpam: s.batchUndoSpam,
+  })));
 
   const enableUnifiedMailbox = useSettingsStore((s) => s.enableUnifiedMailbox);
   const accounts = useAccountStore((s) => s.accounts);

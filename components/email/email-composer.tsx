@@ -350,7 +350,7 @@ export function EmailComposer({
     restoreFocus: true,
   });
 
-  const { client } = useAuthStore();
+  const client = useAuthStore((s) => s.client);
   const currentIdentity = selectedIdentityId
     ? identities.find((identity) => identity.id === selectedIdentityId) || primaryIdentity
     : primaryIdentity;

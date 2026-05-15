@@ -917,8 +917,11 @@ export function EmailViewer({
 
   // Tablet list visibility
   const { isTablet, isMobile } = useDeviceDetection();
-  const { tabletListVisible } = useUIStore();
-  const { identities, client, isDemoMode, activeAccountId } = useAuthStore();
+  const tabletListVisible = useUIStore((s) => s.tabletListVisible);
+  const identities = useAuthStore((s) => s.identities);
+  const client = useAuthStore((s) => s.client);
+  const isDemoMode = useAuthStore((s) => s.isDemoMode);
+  const activeAccountId = useAuthStore((s) => s.activeAccountId);
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const { startTour } = useTour();
   const [showFullHeaders, setShowFullHeaders] = useState(false);

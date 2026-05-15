@@ -45,7 +45,8 @@ export default function ContactsPage() {
   const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore();
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
-  const { quota, isPushConnected } = useEmailStore();
+  const quota = useEmailStore(s => s.quota);
+  const isPushConnected = useEmailStore(s => s.isPushConnected);
   const {
     contacts,
     addressBooks,

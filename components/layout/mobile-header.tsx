@@ -24,7 +24,9 @@ export function MobileHeader({
   className,
 }: MobileHeaderProps) {
   const t = useTranslations('sidebar');
-  const { toggleSidebar, goBack, sidebarOpen } = useUIStore();
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const goBack = useUIStore((s) => s.goBack);
 
   const handleLeftAction = () => {
     if (showBack && onBack) {

@@ -825,7 +825,7 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
                   email={email}
                   selected={email.id === selectedEmailId}
                   isLast={index === emailsToShow.length - 1}
-                  onClick={() => onEmailSelect(email)}
+                  onSelect={onEmailSelect}
                   onContextMenu={onContextMenu}
                 />
               ))

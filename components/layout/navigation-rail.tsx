@@ -166,8 +166,11 @@ export function NavigationRail({
   const router = useRouter();
   const { appLogoLightUrl, appLogoDarkUrl } = useConfig();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
-  const { supportsCalendar } = useCalendarStore();
-  const { mailboxes } = useEmailStore();
+  const supportsCalendar = useCalendarStore((s) => s.supportsCalendar);
+  // Only inbox unread count matters here — subscribing to the whole mailboxes
+  // array would re-render the rail on any mailbox mutation. Project to the
+  // single scalar with a selector instead.
+  const inboxUnread = useEmailStore(s => s.mailboxes.find(m => m.role === "inbox")?.unreadEmails || 0);
   const client = useAuthStore((s) => s.client);
   const supportsFiles = client?.supportsFiles() ?? false;
   const supportsContacts = client?.supportsContacts() ?? false;
@@ -176,7 +179,6 @@ export function NavigationRail({
   const sidebarAppsEnabled = usePolicyStore((s) => s.isFeatureEnabled('sidebarAppsEnabled'));
   const filesEnabled = usePolicyStore((s) => s.isFeatureEnabled('filesEnabled'));
   const visibleSidebarApps = sidebarAppsEnabled ? sidebarApps : [];
-  const inboxUnread = mailboxes.find(m => m.role === "inbox")?.unreadEmails || 0;
   const [isStalwartAdmin, setIsStalwartAdmin] = useState(false);
   const hasUpdate = useUpdateStore(selectHasUpdate);
   const updateSeverity = useUpdateStore((s) => s.status?.severity);

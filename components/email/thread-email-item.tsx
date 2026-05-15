@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { memo, useCallback } from "react";
 import { formatDate } from "@/lib/utils";
 import { Email } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
@@ -16,15 +16,17 @@ interface ThreadEmailItemProps {
   email: Email;
   selected?: boolean;
   isLast?: boolean;
-  onClick?: () => void;
+  // Receives the email so callers can pass a stable callback (no per-row
+  // closure). Inline `onClick={() => onSelect(email)}` would defeat the memo.
+  onSelect?: (email: Email) => void;
   onContextMenu?: (e: React.MouseEvent, email: Email) => void;
 }
 
-export function ThreadEmailItem({
+function ThreadEmailItemImpl({
   email,
   selected,
   isLast = false,
-  onClick,
+  onSelect,
   onContextMenu,
 }: ThreadEmailItemProps) {
   const isUnread = !email.keywords?.$seen;
@@ -32,9 +34,11 @@ export function ThreadEmailItem({
   const isAnswered = email.keywords?.$answered;
   const isForwarded = email.keywords?.$forwarded;
   const sender = email.from?.[0];
-  const { selectedMailbox, selectedEmailIds, toggleEmailSelection, selectRangeEmails, clearSelection } = useEmailStore();
+  // Granular selectors — see email-list.tsx parent for rationale.
+  const selectedMailbox = useEmailStore(s => s.selectedMailbox);
+  const isChecked = useEmailStore(s => s.selectedEmailIds.has(email.id));
+  const hasSelection = useEmailStore(s => s.selectedEmailIds.size > 0);
   const density = useSettingsStore((state) => state.density);
-  const isChecked = selectedEmailIds.has(email.id);
 
   const { dragHandlers, isDragging } = useEmailDrag({
     email,
@@ -60,19 +64,20 @@ export function ThreadEmailItem({
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleEmailSelection(email.id);
+    useEmailStore.getState().toggleEmailSelection(email.id);
   };
 
   const handleClick = (e: React.MouseEvent) => {
+    const store = useEmailStore.getState();
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
-      toggleEmailSelection(email.id);
+      store.toggleEmailSelection(email.id);
     } else if (e.shiftKey) {
       e.preventDefault();
-      selectRangeEmails(email.id);
+      store.selectRangeEmails(email.id);
     } else {
-      if (selectedEmailIds.size > 0) clearSelection();
-      onClick?.();
+      if (hasSelection) store.clearSelection();
+      onSelect?.(email);
     }
   };
 
@@ -99,7 +104,7 @@ export function ThreadEmailItem({
     >
       <div className="flex items-start gap-3">
         {/* Checkbox - only visible when in selection mode */}
-        {selectedEmailIds.size > 0 && (
+        {hasSelection && (
           <button
             onClick={handleCheckboxClick}
             className={cn(
@@ -195,3 +200,8 @@ export function ThreadEmailItem({
     </div>
   );
 }
+
+// Memoized: parents (ThreadListItem) now pass stable props (formatDate is
+// pure, callbacks are useCallback-wrapped). With the row's internal selectors
+// being granular, an unrelated store mutation no longer re-renders this row.
+export const ThreadEmailItem = memo(ThreadEmailItemImpl);

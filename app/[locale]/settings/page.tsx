@@ -346,7 +346,8 @@ export default function SettingsPage() {
   const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore();
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
-  const { quota, isPushConnected } = useEmailStore();
+  const quota = useEmailStore(s => s.quota);
+  const isPushConnected = useEmailStore(s => s.isPushConnected);
   const { stalwartFeaturesEnabled } = useConfig();
   const { isFeatureEnabled } = usePolicyStore();
   const [activeTab, setActiveTab] = useState<Tab>(readPersistedTab);

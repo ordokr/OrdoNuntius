@@ -77,7 +77,8 @@ export default function CalendarPage() {
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const { client, isAuthenticated, logout, checkAuth, switchAccount, activeAccountId, isLoading: authLoading } = useAuthStore();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
-  const { quota, isPushConnected } = useEmailStore();
+  const quota = useEmailStore(s => s.quota);
+  const isPushConnected = useEmailStore(s => s.isPushConnected);
   const {
     calendars, events, selectedDate, viewMode, selectedCalendarIds,
     isLoading, isLoadingEvents, supportsCalendar, error,
