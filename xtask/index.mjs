@@ -17,6 +17,10 @@ import { promises as dns } from "node:dns";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist");
+// Bundle budget threshold per .next/static/chunks/*.js. Must be declared
+// at module top before main() is invoked below, otherwise checkBundleBudget
+// (called from release() via main()) hits the temporal dead zone.
+const CHUNK_SIZE_BUDGET_KB = 1500;
 
 const args = process.argv.slice(2);
 const command = args[0] || "help";
@@ -166,7 +170,79 @@ function release() {
     section("release");
     verify();
     build();
+    checkBundleBudget();
     return pack();
+}
+
+// ---------------------------------------------------------------------------
+// checkBundleBudget — regression guard for per-chunk size
+//
+// Rationale: a previous regression had `components/providers/intl-provider.tsx`
+// statically importing all 16 locale catalogs into one 1.83 MB client chunk
+// that every user downloaded regardless of which locale they needed. The
+// fix landed in commit 1f7b09d, but nothing prevents a future change from
+// reintroducing the same shape. This check fails the release gate if any
+// `.next/static/chunks/*.js` exceeds the threshold below, so a single
+// inadvertent barrel-import or static-locale-catalog regression is caught
+// before deploy rather than discovered when users complain.
+//
+// The threshold is generous on current state: largest legitimate chunk
+// today is the lazy asn1js chunk at ~750 KB, and the largest legitimate
+// entry-path chunk is ~227 KB. 1.5 MB leaves headroom for normal growth
+// while catching the kind of accidental-barrel-import regressions that
+// historically went unnoticed for weeks.
+// ---------------------------------------------------------------------------
+
+function checkBundleBudget() {
+    section("bundle-budget");
+    const chunksDir = join(ROOT, ".next", "static", "chunks");
+    if (!existsSync(chunksDir)) {
+        throw new Error(`bundle-budget: ${chunksDir} not found — did build run?`);
+    }
+    const overBudget = [];
+    const stack = [chunksDir];
+    let totalKb = 0;
+    let count = 0;
+    let largest = { path: "", kb: 0 };
+    while (stack.length) {
+        const dir = stack.pop();
+        let entries;
+        try { entries = readdirSync(dir, { withFileTypes: true }); }
+        catch { continue; }
+        for (const e of entries) {
+            const p = join(dir, e.name);
+            if (e.isDirectory()) {
+                stack.push(p);
+            } else if (e.name.endsWith(".js")) {
+                try {
+                    const kb = statSync(p).size / 1024;
+                    totalKb += kb;
+                    count++;
+                    if (kb > largest.kb) largest = { path: p, kb };
+                    if (kb > CHUNK_SIZE_BUDGET_KB) {
+                        overBudget.push({ path: p, kb });
+                    }
+                } catch { /* skip unreadable */ }
+            }
+        }
+    }
+    console.log(`  ${count} chunks, ${(totalKb / 1024).toFixed(1)} MB total`);
+    console.log(`  largest: ${largest.path.replace(ROOT, "")} (${largest.kb.toFixed(0)} KB)`);
+    console.log(`  budget:  ${CHUNK_SIZE_BUDGET_KB} KB per chunk`);
+    if (overBudget.length > 0) {
+        console.log(`  ✗ ${overBudget.length} chunk(s) over budget:`);
+        for (const c of overBudget) {
+            console.log(`    ${c.path.replace(ROOT, "")} (${c.kb.toFixed(0)} KB)`);
+        }
+        throw new Error(
+            `bundle-budget: ${overBudget.length} chunk(s) exceed ${CHUNK_SIZE_BUDGET_KB} KB. ` +
+            `Investigate with: grep -ao '[a-z]\\{4,\\}' <chunk> | sort -u | head -20  to identify what's inside. ` +
+            `Common causes: a barrel import (entire library, not just used exports), ` +
+            `static import of multi-locale message catalogs, or a previously-lazy ` +
+            `module promoted to static.`,
+        );
+    }
+    console.log(`  ✓ all chunks under budget`);
 }
 
 function deploy(restArgs = []) {

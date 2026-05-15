@@ -49,6 +49,28 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: import.meta.dirname,
   },
+  // Force barrel-package imports to compile to per-named-export imports.
+  // Without this, `import { Send, X } from 'lucide-react'` pulls the
+  // entire barrel module (which transitively references all ~1400 icons),
+  // and every lazy-loaded route ends up shipping its own copy of the icon
+  // tree — we measured 5 identical 580 KB lucide chunks in the build
+  // output before this was set. The listed packages are the ones whose
+  // barrel imports actually dominate our bundle:
+  //   - lucide-react: ~1400 icons via barrel; we use ~80
+  //   - @radix-ui/react-icons: similar barrel structure
+  //   - date-fns: barrel re-exports the whole locale + format library
+  //   - sonner: small but barrel-shaped
+  // See https://nextjs.org/docs/app/api-reference/config/next-config-js/optimizePackageImports
+  // (Lives under `experimental` in Next 16; check Next release notes for
+  // promotion.)
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "@radix-ui/react-icons",
+      "date-fns",
+      "sonner",
+    ],
+  },
   env: {
     NEXT_PUBLIC_GIT_COMMIT: gitCommitHash,
     NEXT_PUBLIC_APP_VERSION: appVersion,
