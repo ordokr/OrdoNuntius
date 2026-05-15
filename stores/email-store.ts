@@ -1137,11 +1137,16 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     try {
       const emailIdsArray = Array.from(selectedEmailIds);
 
+      // Bulk operations on large mailboxes were O(selected × emails) because
+      // each loop did emails.find(e.id === emailId). One Map build is
+      // O(emails); each lookup becomes O(1).
+      const emailsById = new Map(emails.map(e => [e.id, e]));
+
       if (get().isUnifiedView) {
         // Group emails by accountId for cross-account operations
         const emailsByAccount = new Map<string, string[]>();
         for (const emailId of emailIdsArray) {
-          const email = emails.find(e => e.id === emailId);
+          const email = emailsById.get(emailId);
           const acctId = email?.accountId || '__default__';
           if (!emailsByAccount.has(acctId)) emailsByAccount.set(acctId, []);
           emailsByAccount.get(acctId)!.push(emailId);
@@ -1164,19 +1169,25 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           : email
       );
 
-      // Update mailbox counters
-      const affectedEmails = emails.filter(e => selectedEmailIds.has(e.id));
+      // Update mailbox counters. Was O(M × A) — for each mailbox we walked
+      // every affected email to test mailbox.id membership. Inverted: walk
+      // each affected email once, accumulate per-mailbox deltas keyed by
+      // mailbox id (most emails live in 1-2 mailboxes, so avg-case is
+      // O(A × ~2 + M) instead of O(M × A)).
+      const unreadDelta = new Map<string, number>();
+      for (const emailId of emailIdsArray) {
+        const email = emailsById.get(emailId);
+        if (!email?.mailboxIds) continue;
+        const wasRead = email.keywords?.$seen === true;
+        if (wasRead === read) continue;
+        const sign = read ? -1 : 1;
+        for (const mailboxId of Object.keys(email.mailboxIds)) {
+          unreadDelta.set(mailboxId, (unreadDelta.get(mailboxId) ?? 0) + sign);
+        }
+      }
       const updatedMailboxes = mailboxes.map(mailbox => {
-        let deltaUnread = 0;
-        affectedEmails.forEach(email => {
-          if (email.mailboxIds?.[mailbox.id]) {
-            const wasRead = email.keywords?.$seen === true;
-            if (wasRead !== read) {
-              deltaUnread += read ? -1 : 1;
-            }
-          }
-        });
-
+        const deltaUnread = unreadDelta.get(mailbox.id) ?? 0;
+        if (deltaUnread === 0) return mailbox;
         return {
           ...mailbox,
           unreadEmails: Math.max(0, mailbox.unreadEmails + deltaUnread),
@@ -1213,10 +1224,13 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const isInJunk = currentMailbox?.role === 'junk';
       const forceDestroy = permanent || isInTrash || (isInJunk && permanentlyDeleteJunk);
 
+      // Build emailsById once; loops below were each O(selected × emails).
+      const emailsById = new Map(emails.map(e => [e.id, e]));
+
       // Group emails by accountId (handles unified view and search results spanning accounts).
       const emailsByAccount = new Map<string, string[]>();
       for (const emailId of emailIdsArray) {
-        const email = emails.find(e => e.id === emailId);
+        const email = emailsById.get(emailId);
         const acctId = email?.accountId || '__default__';
         if (!emailsByAccount.has(acctId)) emailsByAccount.set(acctId, []);
         emailsByAccount.get(acctId)!.push(emailId);
@@ -1264,23 +1278,35 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
         // Only remove successfully moved emails from local state.
         if (movedEmailIds.size < emailIdsArray.length) {
-          const deletedEmails = emails.filter(e => movedEmailIds.has(e.id));
-          const remainingEmails = emails.filter(e => !movedEmailIds.has(e.id));
-          const updatedMailboxes = mailboxes.map(mailbox => {
-            let deltaTotalEmails = 0;
-            let deltaUnreadEmails = 0;
-            deletedEmails.forEach(email => {
-              if (email.mailboxIds?.[mailbox.id]) {
-                deltaTotalEmails--;
-                if (!email.keywords?.$seen) deltaUnreadEmails--;
+          // Single pass per email instead of mailboxes.map × emails.forEach
+          // (O(D + M) vs O(D × M)). Most emails are in 1-2 mailboxes.
+          const totalDelta = new Map<string, number>();
+          const unreadDelta = new Map<string, number>();
+          const remainingEmails: Email[] = [];
+          for (const email of emails) {
+            if (movedEmailIds.has(email.id)) {
+              if (!email.mailboxIds) continue;
+              const isUnread = !email.keywords?.$seen;
+              for (const mailboxId of Object.keys(email.mailboxIds)) {
+                totalDelta.set(mailboxId, (totalDelta.get(mailboxId) ?? 0) - 1);
+                if (isUnread) {
+                  unreadDelta.set(mailboxId, (unreadDelta.get(mailboxId) ?? 0) - 1);
+                }
               }
-            });
+            } else {
+              remainingEmails.push(email);
+            }
+          }
+          const updatedMailboxes = mailboxes.map(mailbox => {
+            const dt = totalDelta.get(mailbox.id) ?? 0;
+            const du = unreadDelta.get(mailbox.id) ?? 0;
+            if (dt === 0 && du === 0) return mailbox;
             return {
               ...mailbox,
-              totalEmails: Math.max(0, mailbox.totalEmails + deltaTotalEmails),
-              unreadEmails: Math.max(0, mailbox.unreadEmails + deltaUnreadEmails),
-              totalThreads: Math.max(0, mailbox.totalThreads + deltaTotalEmails),
-              unreadThreads: Math.max(0, mailbox.unreadThreads + deltaUnreadEmails),
+              totalEmails: Math.max(0, mailbox.totalEmails + dt),
+              unreadEmails: Math.max(0, mailbox.unreadEmails + du),
+              totalThreads: Math.max(0, mailbox.totalThreads + dt),
+              unreadThreads: Math.max(0, mailbox.unreadThreads + du),
             };
           });
           set({
@@ -1295,30 +1321,35 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         }
       }
 
-      // Remove deleted emails from local state
-      const remainingEmails = emails.filter(e => !selectedEmailIds.has(e.id));
-
-      // Update mailbox counters
-      const deletedEmails = emails.filter(e => selectedEmailIds.has(e.id));
-      const updatedMailboxes = mailboxes.map(mailbox => {
-        let deltaTotalEmails = 0;
-        let deltaUnreadEmails = 0;
-
-        deletedEmails.forEach(email => {
-          if (email.mailboxIds?.[mailbox.id]) {
-            deltaTotalEmails--;
-            if (!email.keywords?.$seen) {
-              deltaUnreadEmails--;
+      // Remove deleted emails and accumulate mailbox deltas in a single
+      // pass — was O(emails) × 2 (filter both ways) + O(M × D) for counters.
+      const totalDelta = new Map<string, number>();
+      const unreadDelta = new Map<string, number>();
+      const remainingEmails: Email[] = [];
+      for (const email of emails) {
+        if (selectedEmailIds.has(email.id)) {
+          if (!email.mailboxIds) continue;
+          const isUnread = !email.keywords?.$seen;
+          for (const mailboxId of Object.keys(email.mailboxIds)) {
+            totalDelta.set(mailboxId, (totalDelta.get(mailboxId) ?? 0) - 1);
+            if (isUnread) {
+              unreadDelta.set(mailboxId, (unreadDelta.get(mailboxId) ?? 0) - 1);
             }
           }
-        });
-
+        } else {
+          remainingEmails.push(email);
+        }
+      }
+      const updatedMailboxes = mailboxes.map(mailbox => {
+        const dt = totalDelta.get(mailbox.id) ?? 0;
+        const du = unreadDelta.get(mailbox.id) ?? 0;
+        if (dt === 0 && du === 0) return mailbox;
         return {
           ...mailbox,
-          totalEmails: Math.max(0, mailbox.totalEmails + deltaTotalEmails),
-          unreadEmails: Math.max(0, mailbox.unreadEmails + deltaUnreadEmails),
-          totalThreads: Math.max(0, mailbox.totalThreads + deltaTotalEmails),
-          unreadThreads: Math.max(0, mailbox.unreadThreads + deltaUnreadEmails)
+          totalEmails: Math.max(0, mailbox.totalEmails + dt),
+          unreadEmails: Math.max(0, mailbox.unreadEmails + du),
+          totalThreads: Math.max(0, mailbox.totalThreads + dt),
+          unreadThreads: Math.max(0, mailbox.unreadThreads + du)
         };
       });
 
@@ -1346,10 +1377,12 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const emailIdsArray = Array.from(selectedEmailIds);
 
       if (get().isUnifiedView) {
+        // Build emailsById once; the loop below was O(selected × emails).
+        const emailsById = new Map(emails.map(e => [e.id, e]));
         // Group emails by accountId for cross-account operations
         const emailsByAccount = new Map<string, string[]>();
         for (const emailId of emailIdsArray) {
-          const email = emails.find(e => e.id === emailId);
+          const email = emailsById.get(emailId);
           const acctId = email?.accountId || '__default__';
           if (!emailsByAccount.has(acctId)) emailsByAccount.set(acctId, []);
           emailsByAccount.get(acctId)!.push(emailId);

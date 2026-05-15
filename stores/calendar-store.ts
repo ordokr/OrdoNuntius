@@ -46,12 +46,20 @@ function mapServerEventToStoreEvent(
   targetAccountId?: string
 ): CalendarEvent {
   const mappedCalendarIds = mapCalendarIdsToStoreIds(event.calendarIds, calendars, targetAccountId) || event.calendarIds;
-  const matchedCalendar = Object.keys(event.calendarIds || {})
-    .map((calendarId) => calendars.find((calendar) =>
-      (calendar.originalId || calendar.id) === calendarId
-      && (!targetAccountId || calendar.accountId === targetAccountId)
-    ))
-    .find((calendar): calendar is Calendar => Boolean(calendar));
+  // Was O(K × C) — for each key in event.calendarIds, scanned all calendars.
+  // Now O(C + K) — build a lookup once (filtering by targetAccountId in the
+  // same pass), then probe each key directly. Calendars are typically ~50
+  // and this can be called once per event in bulk-fetch flows.
+  const calendarByOriginal = new Map<string, Calendar>();
+  for (const calendar of calendars) {
+    if (targetAccountId && calendar.accountId !== targetAccountId) continue;
+    calendarByOriginal.set(calendar.originalId || calendar.id, calendar);
+  }
+  let matchedCalendar: Calendar | undefined;
+  for (const calendarId of Object.keys(event.calendarIds || {})) {
+    const candidate = calendarByOriginal.get(calendarId);
+    if (candidate) { matchedCalendar = candidate; break; }
+  }
   const resolvedAccountId = matchedCalendar?.accountId || targetAccountId;
   const isShared = matchedCalendar?.isShared || false;
 

@@ -26,10 +26,14 @@ export function groupEmailsByThread(emails: Email[], disableThreading = false): 
   const threadGroups: ThreadGroup[] = [];
 
   for (const [threadId, threadEmails] of threadMap) {
-    // Sort emails by receivedAt descending (newest first)
-    const sortedEmails = [...threadEmails].sort(
-      (a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
-    );
+    // Sort emails by receivedAt descending (newest first). Decorate-sort-
+    // undecorate: parse each receivedAt once (O(n)) instead of twice per
+    // comparison (O(n log n)). For long threads this halves the date work
+    // and is consequential for sortThreadGroups below with N > 1000.
+    const sortedEmails = threadEmails
+      .map(e => ({ e, ms: new Date(e.receivedAt).getTime() }))
+      .sort((a, b) => b.ms - a.ms)
+      .map(x => x.e);
 
     const latestEmail = sortedEmails[0];
 
@@ -70,9 +74,13 @@ export function groupEmailsByThread(emails: Email[], disableThreading = false): 
  * Sorts thread groups by their latest email's receivedAt date (newest first).
  */
 export function sortThreadGroups(groups: ThreadGroup[]): ThreadGroup[] {
-  return [...groups].sort(
-    (a, b) => new Date(b.latestEmail.receivedAt).getTime() - new Date(a.latestEmail.receivedAt).getTime()
-  );
+  // Schwartzian transform: parse each latestEmail.receivedAt once instead
+  // of twice per comparison. With 1000 thread groups, this is the
+  // difference between ~1000 Date parses and ~20000.
+  return groups
+    .map(g => ({ g, ms: new Date(g.latestEmail.receivedAt).getTime() }))
+    .sort((a, b) => b.ms - a.ms)
+    .map(x => x.g);
 }
 
 /**
@@ -125,10 +133,12 @@ export function mergeThreadEmails(
     }
   }
 
-  // Convert back to array and sort
-  const mergedEmails = Array.from(emailMap.values()).sort(
-    (a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
-  );
+  // Convert back to array and sort. Schwartzian transform: O(n) date
+  // parses instead of O(n log n) (each Date() call parses the string).
+  const mergedEmails = Array.from(emailMap.values())
+    .map(e => ({ e, ms: new Date(e.receivedAt).getTime() }))
+    .sort((a, b) => b.ms - a.ms)
+    .map(x => x.e);
 
   const latestEmail = mergedEmails[0];
   const participantNames = getThreadParticipants(mergedEmails);
