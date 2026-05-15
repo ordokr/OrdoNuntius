@@ -127,7 +127,7 @@ describe('ui permission requirement', () => {
 
 describe('slot registration bridge', () => {
   it('calls bridge when set', () => {
-    const bridge = vi.fn((_name, _reg) => ({ dispose: () => {} }));
+    const bridge = vi.fn((_name: unknown, _reg: unknown) => ({ dispose: () => {} }));
     setSlotRegistrationBridge(bridge);
 
     const plugin = makePlugin({ permissions: ['ui:email-footer'] });

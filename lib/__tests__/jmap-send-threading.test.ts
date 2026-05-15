@@ -31,7 +31,7 @@ function mockSendEmailFlow() {
   const captured: CapturedRequest[] = [];
   const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
-  fetchSpy.mockImplementation(async (_url, init) => {
+  fetchSpy.mockImplementation(async (_url: unknown, init: unknown) => {
     const body = JSON.parse((init as { body: string }).body) as CapturedRequest;
     captured.push(body);
     const callIdx = captured.length - 1;

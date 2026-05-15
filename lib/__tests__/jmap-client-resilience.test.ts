@@ -274,7 +274,7 @@ describe('JMAPClient resilience', () => {
       expect(callback).toHaveBeenCalledWith(false);
       expect(callback).toHaveBeenCalledWith(true);
       // Verify ordering: false fired before true
-      const calls = callback.mock.calls.map((c) => c[0]);
+      const calls = callback.mock.calls.map((c: unknown[]) => c[0]);
       const falseIdx = calls.indexOf(false);
       const trueIdx = calls.lastIndexOf(true);
       expect(falseIdx).toBeLessThan(trueIdx);
@@ -297,7 +297,7 @@ describe('JMAPClient resilience', () => {
 
       expect(callback).toHaveBeenCalledWith(false);
       // Should not have fired true at any point
-      const trueCall = callback.mock.calls.find((c) => c[0] === true);
+      const trueCall = callback.mock.calls.find((c: unknown[]) => c[0] === true);
       expect(trueCall).toBeUndefined();
     });
 
