@@ -84,8 +84,17 @@ import { RecipientPopover } from "./recipient-popover";
 import { isFilePreviewable } from "@/lib/file-preview";
 import { SmimeStatusBanner } from "./smime-status-banner";
 import { detectSmime } from "@/lib/smime/smime-detect";
-import { smimeDecrypt, SmimeKeyLockedError, normalizeCmsBytes } from "@/lib/smime/smime-decrypt";
-import { smimeVerify } from "@/lib/smime/smime-verify";
+// smime-decrypt and smime-verify both import the pkijs/asn1js/webcrypto-liner
+// stack (~1.15 MB). Static imports would put that cost on every inbox load
+// even when the user is viewing plain-text email. The shape types (via
+// `typeof import(...)`) are zero-cost at runtime — TypeScript erases them
+// to nothing — and let the processSmime() body below use the lazy-loaded
+// runtime with full type checking. The detectSmime() gate at the top of
+// the S/MIME effect already returns early when detection.type is null, so
+// processSmime() (and therefore the await import calls) only fires for
+// actual signed or encrypted messages.
+type SmimeDecryptMod = typeof import("@/lib/smime/smime-decrypt");
+type SmimeVerifyMod = typeof import("@/lib/smime/smime-verify");
 import { useSmimeStore } from "@/stores/smime-store";
 import type { SmimeStatus } from "@/lib/smime/types";
 import { parseTnef, isTnefAttachment } from "@/lib/tnef";
@@ -1320,6 +1329,20 @@ export function EmailViewer({
 
     async function processSmime() {
       try {
+        // Lazy-load the pkijs/asn1js/webcrypto-liner stack only when we have
+        // an actual signed/encrypted message to process. Module-level static
+        // imports of these would put ~1.15 MB on every inbox load even when
+        // the user is reading plain-text email. detectSmime above already
+        // gated this branch (we only get here if detection.type is set), so
+        // every async-cost paid here is justified by a real S/MIME message.
+        const [smimeDecryptMod, smimeVerifyMod]: [SmimeDecryptMod, SmimeVerifyMod] =
+          await Promise.all([
+            import("@/lib/smime/smime-decrypt"),
+            import("@/lib/smime/smime-verify"),
+          ]);
+        const { smimeDecrypt, SmimeKeyLockedError, normalizeCmsBytes } = smimeDecryptMod;
+        const { smimeVerify } = smimeVerifyMod;
+
         const toHex = (bytes: Uint8Array, count: number) =>
           Array.from(bytes.slice(0, count)).map(b => b.toString(16).padStart(2, '0')).join(' ');
 

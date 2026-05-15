@@ -10,11 +10,21 @@ import {
   listPublicCerts,
   deletePublicCert as deletePublicCertDB,
 } from '@/lib/smime/key-storage';
-import { importPkcs12, unlockPrivateKey } from '@/lib/smime/pkcs12-import';
-import {
-  parseCertificatePemOrDer,
-  extractCertificateInfo,
-} from '@/lib/smime/certificate-utils';
+
+// pkcs12-import and certificate-utils both pull in pkijs + asn1js +
+// webcrypto-liner (~1.15 MB combined). Static imports here would put that
+// stack on the inbox bundle through the chain:
+//   lib/account-state-manager.ts → stores/smime-store.ts → here
+// Lazy-load them at call time so the cost is only paid when a user
+// imports a PKCS#12 file, unlocks a private key, or views a contact's
+// certificate. The store's API stays sync-callable; each action method
+// is already async, so the extra `await import()` is invisible to callers.
+async function loadPkcs12Import() {
+  return import('@/lib/smime/pkcs12-import');
+}
+async function loadCertificateUtils() {
+  return import('@/lib/smime/certificate-utils');
+}
 
 const REMEMBERED_UNLOCKS_STORAGE_KEY = 'smime-unlocked-session';
 
@@ -107,6 +117,7 @@ async function restoreRememberedKeys(keyRecords: SmimeKeyRecord[]): Promise<{
     }
 
     try {
+      const { unlockPrivateKey } = await loadPkcs12Import();
       const { signingKey, decryptionKey, legacyDecryptionKey } = await unlockPrivateKey(record, passphrase);
       unlockedKeys.set(record.id, signingKey);
       if (decryptionKey) {
@@ -260,6 +271,7 @@ export const useSmimeStore = create<SmimeStore>()(
       importPKCS12: async (file, p12Passphrase, storagePassphrase) => {
         set({ isLoading: true, error: null });
         try {
+          const { importPkcs12 } = await loadPkcs12Import();
           const { keyRecord } = await importPkcs12(file, p12Passphrase, storagePassphrase);
           const acctId = get().currentAccountId;
           if (acctId) keyRecord.accountId = acctId;
@@ -281,6 +293,7 @@ export const useSmimeStore = create<SmimeStore>()(
       importPublicCert: async (data, source, contactId) => {
         set({ isLoading: true, error: null });
         try {
+          const { parseCertificatePemOrDer, extractCertificateInfo } = await loadCertificateUtils();
           const cert = parseCertificatePemOrDer(data);
           // Always re-encode to DER - input might be PEM text (string or ArrayBuffer)
           const der = cert.toSchema(true).toBER(false);
@@ -378,6 +391,7 @@ export const useSmimeStore = create<SmimeStore>()(
         const record = get().keyRecords.find((k) => k.id === id);
         if (!record) throw new Error('Key record not found');
 
+        const { unlockPrivateKey } = await loadPkcs12Import();
         const { signingKey, decryptionKey, legacyDecryptionKey } = await unlockPrivateKey(record, passphrase);
         if (get().rememberUnlockedKeys) {
           rememberUnlockedKey(id, passphrase);
