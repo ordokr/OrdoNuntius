@@ -19,7 +19,40 @@ npm run xtask -- release             # verify + build + pack — full local rele
 npm run xtask -- deploy <env> [ssh]  # release + scp + remote install via infra/scripts/deploy-ec2.sh
                                      # env: email-lab | staging | prod
                                      # ssh: default ordo-epistola
+npm run xtask -- clean               # wipe dist/, .next/, test-results/, tmp/
+                                     # (build outputs only; node_modules kept)
+npm run xtask -- doctor              # pre-flight self-check before deploy
 ```
+
+## Build hygiene
+
+`pack` wipes `dist/` at start, so it never accumulates old tarballs
+across deploys. (Unchecked accumulation was the cause of the 2026-05-15
+7.2 GB scp stall — one tarball per deploy was getting shipped together.)
+
+`.next/` is managed by `next build` and grows with turbopack's
+incremental cache. If it crosses ~2 GB or you suspect a stale build is
+affecting output, `xtask clean` wipes both `dist/` and `.next/` (next
+deploy rebuilds from scratch).
+
+## Pre-deploy doctor
+
+`xtask doctor` checks the workstation for the failure modes that have
+bitten us in production:
+
+| Check | Why |
+|---|---|
+| `node_modules/.bin/{tsc,eslint,next,vitest}` present | Partial `npm install` / `npm ci` runs leave `.bin/` half-populated; `npx tsc` then fetches a wrong binary and `verify` fails confusingly. Fix: `rm -rf node_modules && npm ci`. |
+| `dist/` < 500 MB | Bloat indicator. `xtask clean` wipes it. |
+| `.next/` < 2 GB | Turbopack incremental cache bloat. Same fix. |
+| `git status` clean | Advisory — deploys ship from working tree, so uncommitted changes are surfaceable but not blocking. |
+| SSH alias `ec2` resolves | Lightweight host reachability check — saves the time of getting through verify+build only to scp-fail. |
+
+A clean `doctor` is a green light for `deploy`. A non-clean `doctor`
+exits non-zero with the exact fix command for each issue.
+
+See `infra/runbooks/lessons-learned-2026-05-15.md` for the failure
+modes that drove these checks.
 
 ## Gate contract
 

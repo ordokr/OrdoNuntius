@@ -8,7 +8,8 @@
 
 import { spawnSync, execSync } from "node:child_process";
 import {
-    cpSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync,
+    cpSync, existsSync, lstatSync, mkdirSync, readdirSync, rmSync,
+    statSync, writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,6 +23,7 @@ const command = args[0] || "help";
 
 const COMMANDS = {
     help, verify, build, pack, release, deploy, "check-dns": checkDns,
+    clean, doctor,
 };
 
 main();
@@ -64,8 +66,16 @@ Commands:
                                   MX) for the Salt & Light mail lane.
                                   default mail-domain: saltnlightllc.com
                                   default host:        mail.saltnlightllc.com
+  clean                           wipe dist/, .next/, test-results/, tmp/
+                                  (build outputs only — node_modules is kept).
+                                  Run before a release to guarantee a fresh build.
+  doctor                          self-check the workstation before deploy:
+                                  node_modules/.bin symlinks intact, dist/
+                                  not bloated, git tree state sane. Prints
+                                  a fix command for each issue it finds.
 
-See xtask/README.md for the gate contract.
+See xtask/README.md for the gate contract and
+infra/runbooks/lessons-learned-2026-05-15.md for the failure-mode appendix.
 `);
 }
 
@@ -176,6 +186,154 @@ function deploy(restArgs = []) {
     const cmd = process.platform === "win32" ? "bash" : "bash";
     runStep("deploy-ec2.sh", cmd,
         [join(ROOT, "infra", "scripts", "deploy-ec2.sh"), env, ssh]);
+}
+
+// ---------------------------------------------------------------------------
+// clean — wipe build outputs (NOT node_modules)
+//
+// Why: during the 2026-05-15 launch arc, `dist/` accumulated to 7.4GB
+// across many builds (one tarball per `pack` invocation, never collected)
+// and `.next/` to 8GB (turbopack incremental cache). Both caused
+// deploy-ec2.sh's scp step to upload a multi-GB tarball that stalled.
+// `pack` now self-cleans `dist/`; `clean` extends that to the other
+// build outputs so an operator can baseline the tree before a release.
+// ---------------------------------------------------------------------------
+
+function clean() {
+    section("clean");
+    const targets = ["dist", ".next", "test-results", "tmp"];
+    for (const t of targets) {
+        const p = join(ROOT, t);
+        const sizeMb = dirSizeMb(p);
+        if (sizeMb === null) {
+            console.log(`  - ${t}/ (absent)`);
+            continue;
+        }
+        rmSync(p, { recursive: true, force: true });
+        console.log(`  ✓ ${t}/ wiped (${sizeMb.toFixed(0)} MB freed)`);
+    }
+    console.log("\n  node_modules/ left intact — run `npm ci` if it's also wedged.");
+}
+
+// ---------------------------------------------------------------------------
+// doctor — pre-flight check on the workstation before a deploy
+//
+// Each check is independent. A failed check prints both the diagnosis
+// and the exact command to fix it, then doctor() exits non-zero. The
+// goal is "one command tells you everything that's wrong" — operators
+// don't need to remember the list of failure modes from runbooks.
+//
+// Checks today:
+//   - node_modules/.bin/{tsc,eslint,next,vitest} symlinks present
+//     (partial npm-install state breaks `npx tsc` etc.)
+//   - dist/ size < 500MB (prevents repeating the 7GB upload incident)
+//   - .next/ size < 2GB (turbopack cache bloat indicator)
+//   - git working tree status (warns on uncommitted changes; not fatal)
+//   - SSH alias `ec2` resolves (lightweight host-side reachability hint)
+// ---------------------------------------------------------------------------
+
+function doctor() {
+    section("doctor");
+    const issues = [];
+
+    // 1. node_modules/.bin/* symlinks
+    const requiredBins = ["tsc", "eslint", "next", "vitest"];
+    for (const bin of requiredBins) {
+        // Windows uses .CMD/.BAT shims, POSIX uses symlinks/scripts.
+        const candidates = process.platform === "win32"
+            ? [`${bin}.cmd`, bin, `${bin}.CMD`]
+            : [bin];
+        const found = candidates.some((c) => {
+            try {
+                lstatSync(join(ROOT, "node_modules", ".bin", c));
+                return true;
+            } catch { return false; }
+        });
+        if (!found) {
+            issues.push({
+                what: `node_modules/.bin/${bin} missing`,
+                fix: "rm -rf node_modules && npm ci --no-audit --no-fund",
+            });
+        }
+    }
+
+    // 2. dist/ size
+    const distMb = dirSizeMb(DIST);
+    if (distMb !== null && distMb > 500) {
+        issues.push({
+            what: `dist/ is ${distMb.toFixed(0)} MB (>500 MB threshold)`,
+            fix: "npm run xtask -- clean",
+        });
+    }
+
+    // 3. .next/ size
+    const nextMb = dirSizeMb(join(ROOT, ".next"));
+    if (nextMb !== null && nextMb > 2000) {
+        issues.push({
+            what: `.next/ is ${nextMb.toFixed(0)} MB (>2 GB threshold)`,
+            fix: "npm run xtask -- clean",
+        });
+    }
+
+    // 4. git status (advisory, never fatal)
+    let dirty = "";
+    try {
+        dirty = execSync("git status --porcelain", { cwd: ROOT })
+            .toString().trim();
+    } catch { /* git absent or not a repo — silently ignore */ }
+    if (dirty) {
+        const lines = dirty.split("\n").length;
+        console.log(`  · git: ${lines} uncommitted change(s) — advisory, deploys ship from working tree.`);
+    } else {
+        console.log("  ✓ git: working tree clean");
+    }
+
+    // 5. ssh alias ec2 resolves
+    const sshCheck = spawnSync(
+        "ssh",
+        ["-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "ec2",
+         "echo ok"],
+        { cwd: ROOT, stdio: "pipe", shell: process.platform === "win32" },
+    );
+    if (sshCheck.status !== 0) {
+        issues.push({
+            what: "ssh alias `ec2` does not resolve / reach the host",
+            fix: "add a Host ec2 stanza in ~/.ssh/config or check VPN/network",
+        });
+    }
+
+    // Report
+    if (issues.length === 0) {
+        console.log("\n  ✓ all checks passed — safe to deploy.");
+        return;
+    }
+    console.log("\n  Issues found:");
+    for (const i of issues) {
+        console.log(`  ✗ ${i.what}`);
+        console.log(`    fix: ${i.fix}`);
+    }
+    throw new Error(`doctor: ${issues.length} issue(s) found — fix and re-run.`);
+}
+
+// Helper: directory size in MB, or null if the path doesn't exist.
+function dirSizeMb(path) {
+    if (!existsSync(path)) return null;
+    let total = 0;
+    const stack = [path];
+    while (stack.length) {
+        const p = stack.pop();
+        let entries;
+        try { entries = readdirSync(p, { withFileTypes: true }); }
+        catch { continue; }
+        for (const e of entries) {
+            const child = join(p, e.name);
+            try {
+                if (e.isDirectory()) stack.push(child);
+                else total += statSync(child).size;
+            } catch { /* skip unreadable */ }
+        }
+    }
+    return total / 1024 / 1024;
 }
 
 // ---------------------------------------------------------------------------

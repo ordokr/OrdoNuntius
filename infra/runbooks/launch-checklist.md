@@ -12,6 +12,10 @@ Pre-reads:
 - `infra/runbooks/oauth-wiring.md` — optional OIDC client setup (cross-origin CORS)
 - `infra/runbooks/outbound-ses-check.md` — SES verification
 - `infra/runbooks/restart-canary-webmail.md` — per-deploy verification
+- `infra/runbooks/lessons-learned-2026-05-15.md` — failure-mode appendix
+  (X-Forwarded-Proto/EPROTO, `/.well-known/jmap` 307, cache-poisoning 301s,
+  retry-budget math, lenient inbox auto-select, build-output hygiene,
+  AWS/DNS gotchas, prod-visible diagnostic conventions)
 
 ## Phase D — host prep and AWS bootstrap
 
