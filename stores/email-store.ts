@@ -10,6 +10,7 @@ import type { ExternalSearchResult } from "@/lib/plugin-types";
 import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
 import { useAuthStore } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
+import { getLastInbox, setLastInbox } from "@/lib/last-inbox";
 
 interface EmailStore {
   emails: Email[];
@@ -352,6 +353,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           primary.find(m => (m.name || '').trim().toLowerCase() === 'inbox');
         if (inboxMailbox) {
           set({ mailboxes, selectedMailbox: inboxMailbox.id, ...loadingPatch });
+          // Cache for next cold-load so prefetchInitialData can fire Email/query
+          // in parallel with Mailbox/get instead of after it.
+          setLastInbox(client.getAccountId(), inboxMailbox.id);
         } else {
           set({ mailboxes, selectedMailbox: '', ...loadingPatch });
         }
@@ -374,16 +378,47 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     if (target.__prefetchPromise) return target.__prefetchPromise;
     target.__prefetchPromise = (async () => {
       try {
-        await Promise.all([
-          get().fetchMailboxes(client),
-          get().fetchQuota(client),
-        ]);
-        const { selectedMailbox } = get();
-        if (selectedMailbox) {
-          await get().fetchEmails(client, selectedMailbox);
+        // Speculative-parallel cold-load. Previously Mailbox/get had to land
+        // before Email/query could fire — one full JMAP roundtrip serialized.
+        // We now read the previously-resolved inbox ID from localStorage and
+        // fire Email/query in parallel; if Mailbox/get later reports a
+        // different inbox ID we discard the speculative result and re-query.
+        const accountId = client.getAccountId();
+        const speculativeId = getLastInbox(accountId);
+        const emailsPerPage = useSettingsStore.getState().emailsPerPage;
+
+        const mailboxesPromise = get().fetchMailboxes(client);
+        const quotaPromise = get().fetchQuota(client);
+        const speculativePromise: Promise<{ emails: Email[]; hasMore: boolean; total: number } | null> =
+          speculativeId
+            ? client.getEmails(speculativeId, undefined, emailsPerPage, 0, undefined).catch(() => null)
+            : Promise.resolve(null);
+
+        await mailboxesPromise;
+        const resolvedInboxId = get().selectedMailbox;
+        const speculative = await speculativePromise;
+
+        const speculativeMatches =
+          speculative !== null && resolvedInboxId !== "" && resolvedInboxId === speculativeId;
+
+        if (speculativeMatches && get().selectedMailbox === speculativeId) {
+          // User hasn't navigated away during the race — commit speculative.
+          set({
+            emails: speculative!.emails,
+            hasMoreEmails: speculative!.hasMore,
+            totalEmails: speculative!.total,
+            isLoading: false,
+          });
+          console.info(
+            `[prefetch] speculative inbox hit: ${speculative!.emails.length}/${speculative!.total} emails (saved 1 RTT)`,
+          );
+        } else if (resolvedInboxId) {
+          await get().fetchEmails(client, resolvedInboxId);
         } else {
           await get().fetchEmails(client);
         }
+
+        await quotaPromise.catch(() => undefined);
         // Tag counts can finish whenever; don't block the prefetch on them.
         void get().fetchTagCounts(client);
       } finally {
