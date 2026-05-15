@@ -43,63 +43,42 @@ case "${TARGET_ENV}" in
 esac
 SSM_PREFIX="/saltnlight/webmail/${TARGET_ENV}"
 
-STAMP="$(date +%Y%m%d%H%M%S)"
-STAGE="$(mktemp -d -t "ordonuntius-release-${STAMP}.XXXXXX")"
-ARCHIVE="${TMPDIR:-/tmp}/ordonuntius-release-${STAMP}.tgz"
-
-cleanup() {
-    rm -rf "${STAGE}" "${ARCHIVE}" 2>/dev/null || true
-}
-trap cleanup EXIT
-
 echo "[deploy-ec2] env=${TARGET_ENV} host=${HOSTNAME} ssh=${TARGET}"
 echo "[deploy-ec2] root=${ROOT}"
-echo "[deploy-ec2] stage=${STAGE}"
 
 cd "${ROOT}"
 
-# 1. Build with next.js standalone output (already set in next.config.ts).
-GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
-export GIT_COMMIT
-echo "[deploy-ec2] building OrdoNuntius @ ${GIT_COMMIT}"
-npm ci
-npm run build
-
-# next.js standalone layout:
-#   .next/standalone/server.js + .next/standalone/.next/...
-#   .next/static/   (must be placed at  standalone/.next/static)
-#   public/         (must be placed at  standalone/public)
-[[ -f .next/standalone/server.js ]] || {
-    echo "deploy-ec2: .next/standalone/server.js missing; is next.config.ts output:'standalone'?" >&2
+# 1. Locate the pre-built tarball produced by `xtask pack`.
+#
+# Previously this script did its own `npm ci && npm run build && tar`, which
+# meant every `xtask deploy` rebuilt twice (once in xtask, once here) — a
+# 60-120s waste per deploy. `xtask release` (the prerequisite for `xtask
+# deploy`) already runs verify+build+pack and writes the tarball path to
+# `dist/LATEST`. Read it from there.
+#
+# If LATEST is missing the operator either invoked this script directly
+# without xtask, or the pack step failed. Either way the operator's fix is
+# `npm run xtask -- pack` first — refuse rather than silently rebuild.
+LATEST_POINTER="${ROOT}/dist/LATEST"
+if [[ ! -f "${LATEST_POINTER}" ]]; then
+    echo "deploy-ec2: ${LATEST_POINTER} missing." >&2
+    echo "deploy-ec2: run \`npm run xtask -- pack\` first, or use \`npm run xtask -- deploy\`" >&2
+    echo "deploy-ec2: which packs and then invokes this script." >&2
     exit 2
-}
-mkdir -p "${STAGE}"
-cp -a .next/standalone/. "${STAGE}/"
-mkdir -p "${STAGE}/.next"
-cp -a .next/static "${STAGE}/.next/static"
-cp -a public "${STAGE}/public"
+fi
+PREBUILT_ARCHIVE=$(cat "${LATEST_POINTER}")
+if [[ ! -f "${PREBUILT_ARCHIVE}" ]]; then
+    echo "deploy-ec2: tarball ${PREBUILT_ARCHIVE} listed in LATEST not found." >&2
+    echo "deploy-ec2: re-run \`npm run xtask -- pack\` to regenerate." >&2
+    exit 2
+fi
 
-# 2. Ship the infra scripts the install step needs.
-mkdir -p "${STAGE}/install"
-cp infra/systemd/ordonuntius.service.template     "${STAGE}/install/"
-cp infra/nginx/webmail.saltnlightllc.com.conf     "${STAGE}/install/"
-cp infra/nginx/connection-upgrade.conf            "${STAGE}/install/"
-cp infra/scripts/install-ordo-nuntius.sh          "${STAGE}/install/"
-chmod +x "${STAGE}/install/install-ordo-nuntius.sh"
+GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
+echo "[deploy-ec2] using pre-built tarball $(basename "${PREBUILT_ARCHIVE}") @ ${GIT_COMMIT}"
+echo "[deploy-ec2] tarball size: $(du -h "${PREBUILT_ARCHIVE}" | cut -f1)"
 
-# Record the deploy metadata for the About screen / audit.
-cat > "${STAGE}/install/RELEASE.json" <<EOF
-{
-  "stamp": "${STAMP}",
-  "git_commit": "${GIT_COMMIT}",
-  "target_env": "${TARGET_ENV}",
-  "hostname": "${HOSTNAME}"
-}
-EOF
-
-# 3. Pack and ship.
-tar -czf "${ARCHIVE}" -C "${STAGE}" .
-echo "[deploy-ec2] archive: $(du -h "${ARCHIVE}" | cut -f1)"
+# Reuse the pre-built archive directly; no local rebuild, no tar reassembly.
+ARCHIVE="${PREBUILT_ARCHIVE}"
 
 scp "${ARCHIVE}" "${TARGET}:/tmp/ordonuntius-release.tgz"
 
