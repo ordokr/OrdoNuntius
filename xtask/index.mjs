@@ -117,8 +117,8 @@ function pack(restArgs = []) {
     mkdirSync(installDst, { recursive: true });
     cpSync(join(ROOT, "infra", "systemd", "ordonuntius.service.template"),
         join(installDst, "ordonuntius.service.template"));
-    cpSync(join(ROOT, "infra", "nginx", "mail.saltnlightllc.com.conf"),
-        join(installDst, "mail.saltnlightllc.com.conf"));
+    cpSync(join(ROOT, "infra", "nginx", "webmail.saltnlightllc.com.conf"),
+        join(installDst, "webmail.saltnlightllc.com.conf"));
     cpSync(join(ROOT, "infra", "nginx", "connection-upgrade.conf"),
         join(installDst, "connection-upgrade.conf"));
     cpSync(join(ROOT, "infra", "scripts", "install-ordo-nuntius.sh"),

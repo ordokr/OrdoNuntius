@@ -58,7 +58,7 @@ RELEASE_DIR="${ORDO_NUNTIUS_RELEASE_DIR}"
 
 INSTALL_DIR=${RELEASE_DIR}/install
 UNIT_TEMPLATE=${INSTALL_DIR}/ordonuntius.service.template
-NGINX_SITE_SRC=${INSTALL_DIR}/mail.saltnlightllc.com.conf
+NGINX_SITE_SRC=${INSTALL_DIR}/webmail.saltnlightllc.com.conf
 NGINX_UPGRADE_SRC=${INSTALL_DIR}/connection-upgrade.conf
 [[ -f "${UNIT_TEMPLATE}" ]]    || err "systemd unit template missing: ${UNIT_TEMPLATE}"
 [[ -f "${NGINX_SITE_SRC}" ]]   || err "nginx site config missing: ${NGINX_SITE_SRC}"
@@ -120,9 +120,9 @@ if [[ -z "${session_secret}" ]]; then
     err "SSM parameter ${ORDO_NUNTIUS_SSM_PREFIX%/}/session-secret missing — populate it before installing"
 fi
 
-# Render env file. Loopback http://127.0.0.1:8443 would defeat nginx; we want
-# the JMAP_SERVER_URL to be the public hostname so a future move to a separate
-# instance is a config change, not a rewrite (see roadmap candidate B exit option).
+# OrdoNuntius runs on saltnlight-prod; OrdoEpistola JMAP lives on the
+# separate email-lab box at mail.saltnlightllc.com. JMAP_SERVER_URL points
+# cross-instance, not at this host.
 cat > "${ENV_FILE}.tmp" <<EOF
 # ${ENV_FILE}
 # Rendered by install-ordo-nuntius.sh from SSM.
@@ -131,7 +131,11 @@ HOSTNAME=127.0.0.1
 PORT=3000
 
 APP_NAME=OrdoNuntius
-JMAP_SERVER_URL=https://${ORDO_NUNTIUS_HOSTNAME}
+# JMAP is served same-origin via the nginx proxy on this host. The browser
+# only talks to webmail.saltnlightllc.com; nginx forwards JMAP/auth/well-known
+# to mail.saltnlightllc.com server-side. Avoids the cross-origin CORS hazard
+# (OrdoEpistola does not emit Access-Control-Allow-Origin response headers).
+JMAP_SERVER_URL=${ORDO_NUNTIUS_JMAP_SERVER_URL:-https://${ORDO_NUNTIUS_HOSTNAME}}
 STALWART_FEATURES=true
 
 SESSION_SECRET=${session_secret}
@@ -214,7 +218,7 @@ systemctl daemon-reload
 
 # The site config and connection-upgrade map are environment-agnostic.
 install -m 0644 "${NGINX_UPGRADE_SRC}" /etc/nginx/conf.d/connection-upgrade.conf
-install -m 0644 "${NGINX_SITE_SRC}"    /etc/nginx/conf.d/mail.saltnlightllc.com.conf
+install -m 0644 "${NGINX_SITE_SRC}"    /etc/nginx/conf.d/webmail.saltnlightllc.com.conf
 
 # Validate before activation. The deploy thread reloads nginx after starting
 # the unit so a webmail crash on first launch doesn't break inbound mail.
@@ -228,11 +232,9 @@ log "install-ordo-nuntius complete"
 log "  app:       ${APP_ROOT}/current -> ${NEW_RELEASE}"
 log "  env file:  ${ENV_FILE}"
 log "  unit:      ${UNIT}"
-log "  nginx:     /etc/nginx/conf.d/mail.saltnlightllc.com.conf (validated, not reloaded)"
+log "  nginx:     /etc/nginx/conf.d/webmail.saltnlightllc.com.conf (validated, not reloaded)"
 log ""
 log "Service is NOT started. Deploy thread should now:"
-log "  - Verify OrdoEpistola has been reconfigured to bind 127.0.0.1:8443"
-log "    (one-time cutover; see infra/runbooks/nginx-cutover.md)."
 log "  - 'systemctl enable --now ordonuntius'."
 log "  - 'systemctl reload nginx'."
 log "  - Run the restart canary (infra/runbooks/restart-canary-webmail.md)."

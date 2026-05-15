@@ -8,7 +8,7 @@ service take user traffic.
 
 A real browser on the operator workstation can:
 
-1. Load `https://mail.saltnlightllc.com/` and see the OrdoNuntius login
+1. Load `https://webmail.saltnlightllc.com/` and see the OrdoNuntius login
    page with the OrdoNuntius logo (NOT the generic Bulwark page; verify
    branding loaded).
 2. Log in with a Salt & Light test account (`canary@saltnlightllc.com`).
@@ -31,7 +31,7 @@ debug forward. Production users see the same failures you see.
 | Current release symlink | `readlink /opt/ordonuntius/current` | absolute path under `/opt/ordonuntius/releases/<stamp>` |
 | Server.js present | `ls /opt/ordonuntius/current/server.js` | exists |
 | Nginx config valid | `sudo nginx -t` | `syntax is ok` and `test is successful` |
-| OrdoEpistola on loopback | `sudo ss -tlnp \| grep 8443` | `127.0.0.1:8443 LISTEN ordoepistola` |
+| Cross-instance JMAP reachable | `curl -sSf https://mail.saltnlightllc.com/.well-known/jmap -o /dev/null -w '%{http_code}'` | `200` or `307` |
 | Nginx not yet routing | `curl -sSf -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/` | `200` or `307` after manual `systemctl start ordonuntius` |
 
 ## Cutover sequence
@@ -51,18 +51,20 @@ curl -sSf -o /dev/null -w 'loopback api/config=%{http_code}\n' \
 sudo nginx -t
 sudo systemctl reload nginx
 
-# 4. Public smoke.
-curl -sSf -o /dev/null -w 'public /=%{http_code}\n'        https://mail.saltnlightllc.com/
-curl -sSf -o /dev/null -w 'public .well-known/jmap=%{http_code}\n' \
+# 4. Public smoke (webmail UI only — JMAP /.well-known lives on
+# mail.saltnlightllc.com, not on this host).
+curl -sSf -o /dev/null -w 'public /=%{http_code}\n' https://webmail.saltnlightllc.com/
+curl -sSf -o /dev/null -w 'cross-origin JMAP discovery=%{http_code}\n' \
     https://mail.saltnlightllc.com/.well-known/jmap
 ```
 
-All four codes should be `200` (the OrdoNuntius login may 307 to a locale
-prefix — that is also acceptable).
+The webmail public code should be `200` (or `307` to a locale prefix —
+acceptable). The cross-origin JMAP discovery probe lives on the OTHER
+instance; if it fails, the issue is on mail.saltnlightllc.com, not here.
 
 ## Browser falsifier
 
-Open Chrome on the operator workstation. Visit `https://mail.saltnlightllc.com/`.
+Open Chrome on the operator workstation. Visit `https://webmail.saltnlightllc.com/`.
 Walk through steps (1)–(5) of the falsifier above. The send-self test is the
 load-bearing check — it exercises OrdoNuntius → OrdoEpistola JMAP submission
 **and** OrdoEpistola SMTP outbound + inbound delivery.
@@ -81,7 +83,7 @@ sudo systemctl restart ordonuntius
 #    location / block while OrdoEpistola continues to handle JMAP.
 sudo sed -i.bak \
     's|proxy_pass http://127.0.0.1:3000;|return 503;|' \
-    /etc/nginx/conf.d/mail.saltnlightllc.com.conf
+    /etc/nginx/conf.d/webmail.saltnlightllc.com.conf
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -89,12 +91,13 @@ sudo nginx -t && sudo systemctl reload nginx
 
 Watch these for 15 minutes after cutover:
 
-- `ordoepistola-email-lab-service-inactive` — must stay OK. If this fires,
-  the cutover broke OrdoEpistola; rollback the nginx-cutover, not the
-  OrdoNuntius release.
-- `ordoepistola-email-lab-degraded` (composite) — must stay OK.
 - `ordonuntius-email-lab-service-inactive` (added by `ordo-nuntius-iam.yaml`)
   — must stay OK.
+- `ordonuntius-email-lab-degraded` (composite) — must stay OK.
+- `saltnlight-prod-cpu-high` — should NOT fire from the OrdoNuntius
+  release. Next.js cold-start can spike CPU briefly but well under 80%.
+- `ordoepistola-email-lab-service-inactive` — separate instance; webmail
+  can't relay mail without it. Should stay OK regardless of this release.
 
 ## After 24-hour soak
 

@@ -2,96 +2,38 @@
 
 ## What this is
 
-OrdoEpistola acts as the OAuth/OIDC IdP. OrdoNuntius is an OIDC client that
-delegates the user-facing login flow to OrdoEpistola, exchanges the
-authorization code for tokens server-side, and uses the access token to
-make JMAP requests on the user's behalf.
+OrdoEpistola acts as the OAuth/OIDC IdP for OrdoNuntius. The two services
+run on **different hosts**:
 
-Both services run on the same host (`email-lab-ordoepistola-01`,
-`mail.saltnlightllc.com`). nginx in front terminates TLS and routes by URI.
+- OrdoNuntius (the OIDC client) — `webmail.saltnlightllc.com` (saltnlight-prod)
+- OrdoEpistola (the IdP) — `mail.saltnlightllc.com` (email-lab box)
 
-## Prerequisite — OrdoEpistola supports a non-`/login` authorization path
+**CORS is handled by the nginx same-origin proxy.** The browser only
+talks to `webmail.saltnlightllc.com`; nginx forwards JMAP, `/auth/*`, and
+`/.well-known/*` requests to mail.saltnlightllc.com server-side. No CORS
+headers are needed from OrdoEpistola, and no OrdoEpistola changes are
+required to wire OAuth.
 
-The upstream OrdoEpistola hardcoded its OAuth authorization endpoint as
-`{base_url}/login`. That collides with OrdoNuntius's own login page on the
-same hostname. The OrdoEpistola fork at `ordokr/OrdoEpistola` commit
-`2776d6ff` adds an env var `ORDO_EPISTOLA_OAUTH_LOGIN_SEGMENT` that picks
-the first URL-path segment of the authorization endpoint (default
-`"login"` — preserves upstream behavior; set to e.g. `"oauth-login"` to
-free up `/login` for the webmail).
+The OIDC `issuer` claim still resolves to `https://mail.saltnlightllc.com`
+(OrdoEpistola's actual base URL — that's what it signs JWTs with). The
+OrdoNuntius OIDC client must be configured with that issuer URL so its
+discovery + JWKS verification points at the right authority.
 
-**Before running this runbook**, confirm the deployed OrdoEpistola binary
-is at or beyond `2776d6ff` (`ordo-epistola --version` and grep
-`OAuthConfig::login_path_segment` in symbols, or just check the deployed
-git SHA from `ops/aws.md`). If the running binary is older, rebuild and
-redeploy it first.
+## Step 1 — register OrdoNuntius as an OAuth client
 
-## Step 1 — Set the OrdoEpistola env var
-
-Edit `/etc/ordoepistola/ordoepistola.env` on the host:
+From a machine with admin access to mail.saltnlightllc.com:
 
 ```sh
-sudo nano /etc/ordoepistola/ordoepistola.env
-```
+ADMIN=$(aws ssm get-parameter --region us-east-2 \
+    --name /saltnlight/email/email-lab/stalwart/admin-bootstrap \
+    --with-decryption --query 'Parameter.Value' --output text)
 
-Add:
-
-```
-ORDO_EPISTOLA_OAUTH_LOGIN_SEGMENT=oauth-login
-```
-
-Reload:
-
-```sh
-sudo systemctl restart ordoepistola
-sleep 5
-sudo systemctl is-active ordoepistola
-```
-
-Verify the metadata advertises the new path:
-
-```sh
-curl -sf https://mail.saltnlightllc.com/.well-known/openid-configuration \
-    | python3 -c 'import json,sys; m=json.load(sys.stdin); print(m["authorization_endpoint"])'
-# expect: https://mail.saltnlightllc.com/oauth-login
-```
-
-The legacy `/login` URL is preserved as a backstop — visiting it still
-renders the same login HTML. The OIDC discovery doc just no longer
-advertises it.
-
-## Step 2 — Register OrdoNuntius as an OAuth client in OrdoEpistola
-
-Three options. Pick one.
-
-### Option 2a — Dynamic Client Registration (RFC 7591)
-
-If OrdoEpistola has `anonymousClientRegistration=true` (check
-`https://mail.saltnlightllc.com/.well-known/oauth-authorization-server`),
-OrdoNuntius can register itself at boot. Nothing to do here — proceed to
-Step 3 with empty `client-id` and `client-secret` SSM params, and the
-OrdoNuntius login flow will register on first OAuth attempt.
-
-### Option 2b — Manual registration via the OrdoEpistola admin API
-
-Get an admin access token:
-
-```sh
-ADMIN_USER=$(aws ssm get-parameter --region us-east-2 \
-    --name /saltnlight/email/email-lab/admin-bootstrap \
-    --with-decryption --query 'Parameter.Value' --output text \
-    | cut -d: -f1)
-ADMIN_PASS=$(aws ssm get-parameter --region us-east-2 \
-    --name /saltnlight/email/email-lab/admin-bootstrap \
-    --with-decryption --query 'Parameter.Value' --output text \
-    | cut -d: -f2-)
-
-curl -sf -u "${ADMIN_USER}:${ADMIN_PASS}" \
-    https://mail.saltnlightllc.com/auth/register \
-    -X POST -H 'Content-Type: application/json' -d '{
+curl -sf -u "$ADMIN" \
+    -H 'Content-Type: application/json' \
+    -X POST https://mail.saltnlightllc.com/auth/register -d '{
         "client_name": "OrdoNuntius",
         "redirect_uris": [
-            "https://mail.saltnlightllc.com/api/auth/callback/ordoepistola"
+            "https://webmail.saltnlightllc.com/api/auth/callback/ordoepistola"
         ],
         "grant_types": ["authorization_code", "refresh_token"],
         "response_types": ["code"],
@@ -102,89 +44,76 @@ curl -sf -u "${ADMIN_USER}:${ADMIN_PASS}" \
 
 Save the returned `client_id` and `client_secret`.
 
-### Option 2c — Pre-seed a client via OrdoEpistola admin UI
+The redirect URI uses `webmail.saltnlightllc.com` (the actual public host
+the browser ends up on); OrdoEpistola sees that URI and 302's the browser
+back there at the end of the auth flow.
 
-If the OrdoEpistola admin web UI is enabled (currently it is NOT — see
-`infra/scripts/install-ordo-epistola.sh:160` which sets
-`ORDO_EPISTOLA_WEBADMIN_DISABLED=1`), register through that. Otherwise
-use Option 2a or 2b.
-
-## Step 3 — Populate OrdoNuntius SSM parameters
+## Step 2 — populate OrdoNuntius SSM parameters
 
 ```sh
 aws ssm put-parameter --region us-east-2 --type SecureString --overwrite \
     --name /saltnlight/webmail/email-lab/oauth/client-id \
-    --value "<client_id from step 2>"
+    --value "<client_id from step 1>"
 
 aws ssm put-parameter --region us-east-2 --type SecureString --overwrite \
     --name /saltnlight/webmail/email-lab/oauth/client-secret \
-    --value "<client_secret from step 2>"
+    --value "<client_secret from step 1>"
 
 aws ssm put-parameter --region us-east-2 --type String --overwrite \
     --name /saltnlight/webmail/email-lab/oauth/issuer-url \
     --value "https://mail.saltnlightllc.com"
 ```
 
-The issuer URL is the OrdoEpistola public base URL. OrdoNuntius fetches
-`<issuer-url>/.well-known/openid-configuration` to discover the auth /
-token / userinfo / jwks endpoints — nginx routes all of these to
-OrdoEpistola on `127.0.0.1:8443`.
+The issuer URL is the OrdoEpistola public base URL — that's what
+OrdoEpistola embeds in JWTs as the `iss` claim. The OrdoNuntius server
+fetches `<issuer>/.well-known/openid-configuration` to discover the
+authorization/token endpoints. Those endpoints in the discovery doc
+point at `mail.saltnlightllc.com/login` and `mail.saltnlightllc.com/auth/token`
+— the browser hits the authorization URL directly (cross-domain
+top-level navigation, no CORS), and OrdoNuntius's server-side code hits
+the token URL (no browser involved, no CORS). The fetch-by-OrdoNuntius
+of the discovery doc and JWKS also goes directly to mail., not via the
+proxy.
 
-## Step 4 — Redeploy OrdoNuntius
+(Aside: this means the `/login` URL on `mail.saltnlightllc.com` is what
+the user sees during the auth dance, NOT `webmail.saltnlightllc.com/login`.
+That's fine — the browser handles the top-level redirect; it's just a
+different-hostname page in the same tab. The OrdoEpistola
+`ORDO_EPISTOLA_OAUTH_LOGIN_SEGMENT` patch from earlier is not used in
+this architecture.)
+
+## Step 3 — redeploy OrdoNuntius
 
 ```sh
-# From the OrdoNuntius repo on the operator workstation:
 npm run xtask -- deploy email-lab
 ```
 
 The install script picks up the new SSM params and writes them into
-`/etc/ordonuntius/ordonuntius.env`. On restart, OrdoNuntius sees
-`OAUTH_ENABLED=true`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, and
-`OAUTH_ISSUER_URL` and configures itself as an OIDC client of OrdoEpistola.
-
-## Step 5 — Verify nginx routes the OIDC paths
-
-The OrdoNuntius nginx site config
-(`infra/nginx/mail.saltnlightllc.com.conf`) sends these to OrdoEpistola:
-
-| URI | Target |
-|---|---|
-| `/.well-known/openid-configuration` | OrdoEpistola :8443 |
-| `/.well-known/oauth-authorization-server` | OrdoEpistola :8443 |
-| `/auth/token`, `/auth/introspect`, `/auth/userinfo`, `/auth/register`, `/auth/jwks.json`, `/auth/device` | OrdoEpistola :8443 |
-| `/oauth-login` (configured authorization page) | OrdoEpistola :8443 |
-| `/api/auth/callback/*` (OIDC callback) | OrdoNuntius :3000 (catch-all) |
-| `/` and everything else | OrdoNuntius :3000 |
-
-If you used a segment other than `oauth-login` in Step 1, edit the
-`location = /oauth-login` block in
-`infra/nginx/mail.saltnlightllc.com.conf` to match before deploying.
+`/etc/ordonuntius/ordonuntius.env`.
 
 ## Falsifier (browser test)
 
-1. Browse to `https://mail.saltnlightllc.com/`. The OrdoNuntius login
-   page loads with an "Sign in with OrdoEpistola" button (or the OAuth
-   flow auto-starts, depending on `OAUTH_ONLY` setting).
-2. Click sign-in. Browser redirects to
-   `https://mail.saltnlightllc.com/oauth-login?response_type=code&client_id=...&redirect_uri=...&scope=openid+...&state=...`.
-3. The OrdoEpistola login form renders. Enter `canary@saltnlightllc.com`
-   credentials.
-4. OrdoEpistola redirects back to
-   `https://mail.saltnlightllc.com/api/auth/callback/ordoepistola?code=...&state=...`.
-5. OrdoNuntius server-side exchanges the code at `/auth/token`, fetches
-   userinfo, sets a session cookie, redirects to the inbox.
-6. Inbox loads with the user's mail.
+1. Browse to `https://webmail.saltnlightllc.com/`. Login page loads.
+2. Click "Sign in with OrdoEpistola" (or OAuth auto-starts if `OAUTH_ONLY=true`).
+3. Browser navigates to
+   `https://mail.saltnlightllc.com/login?response_type=code&client_id=...&redirect_uri=https%3A%2F%2Fwebmail.saltnlightllc.com%2Fapi%2Fauth%2Fcallback%2Fordoepistola&scope=openid+...&state=...`.
+4. OrdoEpistola login form renders. Authenticate.
+5. OrdoEpistola redirects to
+   `https://webmail.saltnlightllc.com/api/auth/callback/ordoepistola?code=...&state=...`.
+6. OrdoNuntius server-side exchanges the code at
+   `https://mail.saltnlightllc.com/auth/token` (server-to-server,
+   no CORS).
+7. Inbox loads. JMAP requests in DevTools go to
+   `https://webmail.saltnlightllc.com/jmap` (same-origin) and are
+   forwarded by nginx to OrdoEpistola.
 
-If steps 1-2 work but step 4 lands on a 502 or wrong app, the nginx
-route-table is wrong — recheck the `location =` exact matches.
+If step 7 shows JMAP requests going directly to `mail.saltnlightllc.com`
+instead of through `webmail.saltnlightllc.com`, the `JMAP_SERVER_URL`
+env was misrendered — it should be `https://webmail.saltnlightllc.com`,
+not `https://mail.saltnlightllc.com`. Re-check
+`/etc/ordonuntius/ordonuntius.env` on the host.
 
-If step 5 fails with a token-exchange error, check that the `redirect_uri`
-registered in Step 2 matches OrdoNuntius's actual callback URL exactly
-(scheme + host + path).
-
-## Rollback
-
-To revert to JMAP basic auth:
+## Rollback to JMAP basic auth
 
 ```sh
 aws ssm delete-parameter --region us-east-2 \
@@ -194,10 +123,9 @@ aws ssm delete-parameter --region us-east-2 \
 aws ssm delete-parameter --region us-east-2 \
     --name /saltnlight/webmail/email-lab/oauth/issuer-url
 npm run xtask -- deploy email-lab
-ssh ordo-epistola sudo systemctl restart ordonuntius
+ssh ec2 sudo systemctl restart ordonuntius
 ```
 
-The install script omits the OAuth env block when those SSM params are
-absent. OrdoNuntius falls back to its built-in username/password form,
-which authenticates via HTTP Basic against JMAP — no OrdoEpistola side
-changes needed for the rollback.
+OrdoNuntius falls back to its built-in username/password form. The user
+types creds, OrdoNuntius makes JMAP requests with HTTP Basic — still
+same-origin via the nginx proxy, so still no CORS issues.

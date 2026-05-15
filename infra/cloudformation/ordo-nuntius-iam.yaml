@@ -1,15 +1,17 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
-  OrdoNuntius additive AWS resources for the Salt & Light email lane. This
-  stack does NOT create an EC2 instance — OrdoNuntius is co-located on the
-  existing email-lab EC2 instance that already runs OrdoEpistola. The
-  template only adds:
-    1. An IAM managed policy granting the OrdoEpistola instance role
+  OrdoNuntius additive AWS resources for the Salt & Light webmail. This
+  stack does NOT create an EC2 instance — OrdoNuntius runs on the existing
+  saltnlight-prod EC2 instance (i-0a7d30a49197243b1) alongside
+  hybridportalecosystem. OrdoEpistola JMAP is on a SEPARATE instance
+  (email-lab, i-0a462d2c5eb1ba39e); webmail reaches it cross-instance.
+  The template only adds:
+    1. An IAM managed policy granting the saltnlight-prod instance role
        permission to read /saltnlight/webmail/<env>/* SSM parameters.
     2. A CloudWatch log group for OrdoNuntius journal shipping.
-    3. CloudWatch alarms mirroring the OrdoEpistola alarm posture.
-  Attach the managed policy to the existing OrdoEpistola instance role out
-  of band (the IAM role ARN is an input parameter).
+    3. CloudWatch alarms scoped to the saltnlight-prod instance.
+  Attach the managed policy to the existing instance role out of band
+  (the role name is an input parameter).
 
 Parameters:
   Environment:
@@ -18,15 +20,16 @@ Parameters:
     Default: email-lab
     Description: Deployment environment — used as the SSM parameter prefix segment.
 
-  OrdoEpistolaInstanceRoleName:
+  HostInstanceRoleName:
     Type: String
-    Description: Name of the existing IAM role attached to the email-lab EC2 instance.
-      The new managed policy is attached to this role so OrdoNuntius (running
-      on the same host) inherits SSM read access.
+    Description: Name of the existing IAM role attached to the saltnlight-prod
+      EC2 instance. The new managed policy is attached to this role so
+      OrdoNuntius (running on saltnlight-prod) inherits SSM read access.
 
   InstanceId:
     Type: String
-    Description: ID of the existing OrdoEpistola EC2 instance that hosts OrdoNuntius.
+    Default: i-0a7d30a49197243b1
+    Description: ID of the saltnlight-prod EC2 instance that hosts OrdoNuntius.
       Used as a dimension on the CloudWatch alarms.
 
   AlertSnsTopicArn:
@@ -51,7 +54,7 @@ Resources:
       ManagedPolicyName: !Sub ordo-nuntius-${Environment}-ssm-read
       Description: !Sub Read /saltnlight/webmail/${Environment}/* parameters from SSM.
       Roles:
-        - !Ref OrdoEpistolaInstanceRoleName
+        - !Ref HostInstanceRoleName
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -116,21 +119,19 @@ Resources:
       AlarmActions: !If [HasAlertTopic, [!Ref AlertSnsTopicArn], !Ref 'AWS::NoValue']
       OKActions:     !If [HasAlertTopic, [!Ref AlertSnsTopicArn], !Ref 'AWS::NoValue']
 
-  # Composite alarm: webmail is degraded when CPU is high AND the webmail
-  # systemd unit is down. CPU-only or service-only can be a transient.
-  # Mirrors `ordoepistola-email-lab-degraded`.
+  # Composite alarm: webmail is degraded when host CPU is high AND the
+  # webmail systemd unit is down. Reuses saltnlight-prod-cpu-high (already
+  # present from the production-portal CloudWatch posture) as the CPU
+  # signal — same host, so the existing alarm is the correct one.
   DegradedComposite:
     Type: AWS::CloudWatch::CompositeAlarm
     Properties:
       AlarmName: !Sub ordonuntius-${Environment}-degraded
       AlarmDescription: >-
-        Webmail is degraded — composite of high CPU AND service inactive.
-        The OrdoEpistola CPU alarm is reused as the CPU signal since both
-        services share the host.
+        Webmail is degraded — composite of high host CPU AND service inactive.
       AlarmRule: !Sub
-        - 'ALARM("${CpuAlarmName}") AND ALARM("${ServiceAlarmName}")'
-        - CpuAlarmName: !Sub ordoepistola-${Environment}-cpu-high
-          ServiceAlarmName: !Ref ServiceInactiveAlarm
+        - 'ALARM("saltnlight-prod-cpu-high") AND ALARM("${ServiceAlarmName}")'
+        - ServiceAlarmName: !Ref ServiceInactiveAlarm
       ActionsEnabled: true
       AlarmActions: !If [HasAlertTopic, [!Ref AlertSnsTopicArn], !Ref 'AWS::NoValue']
       OKActions:     !If [HasAlertTopic, [!Ref AlertSnsTopicArn], !Ref 'AWS::NoValue']

@@ -6,7 +6,7 @@
 # Usage:  infra/scripts/deploy-ec2.sh [target-env] [ssh-alias]
 #
 #   target-env   email-lab | staging | prod   (default: email-lab)
-#   ssh-alias    SSH alias from ~/.ssh/config (default: ordo-epistola)
+#   ssh-alias    SSH alias from ~/.ssh/config (default: ec2)
 #
 # Requires on the operator workstation:
 #  - npm (Node 24+) on PATH; build runs locally before upload
@@ -25,7 +25,7 @@
 set -euo pipefail
 
 TARGET_ENV="${1:-email-lab}"
-TARGET="${2:-ordo-epistola}"
+TARGET="${2:-ec2}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 case "${TARGET_ENV}" in
@@ -36,11 +36,10 @@ case "${TARGET_ENV}" in
         ;;
 esac
 
-HOSTNAME="mail.saltnlightllc.com"
 case "${TARGET_ENV}" in
-    email-lab) HOSTNAME="mail.saltnlightllc.com" ;;
-    staging)   HOSTNAME="mail-staging.saltnlightllc.com" ;;
-    prod)      HOSTNAME="mail.saltnlightllc.com" ;;
+    email-lab) HOSTNAME="webmail.saltnlightllc.com" ;;
+    staging)   HOSTNAME="webmail-staging.saltnlightllc.com" ;;
+    prod)      HOSTNAME="webmail.saltnlightllc.com" ;;
 esac
 SSM_PREFIX="/saltnlight/webmail/${TARGET_ENV}"
 
@@ -83,7 +82,7 @@ cp -a public "${STAGE}/public"
 # 2. Ship the infra scripts the install step needs.
 mkdir -p "${STAGE}/install"
 cp infra/systemd/ordonuntius.service.template     "${STAGE}/install/"
-cp infra/nginx/mail.saltnlightllc.com.conf        "${STAGE}/install/"
+cp infra/nginx/webmail.saltnlightllc.com.conf     "${STAGE}/install/"
 cp infra/nginx/connection-upgrade.conf            "${STAGE}/install/"
 cp infra/scripts/install-ordo-nuntius.sh          "${STAGE}/install/"
 chmod +x "${STAGE}/install/install-ordo-nuntius.sh"

@@ -1,117 +1,175 @@
-# Runbook — OrdoNuntius launch checklist (lab → prod)
+# Runbook — OrdoNuntius launch checklist (saltnlight-prod)
 
-Single source-of-truth for taking OrdoNuntius from "nothing on the box"
-to "users at `https://mail.saltnlightllc.com/` are reading and sending
-mail." Sequences all the operator-side steps that the prior runbooks
-each cover in isolation.
+Single sequencing doc for the end-to-end launch. Target architecture:
 
-Pre-reads (cite as you go):
+- OrdoNuntius runs on `saltnlight-prod` (`i-0a7d30a49197243b1`, `16.58.52.6`)
+- Public URL: `https://webmail.saltnlightllc.com/`
+- JMAP server: `https://mail.saltnlightllc.com` (separate EC2 — `email-lab-ordoepistola-01`)
+- legacy-locker is retired from this host as part of the launch
 
-- `infra/runbooks/nginx-cutover.md` — one-time TLS/listener rearrangement
-- `infra/runbooks/oauth-wiring.md` — optional OAuth IdP wiring
-- `infra/runbooks/outbound-ses-check.md` — AWS SES verification
+Pre-reads:
+
+- `infra/runbooks/oauth-wiring.md` — optional OIDC client setup (cross-origin CORS)
+- `infra/runbooks/outbound-ses-check.md` — SES verification
 - `infra/runbooks/restart-canary-webmail.md` — per-deploy verification
 
-Account context:
+## Phase D — host prep and AWS bootstrap
 
-| | |
-|---|---|
-| AWS account | `338071012635` (Salt & Light LLC) |
-| Region | `us-east-2` (Ohio) |
-| Email-lab instance | `i-0a462d2c5eb1ba39e` (`16.58.225.15`, `mail.saltnlightllc.com`) |
-| Email-lab role name | Look up in `OrdoEpistola` CFN outputs; the existing CFN stack's `InstanceRole` |
-| SNS alert topic | `arn:aws:sns:us-east-2:338071012635:legacy-locker-alerts` |
+### D1. Add DNS A record
 
-## Phase D — AWS resources and SSM bootstrap
+External DNS provider (per `Saltnlight/ops/aws.md:248`, not Route53):
 
-1. **Confirm OrdoEpistola binary is at or beyond `ordokr/OrdoEpistola@2776d6ff`**
-   (the commit that adds `ORDO_EPISTOLA_OAUTH_LOGIN_SEGMENT`). If using
-   JMAP basic auth and not OAuth, the binary version doesn't matter for
-   launch; you can defer the rebuild. If OAuth is desired:
+```
+webmail.saltnlightllc.com.   IN  A   16.58.52.6
+```
 
-   ```sh
-   ssh ordo-epistola "/opt/ordoepistola/bin/ordo-epistola --version 2>/dev/null; \
-       cat /opt/ordoepistola/RELEASE 2>/dev/null || true"
-   # then rebuild on-box if older (see Saltnlight/ops/runbooks/rebuild-ordoepistola-on-box.md)
-   ```
+Verify propagation before continuing:
 
-2. **Populate SSM** (env vars first if you have prepared OAuth client
-   creds; otherwise just session-secret):
+```sh
+dig +short webmail.saltnlightllc.com
+# expect: 16.58.52.6
+```
 
-   ```sh
-   # session-secret only (JMAP basic auth path):
-   infra/scripts/seed-ssm.sh email-lab
+### D2. Retire legacy-locker on the host
 
-   # with OAuth (after going through oauth-wiring.md steps 1-2):
-   OAUTH_CLIENT_ID=<from-step-2> \
-   OAUTH_CLIENT_SECRET=<from-step-2> \
-   OAUTH_ISSUER_URL=https://mail.saltnlightllc.com \
-       infra/scripts/seed-ssm.sh email-lab
-   ```
+```sh
+ssh ec2 sudo bash -s <<'EOF'
+set -euo pipefail
+STAMP=$(date +%Y%m%d%H%M%S)
+echo "[retire] stop+disable"
+systemctl stop legacy-locker-webapp || true
+systemctl disable legacy-locker-webapp || true
 
-3. **Deploy the additive CloudFormation stack** (IAM + log group +
-   alarms; no EC2 — that already exists):
+echo "[retire] archive"
+install -d -m 0755 /opt/_archive
+tar -czf /opt/_archive/legacy-locker-${STAMP}.tar.gz \
+    -C /opt legacy-locker 2>/dev/null || \
+    echo "(no /opt/legacy-locker to archive)"
 
-   ```sh
-   # First get the existing instance role name:
-   ROLE_NAME=$(aws iam list-instance-profiles-for-role \
-       --role-name $(aws ec2 describe-instances \
-           --region us-east-2 --instance-ids i-0a462d2c5eb1ba39e \
-           --query 'Reservations[0].Instances[0].IamInstanceProfile.Arn' \
-           --output text | sed 's|.*instance-profile/||') \
-       --query 'InstanceProfiles[0].Roles[0].RoleName' --output text 2>/dev/null) \
-       || ROLE_NAME=<look-up-in-OrdoEpistola-CFN-outputs>
+echo "[retire] remove on-disk artifacts"
+rm -rf /opt/legacy-locker /opt/legacy-locker.*
+rm -f /etc/nginx/conf.d/legacy-locker.conf
+rm -f /etc/nginx/conf.d/legacy-locker.conf.bak.*
+rm -f /etc/systemd/system/legacy-locker-webapp.service
+rm -f /etc/systemd/system/multi-user.target.wants/legacy-locker-webapp.service
 
-   aws cloudformation deploy --region us-east-2 \
-       --template-file infra/cloudformation/ordo-nuntius-iam.yaml \
-       --stack-name ordo-nuntius-email-lab \
-       --capabilities CAPABILITY_NAMED_IAM \
-       --parameter-overrides \
-           Environment=email-lab \
-           OrdoEpistolaInstanceRoleName="${ROLE_NAME}" \
-           InstanceId=i-0a462d2c5eb1ba39e \
-           AlertSnsTopicArn=arn:aws:sns:us-east-2:338071012635:legacy-locker-alerts
-   ```
+systemctl daemon-reload
+nginx -t
+systemctl reload nginx
+echo "[retire] complete; port 3000 freed"
+ss -tlnp | grep -E ':3000\b' || echo "port 3000 not bound"
+EOF
+```
 
-4. **Verify Node 24 on the host**:
+The cert at `/etc/letsencrypt/live/legacy.saltnlightllc.com/` is left in
+place — cheap, supports a future `legacy.saltnlightllc.com -> webmail`
+301 if needed. Auto-renewal continues until removed.
 
-   ```sh
-   ssh ordo-epistola "node --version || echo 'not installed'"
-   # If not installed:
-   ssh ordo-epistola <<'EOF'
-   curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
-   sudo apt-get install -y nodejs
-   node --version
-   EOF
-   ```
+### D3. Install Node 24
 
-## Phase E — nginx cutover (one-time) and first deploy
+```sh
+ssh ec2 sudo bash -s <<'EOF'
+set -euo pipefail
+node --version  # expected: v18.19.1 (current)
+curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+apt-get install -y nodejs
+node --version  # expected: v24.x
+EOF
+```
 
-1. **nginx cutover**: follow `infra/runbooks/nginx-cutover.md` end-to-end.
-   This is the one bit that interrupts mail-server HTTPS traffic — ~5
-   minutes. Don't skip the falsifier checks at the bottom of that runbook.
+Verify `hybridportalecosystem.service` is still healthy after the
+upgrade:
 
-2. **First OrdoNuntius deploy** from the operator workstation:
+```sh
+ssh ec2 'sudo systemctl is-active hybridportalecosystem && \
+    curl -fsS http://127.0.0.1:8080/api/health'
+```
 
-   ```sh
-   npm run xtask -- deploy email-lab
-   ```
+If `hybridportalecosystem` is broken by the Node 24 upgrade, restore by
+installing Node 18 in parallel and switching the systemd unit's
+`ExecStart` to use the explicit path. Do NOT proceed if the portal is
+down — that's customer-impacting.
 
-3. **Start the service and reload nginx** on the host:
+### D4. Issue Let's Encrypt cert for webmail.saltnlightllc.com
 
-   ```sh
-   ssh ordo-epistola
-   sudo systemctl enable --now ordonuntius
-   sudo systemctl reload nginx
-   ```
+```sh
+ssh ec2 sudo certbot certonly --webroot \
+    -w /var/www/letsencrypt \
+    -d webmail.saltnlightllc.com \
+    -n --agree-tos -m timv@saltnlightllc.com
+```
 
-4. **Run the restart canary** (`infra/runbooks/restart-canary-webmail.md`).
-   The browser falsifier at the bottom is the load-bearing check.
+### D5. Seed SSM parameters
 
-## Phase F — DNS and SES verification
+From the operator workstation with AWS CLI configured:
 
-The DNS records (MX, SPF, DMARC, DKIM) already exist for the OrdoEpistola
-launch and aren't part of THIS launch's scope. Re-verify them anyway:
+```sh
+infra/scripts/seed-ssm.sh email-lab
+```
+
+If wiring OAuth at launch (optional), pre-set the env vars first; see
+`infra/runbooks/oauth-wiring.md`.
+
+### D6. Deploy the additive CloudFormation stack
+
+```sh
+# Locate the existing IAM role attached to saltnlight-prod:
+ROLE_NAME=$(aws iam list-instance-profiles --region us-east-2 \
+    --query 'InstanceProfiles[?contains(InstanceProfileName, `prod`) || contains(InstanceProfileName, `legacy`)].Roles[0].RoleName' \
+    --output text | head -1)
+# Verify:
+echo "$ROLE_NAME"
+# If empty, look it up in the console under EC2 -> i-0a7d30a49197243b1 -> IAM Role.
+
+aws cloudformation deploy --region us-east-2 \
+    --template-file infra/cloudformation/ordo-nuntius-iam.yaml \
+    --stack-name ordo-nuntius-prod \
+    --capabilities CAPABILITY_NAMED_IAM \
+    --parameter-overrides \
+        Environment=email-lab \
+        HostInstanceRoleName="${ROLE_NAME}" \
+        InstanceId=i-0a7d30a49197243b1 \
+        AlertSnsTopicArn=arn:aws:sns:us-east-2:338071012635:legacy-locker-alerts
+```
+
+## Phase E — deploy and verify
+
+### E1. Build + ship + install
+
+From the operator workstation:
+
+```sh
+npm run xtask -- deploy email-lab
+```
+
+This runs verify → build → pack → scp to `ec2` → invokes the install
+script remotely. The install does NOT start the service; that's the
+next step.
+
+### E2. Start the service and reload nginx
+
+```sh
+ssh ec2 sudo bash -s <<'EOF'
+systemctl enable --now ordonuntius
+sleep 3
+systemctl is-active ordonuntius || { journalctl -u ordonuntius -n 60; exit 1; }
+nginx -t
+systemctl reload nginx
+EOF
+```
+
+### E3. Restart canary
+
+Follow `infra/runbooks/restart-canary-webmail.md`. The browser falsifier
+at the bottom of that runbook is the load-bearing check.
+
+### E4. (Optional) OAuth wiring
+
+If wiring OAuth at launch, follow `infra/runbooks/oauth-wiring.md`. No
+OrdoEpistola server-side changes are needed for OAuth or for the basic
+JMAP cross-instance traffic — nginx handles the same-origin proxy.
+
+## Phase F — outbound SES verification
 
 ```sh
 SES_DKIM_TOKENS=$(aws ses get-identity-dkim-attributes --region us-east-2 \
@@ -123,100 +181,83 @@ SES_DKIM_TOKENS="$SES_DKIM_TOKENS" npm run xtask -- check-dns
 
 Full procedure: `infra/runbooks/outbound-ses-check.md`.
 
-If anything fails, **stop** — don't promote anything to staging/prod
-with bad outbound DNS. Fix the DNS first.
+## Phase G — staging and production
 
-## Phase G — Staging and production
+Production is the email-lab boundary for now (per
+`Saltnlight/ops/aws.md:43-58`). Webmail launches into that same
+boundary on `saltnlight-prod`. There is no separate staging/prod tier;
+the email-lab boundary IS the production service for v1.
 
-The email-lab boundary is the only environment active today. Staging and
-production are template parameters in the CFN; they don't have
-infrastructure yet. When ready:
+Future staging/prod split: parameterize `Environment` to `staging` /
+`prod` in seed-ssm + CFN, and spin up additional EC2 boxes when justified.
 
-1. **Spin up a staging EC2** (mirror of the email-lab instance, separate
-   subnet). Author follows OrdoEpistola's CFN pattern at
-   `OrdoEpistola/infra/cloudformation/ordo-epistola-ec2.yaml`.
-2. **Seed SSM for staging**: `infra/scripts/seed-ssm.sh staging`.
-3. **Deploy the additive stack**: as in Phase D step 3, with
-   `Environment=staging`, the new instance id, and the staging instance
-   role name.
-4. **Deploy webmail**: `npm run xtask -- deploy staging <ssh-alias>` (set
-   up the alias in `~/.ssh/config` first).
-5. **Run the canary** in staging.
-6. **Cut DNS** for `mail-staging.saltnlightllc.com` to the staging IP.
-
-Production is the same procedure with `Environment=prod` and a third
-EC2. We're not there yet — the email-lab boundary is the production
-service for now, per `Saltnlight/ops/aws.md:43-58`.
-
-## Phase H — Ops glue
+## Phase H — ops glue
 
 After the first 24h soak:
 
-1. **Add OrdoNuntius to the DLM backup policy** (currently targets
-   `Project=legacy-locker` only — extend the tag filter or add a second
-   policy targeting the email-lab instance). See
-   `Saltnlight/ops/aws.md:124-138`.
-2. **Confirm CloudWatch alarms are routing**:
-
-   ```sh
-   aws cloudwatch describe-alarms --region us-east-2 \
-       --alarm-name-prefix ordonuntius-email-lab \
-       --query 'MetricAlarms[].{Name:AlarmName,State:StateValue,Actions:AlarmActions}' \
-       --output table
-   ```
-
-3. **Set up the unified-cloudwatch-agent metric publisher** on the host
-   to emit `OrdoNuntiusServiceActive` (1/0 based on `systemctl is-active
-   ordonuntius`). Mirrors the OrdoEpistola publisher already running.
-   Drop-in to `/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/`.
-4. **Decide telemetry posture**: the OrdoNuntius anonymous telemetry is
-   on by default. For Salt & Light's private-instance posture, set
-   `ORDO_NUNTIUS_TELEMETRY=off` in `/etc/ordonuntius/ordonuntius.env` if
-   you prefer no outbound heartbeat.
-5. **Update the live-state baseline doc**
-   (`Saltnlight/ops/live-state-baseline-2026-05-06.md`) to reflect that
-   OrdoNuntius is live on the email-lab box at
-   `https://mail.saltnlightllc.com/`.
-6. **Update repo map** (`Saltnlight/ops/repos.md`) to add OrdoNuntius.
+1. **DLM backup** — saltnlight-prod is already covered by
+   `policy-004f8cbe5f5968638` (targets `Project=legacy-locker`).
+   OrdoNuntius state lives in `/var/lib/ordonuntius` on the same root EBS,
+   so it's already in the snapshots.
+2. **CloudWatch agent** — add the `OrdoNuntiusServiceActive` custom
+   metric publisher to the existing unified-cloudwatch-agent config on
+   saltnlight-prod (mirrors the OrdoEpistola publisher pattern in
+   `Saltnlight/ops/aws.md:158-179`).
+3. **Telemetry posture** — decide whether to keep the anonymous
+   telemetry on (default) or set `ORDO_NUNTIUS_TELEMETRY=off` in
+   `/etc/ordonuntius/ordonuntius.env`.
+4. **Update docs**:
+   - `Saltnlight/ops/repos.md` — add OrdoNuntius row, note legacy-locker
+     retirement.
+   - `Saltnlight/ops/aws.md` — section "Production instance:
+     saltnlight-prod" service table now lists `ordonuntius.service`
+     instead of `legacy-locker-webapp.service`.
+   - `Saltnlight/ops/live-state-baseline-*.md` — bump baseline date,
+     note that `https://webmail.saltnlightllc.com/` is live.
 
 ## Rollback (whole-launch)
 
 If the launch needs to be rolled back entirely:
 
 ```sh
-# 1. Stop OrdoNuntius and remove its nginx route.
-ssh ordo-epistola <<'EOF'
-sudo systemctl disable --now ordonuntius
-sudo rm /etc/nginx/conf.d/mail.saltnlightllc.com.conf
-sudo rm /etc/nginx/conf.d/connection-upgrade.conf
-sudo nginx -t && sudo systemctl reload nginx
+ssh ec2 sudo bash -s <<'EOF'
+systemctl disable --now ordonuntius
+rm -f /etc/nginx/conf.d/webmail.saltnlightllc.com.conf
+rm -f /etc/nginx/conf.d/connection-upgrade.conf
+nginx -t && systemctl reload nginx
 EOF
 
-# 2. Revert OrdoEpistola to bind :443 directly (reverse the
-#    nginx-cutover.md procedure). After this, mail-server HTTPS is
-#    served directly again, no nginx fronting.
-
-# 3. Tear down the additive CFN stack.
+# Tear down the additive CFN stack:
 aws cloudformation delete-stack --region us-east-2 \
-    --stack-name ordo-nuntius-email-lab
+    --stack-name ordo-nuntius-prod
+
+# Restore legacy-locker from archive (if a regression test catches an
+# unforeseen dependency on it):
+ssh ec2 sudo bash -s <<'EOF'
+LATEST=$(ls -1t /opt/_archive/legacy-locker-*.tar.gz | head -1)
+sudo tar -xzf "$LATEST" -C /opt
+# Hand-restore systemd unit + nginx config (look in archive or git history)
+EOF
 ```
 
-The OrdoEpistola mail server stays running throughout — webmail rollback
-does NOT touch SMTP/IMAPS/JMAP.
+The OrdoEpistola mail server is **never touched** by this launch or its
+rollback — it's on a separate EC2 instance.
 
 ## Status grid
 
-Track in the issue or PR that ships v1:
+Track in the PR that ships v1:
 
 | Phase | Owner | Done | Notes |
 |---|---|---|---|
-| D1 — OAuth wiring decision | | | JMAP basic auth or OAuth |
-| D2 — SSM seeded | | | `seed-ssm.sh email-lab` |
-| D3 — Additive CFN deployed | | | `ordo-nuntius-email-lab` stack |
-| D4 — Node 24 on host | | | |
-| E1 — nginx cutover | | | Falsifier passed |
-| E2 — First xtask deploy | | | tarball stamp |
+| D1 — DNS A added | | | `dig +short webmail.saltnlightllc.com -> 16.58.52.6` |
+| D2 — legacy-locker retired | | | Archive stamp recorded |
+| D3 — Node 24 installed | | | Portal still healthy after upgrade |
+| D4 — Cert issued | | | `/etc/letsencrypt/live/webmail.saltnlightllc.com/` |
+| D5 — SSM seeded | | | session-secret created |
+| D6 — CFN deployed | | | `ordo-nuntius-prod` stack |
+| E1 — xtask deploy | | | Tarball stamp |
+| E2 — Service + nginx reload | | | `systemctl is-active ordonuntius` |
 | E3 — Restart canary | | | Browser falsifier passed |
+| E4 — OrdoEpistola CORS | | | (if OAuth wired) |
 | F — Outbound SES check | | | check-dns passed |
-| G — Staging | | | Not yet (lab is prod) |
-| H — Ops glue | | | DLM, CW, telemetry, docs |
+| H — Ops glue | | | DLM (already covered), CW agent, docs |
