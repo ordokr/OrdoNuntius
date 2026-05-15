@@ -636,15 +636,20 @@ export const useFileStore = create<FileState>((set, get) => ({
 
   cutResources: (names: string[]) => {
     const { currentPath, resources } = get();
-    const ids = names.map(n => resources.find(r => r.name === n)?.id).filter(Boolean) as string[];
-    const serverNames = names.map(n => resources.find(r => r.name === n)?.serverName).filter(Boolean) as string[];
+    // Was O(names × resources) — names.map(.find()) walked the resources
+    // array for every name. Single Map build is O(resources); each lookup
+    // is O(1), so total is O(names + resources).
+    const byName = new Map(resources.map(r => [r.name, r]));
+    const ids = names.map(n => byName.get(n)?.id).filter(Boolean) as string[];
+    const serverNames = names.map(n => byName.get(n)?.serverName).filter(Boolean) as string[];
     set({ clipboard: { mode: 'cut', ids, names, serverNames, sourceParentId: null, sourcePath: currentPath } });
   },
 
   copyResources: (names: string[]) => {
     const { currentPath, resources } = get();
-    const ids = names.map(n => resources.find(r => r.name === n)?.id).filter(Boolean) as string[];
-    const serverNames = names.map(n => resources.find(r => r.name === n)?.serverName).filter(Boolean) as string[];
+    const byName = new Map(resources.map(r => [r.name, r]));
+    const ids = names.map(n => byName.get(n)?.id).filter(Boolean) as string[];
+    const serverNames = names.map(n => byName.get(n)?.serverName).filter(Boolean) as string[];
     set({ clipboard: { mode: 'copy', ids, names, serverNames, sourceParentId: null, sourcePath: currentPath } });
   },
 

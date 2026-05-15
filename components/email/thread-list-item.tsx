@@ -6,7 +6,7 @@ import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { Paperclip, Star, ChevronRight, ChevronDown, Loader2, MessageSquare, CheckSquare, Square, Reply, Forward } from "lucide-react";
-import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
+import { useSettingsStore, KEYWORD_PALETTE, type KeywordDefinition } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useAccountStore } from "@/stores/account-store";
@@ -23,6 +23,12 @@ interface ThreadListItemProps {
   selectedEmailId?: string;
   isLoading?: boolean;
   expandedEmails?: Email[];
+  // Pre-computed by EmailList so each visible row avoids O(M+K) scans
+  // (mailboxes.find + emailKeywords.find) on every render. Optional so
+  // standalone consumers (tests, storybook) still work; falls back to
+  // local computation when absent.
+  currentMailboxRole?: string;
+  emailKeywordsById?: Map<string, KeywordDefinition>;
   onToggleExpand: () => void;
   onEmailSelect: (email: Email) => void;
   onContextMenu?: (e: React.MouseEvent, email: Email) => void;
@@ -42,6 +48,8 @@ interface SingleEmailItemProps {
   onContextMenu?: (e: React.MouseEvent, email: Email) => void;
   showPreview: boolean;
   colorTag: string | null;
+  currentMailboxRole?: string;
+  emailKeywordsById?: Map<string, KeywordDefinition>;
   onToggleStar?: () => void;
   onMarkAsRead?: (read: boolean) => void;
   onDelete?: () => void;
@@ -51,14 +59,15 @@ interface SingleEmailItemProps {
 }
 
 const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
-  function SingleEmailItem({ email, selected, onClick, onContextMenu, showPreview, colorTag, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetColorTag, onMarkAsSpam }, ref) {
+  function SingleEmailItem({ email, selected, onClick, onContextMenu, showPreview, colorTag, currentMailboxRole: currentMailboxRoleProp, emailKeywordsById, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetColorTag, onMarkAsSpam }, ref) {
     const isUnread = !email.keywords?.$seen;
     const isStarred = email.keywords?.$flagged;
     const isAnswered = email.keywords?.$answered;
     const isForwarded = email.keywords?.$forwarded;
     const { selectedMailbox, mailboxes, selectedEmailIds, toggleEmailSelection, selectRangeEmails, clearSelection } = useEmailStore();
-    // In Sent/Drafts folders, show recipient instead of sender (which is always "me")
-    const currentMailboxRole = mailboxes.find(mb => mb.id === selectedMailbox)?.role;
+    // Prefer the hoisted prop (computed once in EmailList for the whole virtual
+    // list); fall back to a local scan only if a caller didn't pass it through.
+    const currentMailboxRole = currentMailboxRoleProp ?? mailboxes.find(mb => mb.id === selectedMailbox)?.role;
     const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
     const sender = showRecipient ? (email.to?.[0] ?? email.from?.[0]) : email.from?.[0];
     const emailKeywords = useSettingsStore((state) => state.emailKeywords);
@@ -74,9 +83,14 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
     const trimmedPreview = stripInvisibleLeading(email.preview ?? '');
     const inlinePreview = showPreview && trimmedPreview ? ` ${trimmedPreview}` : '';
 
-    // Resolve color tags using keyword definitions; unknown tags fall back to gray
+    // Resolve color tags using keyword definitions; unknown tags fall back to gray.
+    // Map lookup is O(1); falling back to .find() only when the Map wasn't hoisted.
     const tagIds = getEmailColorTags(email.keywords);
-    const resolvedKeywordDefs = tagIds.map(id => emailKeywords.find(k => k.id === id) ?? { id, label: id, color: 'gray' });
+    const resolvedKeywordDefs = tagIds.map(id =>
+      emailKeywordsById?.get(id)
+        ?? emailKeywords.find(k => k.id === id)
+        ?? { id, label: id, color: 'gray' }
+    );
     const resolvedKeywordDef = resolvedKeywordDefs[0] ?? null;
     const resolvedColorTag = (() => {
       if (colorTag) return colorTag;
@@ -351,6 +365,8 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
     selectedEmailId,
     isLoading = false,
     expandedEmails,
+    currentMailboxRole: currentMailboxRoleProp,
+    emailKeywordsById,
     onToggleExpand,
     onEmailSelect,
     onContextMenu,
@@ -376,8 +392,9 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
     const { selectedMailbox, mailboxes, selectedEmailIds, toggleEmailSelection, selectRangeEmails, clearSelection, isUnifiedView } = useEmailStore();
     const getAccountById = useAccountStore((state) => state.getAccountById);
     const threadAccountColor = latestEmail.accountId ? getAccountById(latestEmail.accountId)?.avatarColor : undefined;
-    // In Sent/Drafts folders, show recipient instead of sender (which is always "me")
-    const currentMailboxRole = mailboxes.find(mb => mb.id === selectedMailbox)?.role;
+    // Prefer the hoisted prop; fall back to a scan only if a caller didn't
+    // thread it through (back-compat for standalone consumers).
+    const currentMailboxRole = currentMailboxRoleProp ?? mailboxes.find(mb => mb.id === selectedMailbox)?.role;
     const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
     const displayNames = showRecipient
       ? Array.from(new Set(
@@ -406,7 +423,11 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
 
     const threadColor = getThreadColorTag(thread.emails);
     const emailKeywordDefs = useSettingsStore((state) => state.emailKeywords);
-    const keywordDef = threadColor ? (emailKeywordDefs.find(k => k.id === threadColor) ?? { id: threadColor, label: threadColor, color: 'gray' }) : null;
+    const keywordDef = threadColor
+      ? (emailKeywordsById?.get(threadColor)
+          ?? emailKeywordDefs.find(k => k.id === threadColor)
+          ?? { id: threadColor, label: threadColor, color: 'gray' })
+      : null;
     const colorTag = keywordDef ? KEYWORD_PALETTE[keywordDef.color]?.bg ?? null : null;
 
     const isSelected = selectedEmailId === latestEmail.id ||
@@ -424,6 +445,8 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
           onContextMenu={onContextMenu}
           showPreview={showPreview}
           colorTag={colorTag}
+          currentMailboxRole={currentMailboxRole}
+          emailKeywordsById={emailKeywordsById}
           onToggleStar={onToggleStar ? () => onToggleStar(latestEmail) : undefined}
           onMarkAsRead={onMarkAsRead ? (read) => onMarkAsRead(latestEmail, read) : undefined}
           onDelete={onDelete ? () => onDelete(latestEmail) : undefined}

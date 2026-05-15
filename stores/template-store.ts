@@ -122,8 +122,10 @@ export const useTemplateStore = create<TemplateStore>()(
 
       getRecent: () => {
         const { templates, recentTemplateIds } = get();
+        // O(templates + recentTemplateIds) instead of O(recent × templates).
+        const byId = new Map(templates.map((t) => [t.id, t]));
         return recentTemplateIds
-          .map((id) => templates.find((t) => t.id === id))
+          .map((id) => byId.get(id))
           .filter(Boolean) as EmailTemplate[];
       },
 

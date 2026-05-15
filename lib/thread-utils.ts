@@ -36,12 +36,18 @@ export function groupEmailsByThread(emails: Email[], disableThreading = false): 
     // Collect unique participant names from all emails in thread
     const participantNames = getThreadParticipants(sortedEmails);
 
-    // Check for unread, starred, and attachments
-    const hasUnread = sortedEmails.some(e => !e.keywords?.$seen);
-    const hasStarred = sortedEmails.some(e => e.keywords?.$flagged);
-    const hasAttachment = sortedEmails.some(e => e.hasAttachment);
-    const hasAnswered = sortedEmails.some(e => e.keywords?.$answered);
-    const hasForwarded = sortedEmails.some(e => e.keywords?.$forwarded);
+    // Fuse five .some() walks into one pass with early-exit when all flags
+    // are set. Was 5 × O(n_thread); now <= 1 × O(n_thread) with a stop-when-done.
+    let hasUnread = false, hasStarred = false, hasAttachment = false;
+    let hasAnswered = false, hasForwarded = false;
+    for (const e of sortedEmails) {
+      if (!hasUnread && !e.keywords?.$seen) hasUnread = true;
+      if (!hasStarred && e.keywords?.$flagged) hasStarred = true;
+      if (!hasAttachment && e.hasAttachment) hasAttachment = true;
+      if (!hasAnswered && e.keywords?.$answered) hasAnswered = true;
+      if (!hasForwarded && e.keywords?.$forwarded) hasForwarded = true;
+      if (hasUnread && hasStarred && hasAttachment && hasAnswered && hasForwarded) break;
+    }
 
     threadGroups.push({
       threadId,

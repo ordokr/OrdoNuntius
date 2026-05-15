@@ -157,8 +157,6 @@ export function EmailList({
 
   const handleBatchDelete = async () => {
     if (!client || isProcessing) return;
-
-    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
     const isInTrash = currentMailbox?.role === 'trash';
 
     const confirmed = await confirmDialog({
@@ -191,8 +189,21 @@ export function EmailList({
     }
   };
 
-  const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
-  const isEmptyableFolder = currentMailbox?.role === 'trash' || currentMailbox?.role === 'junk';
+  // Hot-path lookups computed once per render and threaded into the
+  // virtualized rows. Without these, every visible ThreadListItem ran its
+  // own mailboxes.find + emailKeywords.find on each render, multiplying
+  // O(M+K) by ~50 virtual items on every scroll / store update.
+  const currentMailbox = useMemo(
+    () => mailboxes.find(m => m.id === selectedMailbox),
+    [mailboxes, selectedMailbox]
+  );
+  const currentMailboxRole = currentMailbox?.role;
+  const isEmptyableFolder = currentMailboxRole === 'trash' || currentMailboxRole === 'junk';
+  const emailKeywordsList = useSettingsStore((state) => state.emailKeywords);
+  const emailKeywordsById = useMemo(
+    () => new Map(emailKeywordsList.map(k => [k.id, k])),
+    [emailKeywordsList]
+  );
 
   const handleEmptyFolder = async () => {
     if (!client || isProcessing || !currentMailbox) return;
@@ -445,6 +456,8 @@ export function EmailList({
                       selectedEmailId={selectedEmailId}
                       isLoading={isLoadingThread === thread.threadId}
                       expandedEmails={threadEmailsCache.get(thread.threadId)}
+                      currentMailboxRole={currentMailboxRole}
+                      emailKeywordsById={emailKeywordsById}
                       onToggleExpand={() => handleToggleThreadExpansion(thread.threadId)}
                       onEmailSelect={(email) => onEmailSelect?.(email)}
                       onContextMenu={openContextMenu}
@@ -488,7 +501,7 @@ export function EmailList({
           menuRef={menuRef}
           mailboxes={mailboxes}
           selectedMailbox={selectedMailbox}
-          currentMailboxRole={mailboxes.find(m => m.id === selectedMailbox)?.role}
+          currentMailboxRole={currentMailboxRole}
           isMultiSelect={selectedEmailIds.has(contextMenu.data.id)}
           selectedCount={selectedEmailIds.size}
           onReply={() => onReply?.(contextMenu.data!)}
