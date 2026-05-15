@@ -149,9 +149,17 @@ TELEMETRY_DATA_DIR=${STATE_DIR}/telemetry
 LOG_FORMAT=json
 LOG_LEVEL=info
 
-LOGIN_COMPANY_NAME=OrdoNuntius
-LOGIN_LOGO_LIGHT_URL=/branding/OrdoNuntius_Logo_Color.svg
-LOGIN_LOGO_DARK_URL=/branding/OrdoNuntius_Logo_Color.svg
+# Salt & Light branding. This install script is specific to the
+# webmail.saltnlightllc.com deploy (see infra/nginx/ and the SSM prefix
+# /saltnlight/webmail/...), so the OrdoNuntius default marks are
+# overridden here with the operator's logo. APP_LOGO_*_URL drives the
+# in-app nav rail; LOGIN_LOGO_*_URL drives the sign-in splash. The PNG
+# is bundled in public/branding/ and served by Next.js as a static asset.
+LOGIN_COMPANY_NAME=Salt & Light LLC
+LOGIN_LOGO_LIGHT_URL=/branding/saltnlight-logo.png
+LOGIN_LOGO_DARK_URL=/branding/saltnlight-logo.png
+APP_LOGO_LIGHT_URL=/branding/saltnlight-logo.png
+APP_LOGO_DARK_URL=/branding/saltnlight-logo.png
 LOGIN_WEBSITE_URL=https://saltnlightllc.com
 EOF
 
