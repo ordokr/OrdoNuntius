@@ -22,11 +22,24 @@ function isSetupPath(pathname: string): boolean {
 }
 
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // Fast path: static assets, Next internals, and API routes bypass the
+  // entire middleware. This was previously after the configManager and
+  // setup-state work, which meant every /_next/static/*, /api/health,
+  // /branding/*.png request paid for one microtask (ensureLoaded) plus
+  // a setup-state function call. A typical page load fires 40-60 of these
+  // requests; the savings compound. Setup-wizard correctness is preserved
+  // because the wizard's own pages (/setup) DO hit the slow path below —
+  // it's only the asset/internal traffic that skips.
+  if (PROXY_SKIP_PATTERN.test(pathname)) {
+    return NextResponse.next();
+  }
+
   // Resolve setup state before deciding what to skip. The first call after
   // boot triggers the config load; subsequent calls are in-memory.
   await configManager.ensureLoaded();
   const setupState = detectSetupState();
-  const pathname = request.nextUrl.pathname;
 
   if (setupState === "bootstrap") {
     // Wizard active. Redirect HTML pages to /setup; let asset/internal
@@ -68,9 +81,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (PROXY_SKIP_PATTERN.test(pathname)) {
-    return NextResponse.next();
-  }
+  // Note: the static-asset / API / _next skip happens at the top of this
+  // function before the awaits above, so no second check is needed here.
 
   const nonce = crypto.randomUUID();
   const isDev = process.env.NODE_ENV === "development";

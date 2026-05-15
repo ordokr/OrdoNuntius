@@ -17,14 +17,17 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Newsreader powers the "scholarly inkwell" display type — folio headings,
-// brand wordmark, and emphasized body callouts. Loaded with italic variants
-// because the brand wordmark uses italic small caps.
+// Newsreader powers the "scholarly inkwell" display type. Current use is
+// limited to two H1s on the login splash — both `font-serif italic
+// font-medium`, i.e. italic weight 500 only. Loading the full 3-weights ×
+// 2-styles = 6-file set put ~150 KB of unused font on the first-paint
+// critical path. If a future surface needs a different weight or upright
+// style, add it explicitly here.
 const newsreader = Newsreader({
   variable: "--font-newsreader",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  style: ["normal", "italic"],
+  weight: ["500"],
+  style: ["italic"],
 });
 
 export async function generateMetadata(): Promise<Metadata> {
