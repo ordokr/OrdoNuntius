@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Email, Mailbox, StateChange, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID } from "@/lib/jmap/types";
+import { Email, Mailbox, StateChange } from "@/lib/jmap/types";
 import type { UnifiedMailboxRole } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -419,8 +419,18 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         }
 
         await quotaPromise.catch(() => undefined);
-        // Tag counts can finish whenever; don't block the prefetch on them.
-        void get().fetchTagCounts(client);
+        // Tag counts are background-priority — they only populate the
+        // sidebar tag-filter badge numbers. Defer to an idle window so the
+        // browser can finish first-paint / hydration before paying the
+        // (multi-keyword fan-out) cost. requestIdleCallback isn't in every
+        // browser yet, so fall back to a generous setTimeout.
+        const fireTagCounts = () => { void get().fetchTagCounts(client); };
+        if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+          (window as typeof window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void })
+            .requestIdleCallback(fireTagCounts, { timeout: 2000 });
+        } else {
+          setTimeout(fireTagCounts, 500);
+        }
       } finally {
         delete target.__prefetchPromise;
       }
@@ -1750,8 +1760,6 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // Merge the refreshed first page with the existing loaded emails.
       // This avoids discarding already-loaded pages which would cause the
       // virtual list to shrink and then rapidly re-load (scroll bounce).
-      const freshMap = new Map(result.emails.map((e: Email) => [e.id, e]));
-
       // Build the merged list: start with the fresh first page, then append
       // existing emails beyond that page (if any), skipping duplicates and
       // emails removed from the first page (e.g. deleted or moved).

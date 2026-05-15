@@ -347,7 +347,6 @@ export default function SettingsPage() {
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const quota = useEmailStore(s => s.quota);
-  const isPushConnected = useEmailStore(s => s.isPushConnected);
   const { stalwartFeaturesEnabled } = useConfig();
   const { isFeatureEnabled } = usePolicyStore();
   const [activeTab, setActiveTab] = useState<Tab>(readPersistedTab);
@@ -832,7 +831,6 @@ export default function SettingsPage() {
         <NavigationRail
           collapsed
           quota={quota}
-          isPushConnected={isPushConnected}
           onLogout={logout}
           onManageApps={handleManageApps}
           onInlineApp={handleInlineApp}

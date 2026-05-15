@@ -49,27 +49,43 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: import.meta.dirname,
   },
+  // Strip console.log/info/debug in production while keeping warn/error so
+  // prod-visible breadcrumbs (`[fetchEmails] ...`, `[prefetch] ...`) still
+  // surface in the browser console. Saves ~5-15 KB of inlined strings off
+  // the production bundle and removes per-call argument-evaluation cost on
+  // hot paths (the `[fetchEmails]` line alone fires for every list refresh).
+  compiler: {
+    removeConsole: { exclude: ["warn", "error", "info"] },
+  },
   // Force barrel-package imports to compile to per-named-export imports.
   // Without this, `import { Send, X } from 'lucide-react'` pulls the
   // entire barrel module (which transitively references all ~1400 icons),
   // and every lazy-loaded route ends up shipping its own copy of the icon
   // tree — we measured 5 identical 580 KB lucide chunks in the build
-  // output before this was set. The listed packages are the ones whose
-  // barrel imports actually dominate our bundle:
+  // output before this was set.
   //   - lucide-react: ~1400 icons via barrel; we use ~80
-  //   - @radix-ui/react-icons: similar barrel structure
   //   - date-fns: barrel re-exports the whole locale + format library
   //   - sonner: small but barrel-shaped
   // See https://nextjs.org/docs/app/api-reference/config/next-config-js/optimizePackageImports
   // (Lives under `experimental` in Next 16; check Next release notes for
   // promotion.)
   experimental: {
-    optimizePackageImports: [
-      "lucide-react",
-      "@radix-ui/react-icons",
-      "date-fns",
-      "sonner",
-    ],
+    optimizePackageImports: ["lucide-react", "date-fns", "sonner"],
+  },
+  // Long-lived caching for static branding assets. These are versioned by
+  // content URL (e.g. faviconUrl is configurable; old logos keep working
+  // under their pre-rename path until cache expiry, new ones get a fresh
+  // URL). One-year immutable means warm-load page reloads skip the network
+  // round-trip entirely.
+  async headers() {
+    return [
+      {
+        source: "/branding/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+    ];
   },
   env: {
     NEXT_PUBLIC_GIT_COMMIT: gitCommitHash,

@@ -78,7 +78,6 @@ export default function CalendarPage() {
   const { client, isAuthenticated, logout, checkAuth, switchAccount, activeAccountId, isLoading: authLoading } = useAuthStore();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const quota = useEmailStore(s => s.quota);
-  const isPushConnected = useEmailStore(s => s.isPushConnected);
   const {
     calendars, events, selectedDate, viewMode, selectedCalendarIds,
     isLoading, isLoadingEvents, supportsCalendar, error,
@@ -1224,7 +1223,6 @@ export default function CalendarPage() {
           <NavigationRail
             collapsed
             quota={quota}
-            isPushConnected={isPushConnected}
             onLogout={logout}
             onManageApps={handleManageApps}
             onInlineApp={handleInlineApp}

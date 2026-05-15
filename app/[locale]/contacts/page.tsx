@@ -46,7 +46,6 @@ export default function ContactsPage() {
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const quota = useEmailStore(s => s.quota);
-  const isPushConnected = useEmailStore(s => s.isPushConnected);
   const {
     contacts,
     addressBooks,
@@ -657,7 +656,6 @@ export default function ContactsPage() {
           <NavigationRail
             collapsed
             quota={quota}
-            isPushConnected={isPushConnected}
             onLogout={logout}
             onManageApps={handleManageApps}
             onInlineApp={handleInlineApp}

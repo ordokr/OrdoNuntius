@@ -6,7 +6,6 @@ import { useTranslations } from "next-intl";
 import { Sidebar } from "@/components/layout/sidebar";
 import dynamic from "next/dynamic";
 import { EmailList } from "@/components/email/email-list";
-import { EmailViewer } from "@/components/email/email-viewer";
 import type { ComposerDraftData } from "@/components/email/email-composer";
 
 // EmailComposer bundles TipTap + extensions + ~2.2k LOC of composer code.
@@ -19,12 +18,23 @@ const EmailComposer = dynamic(
   () => import("@/components/email/email-composer").then(m => ({ default: m.EmailComposer })),
   { ssr: false, loading: () => null }
 );
+// EmailViewer + ThreadConversationView both pull DOMPurify (~50KB compressed)
+// and a tree of email-rendering helpers. Neither is visible on the cold-load
+// inbox list — they only mount when the user clicks an email or expands a
+// thread. Same lazy pattern as EmailComposer.
+const EmailViewer = dynamic(
+  () => import("@/components/email/email-viewer").then(m => ({ default: m.EmailViewer })),
+  { ssr: false, loading: () => null }
+);
+const ThreadConversationView = dynamic(
+  () => import("@/components/email/thread-conversation-view").then(m => ({ default: m.ThreadConversationView })),
+  { ssr: false, loading: () => null }
+);
 // Lazy modal: only mounted when handling a mailto:/webcal: link.
 const ProtocolAccountPicker = dynamic(
   () => import("@/components/protocol/protocol-account-picker").then(m => ({ default: m.ProtocolAccountPicker })),
   { ssr: false, loading: () => null }
 );
-import { ThreadConversationView } from "@/components/email/thread-conversation-view";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { ThreadGroup, Email, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID } from "@/lib/jmap/types";
 import { useAccountStore } from "@/stores/account-store";
@@ -255,7 +265,6 @@ export default function Home() {
     selectedEmail,
     selectedMailbox,
     quota,
-    isPushConnected,
     newEmailNotification,
     selectEmail,
     selectMailbox,
@@ -265,7 +274,6 @@ export default function Home() {
     toggleEmailSelection,
     fetchMailboxes,
     fetchEmails,
-    fetchQuota,
     sendEmail,
     deleteEmail,
     markAsRead,
@@ -315,7 +323,6 @@ export default function Home() {
     selectedEmail: s.selectedEmail,
     selectedMailbox: s.selectedMailbox,
     quota: s.quota,
-    isPushConnected: s.isPushConnected,
     newEmailNotification: s.newEmailNotification,
     selectEmail: s.selectEmail,
     selectMailbox: s.selectMailbox,
@@ -2071,7 +2078,6 @@ export default function Home() {
             <NavigationRail
               collapsed
               quota={quota}
-              isPushConnected={isPushConnected}
               onLogout={handleLogout}
               onShowShortcuts={() => setShowShortcutsModal(true)}
               onManageApps={handleManageApps}

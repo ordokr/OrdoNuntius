@@ -24,14 +24,26 @@ export function ServiceWorkerRegistration() {
       return;
     }
 
-    navigator.serviceWorker
-      .register(`${BASE_PATH}/sw.js`, { scope: `${BASE_PATH}/` })
-      .then((registration) => {
-        console.log("Service Worker registered successfully:", registration);
-      })
-      .catch((error) => {
-        console.error("Service Worker registration failed:", error);
-      });
+    // Defer registration until after `load`. The SW install fetches /sw.js,
+    // parses it, and runs install hooks — all of which compete with the
+    // main bundle for parser time. Yielding until window.load means cold
+    // interactivity isn't delayed by SW setup. If `load` already fired by
+    // the time this useEffect runs (likely under Suspense), register
+    // immediately.
+    const register = () => {
+      navigator.serviceWorker
+        .register(`${BASE_PATH}/sw.js`, { scope: `${BASE_PATH}/` })
+        .catch((error) => {
+          console.error("Service Worker registration failed:", error);
+        });
+    };
+
+    if (document.readyState === "complete") {
+      register();
+    } else {
+      window.addEventListener("load", register, { once: true });
+      return () => window.removeEventListener("load", register);
+    }
   }, []);
 
   return null;

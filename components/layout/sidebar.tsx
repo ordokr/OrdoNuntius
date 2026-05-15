@@ -129,12 +129,10 @@ function getIconClass(isSelected: boolean, isVirtual: boolean, colorful: boolean
 function SidebarRowCounts({
   unread,
   total,
-  isSelected,
   onUnreadClick,
 }: {
   unread?: number;
   total?: number;
-  isSelected: boolean;
   onUnreadClick?: () => void;
 }) {
   const unreadCount = unread ?? 0;
@@ -287,7 +285,6 @@ function SidebarRow({
             <SidebarRowCounts
               unread={unread}
               total={total}
-              isSelected={isSelected}
               onUnreadClick={onUnreadClick}
             />
           </>

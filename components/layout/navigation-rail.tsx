@@ -38,7 +38,6 @@ interface NavigationRailProps {
   collapsed?: boolean;
   className?: string;
   quota?: { used: number; total: number } | null;
-  isPushConnected?: boolean;
   onLogout?: () => void;
   onShowShortcuts?: () => void;
   onManageApps?: () => void;
@@ -153,7 +152,6 @@ export function NavigationRail({
   collapsed = false,
   className,
   quota,
-  isPushConnected,
   onLogout,
   onShowShortcuts,
   onManageApps,
