@@ -5,7 +5,7 @@ import { formatDate, stripInvisibleLeading } from "@/lib/utils";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
-import { Paperclip, Star, Circle, ChevronRight, ChevronDown, Loader2, MessageSquare, CheckSquare, Square, Reply, Forward } from "lucide-react";
+import { Paperclip, Star, ChevronRight, ChevronDown, Loader2, MessageSquare, CheckSquare, Square, Reply, Forward } from "lucide-react";
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useEmailStore } from "@/stores/email-store";
@@ -139,7 +139,8 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
           !resolvedColorTag && !selected && !isChecked && "hover:bg-muted hover:shadow-sm",
           !resolvedColorTag && (selected || isChecked) && "hover:bg-accent hover:shadow-sm",
           resolvedColorTag && "hover:brightness-95 dark:hover:brightness-110",
-          isUnread && !resolvedColorTag && "bg-accent/30",
+          // Unread state is signalled by the left-edge wax stripe + bolder
+          // font weight, not a row-wash. Scholarly inkwell brand.
           isChecked && "ring-2 ring-primary/20 bg-accent/40",
           isDragging && "opacity-50 scale-[0.98] ring-2 ring-primary/30",
           isPressed && "bg-muted scale-[0.98] ring-2 ring-primary/30"
@@ -173,10 +174,12 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
             </button>
           )}
 
+          {/* Wax-seal unread stripe on the leading edge. */}
           {isUnread && (
-            <div className="absolute left-1 top-1/2 -translate-y-1/2">
-              <Circle className="w-2 h-2 fill-unread text-unread" />
-            </div>
+            <div
+              aria-hidden="true"
+              className="absolute left-0 top-0 bottom-0 w-[3px] bg-unread"
+            />
           )}
 
           {density !== 'extra-compact' && (
@@ -558,10 +561,13 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
               </button>
             )}
 
+            {/* Thread-level wax-seal stripe — any unread message in the thread
+                marks the whole row. */}
             {hasUnread && (
-              <div className="absolute left-1 top-1/2 -translate-y-1/2">
-                <Circle className="w-2 h-2 fill-unread text-unread" />
-              </div>
+              <div
+                aria-hidden="true"
+                className="absolute left-0 top-0 bottom-0 w-[3px] bg-unread"
+              />
             )}
 
             {density !== 'extra-compact' && (

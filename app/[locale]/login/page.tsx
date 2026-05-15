@@ -655,7 +655,7 @@ export default function LoginPage() {
                   className="max-w-20 max-h-20 object-contain"
                 />
               </div>
-              <h1 className="text-3xl font-bold text-foreground tracking-tight">
+              <h1 className="text-4xl font-serif italic font-medium text-foreground tracking-tight">
                 {appName}
               </h1>
               <p className="text-base text-muted-foreground mt-2 max-w-xs mx-auto leading-relaxed">
@@ -805,7 +805,12 @@ export default function LoginPage() {
                 className="max-w-16 max-h-16 object-contain"
               />
             </div>
-            <h1 className="text-2xl font-semibold text-foreground tracking-tight">
+            <h1 className={cn(
+              "text-foreground tracking-tight",
+              isAddAccountMode
+                ? "text-2xl font-semibold"
+                : "text-3xl font-serif italic font-medium"
+            )}>
               {isAddAccountMode ? t("add_account_title") : appName}
             </h1>
             <p className="text-sm text-muted-foreground mt-1.5">

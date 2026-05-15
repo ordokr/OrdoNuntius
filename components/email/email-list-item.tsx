@@ -6,7 +6,7 @@ import { formatDate, stripInvisibleLeading } from "@/lib/utils";
 import { Email } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
-import { Paperclip, Star, Circle, CheckSquare, Square, Reply, Forward } from "lucide-react";
+import { Paperclip, Star, CheckSquare, Square, Reply, Forward } from "lucide-react";
 import { useEmailStore } from "@/stores/email-store";
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -105,7 +105,9 @@ export function EmailListItem({ email, selected, onClick, onContextMenu, onToggl
         !colorTag && !selected && !isChecked && "hover:bg-muted hover:shadow-sm",
         !colorTag && (selected || isChecked) && "hover:bg-accent hover:shadow-sm",
         colorTag && "hover:brightness-95 dark:hover:brightness-110",
-        isUnread && !selected && !colorTag && "bg-warning/10",
+        // Unread state is signalled by the left-edge wax stripe (below) +
+        // bolder font weight, not a row-wash. Keeps the warm cream
+        // background calm and lets the wax seal speak for itself.
         // Add visual feedback for checked state
         isChecked && "ring-2 ring-primary/20 bg-selection/60",
         // Drag state visual feedback
@@ -153,11 +155,14 @@ export function EmailListItem({ email, selected, onClick, onContextMenu, onToggl
           </button>
         )}
 
-        {/* Unread indicator */}
+        {/* Unread indicator — amber "wax seal" stripe on the leading edge,
+            per the OrdoNuntius scholarly inkwell brand. Replaces the
+            inherited Bulwark blue dot. */}
         {isUnread && (
-          <div className="absolute left-1 top-1/2 -translate-y-1/2">
-            <Circle className="w-2 h-2 fill-unread text-unread" />
-          </div>
+          <div
+            aria-hidden="true"
+            className="absolute left-0 top-0 bottom-0 w-[3px] bg-unread"
+          />
         )}
 
         {/* Avatar */}
