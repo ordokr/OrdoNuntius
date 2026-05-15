@@ -108,5 +108,5 @@ echo "  sudo systemctl reload nginx"
 echo "  curl -sSf -o /dev/null https://${HOSTNAME}/ && echo OK"
 REMOTE
 
-echo "[deploy-ec2] release ${STAMP} installed on ${TARGET}; service NOT started."
+echo "[deploy-ec2] release installed on ${TARGET} from $(basename "${ARCHIVE}"); service NOT started."
 echo "[deploy-ec2] next: SSH in, run the canary checklist, then enable+start."
