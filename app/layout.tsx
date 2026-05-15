@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import { headers } from "next/headers";
 import { getLocale } from "next-intl/server";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
@@ -15,6 +15,16 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Newsreader powers the "scholarly inkwell" display type — folio headings,
+// brand wordmark, and emphasized body callouts. Loaded with italic variants
+// because the brand wordmark uses italic small caps.
+const newsreader = Newsreader({
+  variable: "--font-newsreader",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -48,7 +58,7 @@ export default async function RootLayout({
   return (
     <html lang={locale} suppressHydrationWarning>
       <head>
-        <meta name="theme-color" content="#ffffff" />
+        <meta name="theme-color" content="#FAF8F3" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta
@@ -81,7 +91,7 @@ export default async function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} antialiased`}
       >
         <ServiceWorkerRegistration />
         {children}

@@ -5,56 +5,62 @@
 :root {
   font-size: var(--font-size-base);
 
-  --color-border: #e2e8f0;
-  --color-input: #e2e8f0;
-  --color-ring: #94a3b8;
-  --color-background: #ffffff;
-  --color-foreground: #0f172a;
-  --color-primary: #3b82f6;
+  /* OrdoNuntius "scholarly inkwell" theme — warm paper, indigo ink, amber
+     wax seal for unread / important. Maps the Nuntiustemplate design tokens
+     into the variable names this codebase already consumes, so existing
+     components pick up the new palette without per-component edits. */
+
+  --color-border: #E5DFD0;           /* warm parchment line */
+  --color-input: #E5DFD0;
+  --color-ring: #C7D2FE;             /* indigo halo */
+  --color-background: #FAF8F3;       /* warm paper */
+  --color-foreground: #18181C;       /* primary ink */
+  --color-primary: #4F46E5;          /* indigo accent */
   --color-primary-foreground: #ffffff;
-  --color-secondary: #f8fafc;
-  --color-secondary-foreground: #0f172a;
-  --color-muted: #f1f5f9;
-  --color-muted-foreground: #64748b;
-  --color-accent: #dbeafe;
-  --color-accent-foreground: #1e40af;
-  --color-destructive: #ef4444;
+  --color-secondary: #FFFEFA;        /* bg-tint, near-white */
+  --color-secondary-foreground: #3F3F46;
+  --color-muted: #EFEAE0;            /* bg-hover */
+  --color-muted-foreground: #71717A; /* ink-3 */
+  --color-accent: #EEF0FE;           /* indigo tint */
+  --color-accent-foreground: #312E81;/* indigo-ink */
+  --color-destructive: #B91C1C;
   --color-destructive-foreground: #ffffff;
-  --color-popover: #ffffff;
-  --color-popover-foreground: #0f172a;
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #18181C;
 
   /* Sidebar */
-  --color-sidebar: #f8fafc;
-  --color-sidebar-foreground: #0f172a;
-  --color-sidebar-border: #e2e8f0;
-  --color-sidebar-accent: #f1f5f9;
-  --color-sidebar-accent-foreground: #0f172a;
+  --color-sidebar: #F7F3EA;          /* bg-sidebar — slightly warmer paper */
+  --color-sidebar-foreground: #18181C;
+  --color-sidebar-border: #E5DFD0;
+  --color-sidebar-accent: #EFEAE0;
+  --color-sidebar-accent-foreground: #18181C;
 
   /* Card */
-  --color-card: #ffffff;
-  --color-card-foreground: #0f172a;
+  --color-card: #FFFFFF;             /* bg-elev */
+  --color-card-foreground: #18181C;
 
   /* Semantic status colors */
-  --color-success: #22c55e;
+  --color-success: #15803D;
   --color-success-foreground: #ffffff;
-  --color-warning: #eab308;
+  --color-warning: #B45309;
   --color-warning-foreground: #ffffff;
-  --color-info: #3b82f6;
+  --color-info: #4F46E5;
   --color-info-foreground: #ffffff;
 
   /* Selection states */
-  --color-selection: #dbeafe;
-  --color-selection-foreground: #1e40af;
+  --color-selection: #EEF0FE;
+  --color-selection-foreground: #312E81;
 
-  /* Unread indicator */
-  --color-unread: #3b82f6;
+  /* Unread indicator — amber "wax seal", per the Nuntiustemplate brand:
+     unread / important mail wears a warm wax-seal mark, not a blue dot. */
+  --color-unread: #B8612A;
 
-  /* Chart colors */
-  --color-chart-1: #3b82f6;
-  --color-chart-2: #22c55e;
-  --color-chart-3: #f59e0b;
-  --color-chart-4: #ef4444;
-  --color-chart-5: #8b5cf6;
+  /* Chart colors — warm spectrum that harmonises with the wax seal */
+  --color-chart-1: #4F46E5;
+  --color-chart-2: #15803D;
+  --color-chart-3: #B8612A;
+  --color-chart-4: #B91C1C;
+  --color-chart-5: #7C3AED;
 
   /* Settings variables */
   --font-size-base: 16px;
@@ -70,56 +76,57 @@
 }
 
 .dark {
-  --color-border: #262626;
-  --color-input: #262626;
-  --color-ring: #d4d4d4;
-  --color-background: #0a0a0a;
-  --color-foreground: #fafafa;
-  --color-primary: #fafafa;
-  --color-primary-foreground: #171717;
-  --color-secondary: #262626;
-  --color-secondary-foreground: #fafafa;
-  --color-muted: #262626;
-  --color-muted-foreground: #a3a3a3;
-  --color-accent: #1e3a8a;
-  --color-accent-foreground: #dbeafe;
-  --color-destructive: #ef4444;
-  --color-destructive-foreground: #fafafa;
-  --color-popover: #1c1c1c;
-  --color-popover-foreground: #fafafa;
+  /* OrdoNuntius dark — deep ink, lightened indigo, brighter wax */
+  --color-border: #20202E;
+  --color-input: #20202E;
+  --color-ring: #3A3A6E;
+  --color-background: #0C0C12;       /* deep ink */
+  --color-foreground: #ECECF1;
+  --color-primary: #8B8BFF;           /* lifted indigo */
+  --color-primary-foreground: #0C0C12;
+  --color-secondary: #14141F;
+  --color-secondary-foreground: #C3C3CE;
+  --color-muted: #1A1A28;             /* bg-hover */
+  --color-muted-foreground: #8B8B98;
+  --color-accent: #1B1B33;            /* accent-tint */
+  --color-accent-foreground: #D3D3FF; /* accent-ink */
+  --color-destructive: #F87171;
+  --color-destructive-foreground: #ffffff;
+  --color-popover: #131321;
+  --color-popover-foreground: #ECECF1;
 
   /* Sidebar */
-  --color-sidebar: #0a0a0a;
-  --color-sidebar-foreground: #fafafa;
-  --color-sidebar-border: #262626;
-  --color-sidebar-accent: #1a1a1a;
-  --color-sidebar-accent-foreground: #fafafa;
+  --color-sidebar: #10101A;
+  --color-sidebar-foreground: #ECECF1;
+  --color-sidebar-border: #20202E;
+  --color-sidebar-accent: #1A1A28;
+  --color-sidebar-accent-foreground: #ECECF1;
 
   /* Card */
-  --color-card: #141414;
-  --color-card-foreground: #fafafa;
+  --color-card: #131321;
+  --color-card-foreground: #ECECF1;
 
   /* Semantic status colors */
-  --color-success: #16a34a;
-  --color-success-foreground: #ffffff;
-  --color-warning: #ca8a04;
-  --color-warning-foreground: #ffffff;
-  --color-info: #60a5fa;
-  --color-info-foreground: #ffffff;
+  --color-success: #4ADE80;
+  --color-success-foreground: #0C0C12;
+  --color-warning: #FBBF24;
+  --color-warning-foreground: #0C0C12;
+  --color-info: #8B8BFF;
+  --color-info-foreground: #0C0C12;
 
   /* Selection states */
-  --color-selection: rgba(59, 130, 246, 0.25);
-  --color-selection-foreground: #93c5fd;
+  --color-selection: rgba(139, 139, 255, 0.18);
+  --color-selection-foreground: #D3D3FF;
 
-  /* Unread indicator */
-  --color-unread: #60a5fa;
+  /* Unread indicator — wax burns brighter in the dark */
+  --color-unread: #E89A5D;
 
   /* Chart colors */
-  --color-chart-1: #60a5fa;
-  --color-chart-2: #4ade80;
-  --color-chart-3: #fbbf24;
-  --color-chart-4: #f87171;
-  --color-chart-5: #a78bfa;
+  --color-chart-1: #8B8BFF;
+  --color-chart-2: #4ADE80;
+  --color-chart-3: #E89A5D;
+  --color-chart-4: #F87171;
+  --color-chart-5: #C084FC;
 }
 
 @theme inline {
@@ -171,6 +178,7 @@ body {
   background-color: var(--color-background);
   color: var(--color-foreground);
   font-family:
+    var(--font-geist-sans),
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
@@ -183,7 +191,22 @@ body {
     sans-serif;
   font-feature-settings:
     "rlig" 1,
-    "calt" 1;
+    "calt" 1,
+    "ss01" 1,
+    "cv11" 1;
+}
+
+/* Display serif — Newsreader. Use for branded headings, the OrdoNuntius
+   wordmark in the login page, and any folio-style display copy. The
+   italic variant is the brand wordmark style (per the Nuntiustemplate
+   thumbnail and brand SVG: the italic "N" in the wax seal). */
+.font-serif {
+  font-family: var(--font-newsreader), "Source Serif 4", Georgia, serif;
+  font-feature-settings: "kern", "liga", "calt";
+}
+
+.font-mono {
+  font-family: var(--font-geist-mono), ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
 }
 
 /* Minimalist scrollbar */
