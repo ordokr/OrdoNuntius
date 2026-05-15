@@ -223,6 +223,12 @@ work, not to relieve well-measured non-constraint stages.
 | 4 | Collapse race between prefetch and fallback effect | Stage 7/8 correctness | shipped commit `e0e9a20` |
 | 5 | `xtask clean` + `doctor` | Operator throughput | shipped commit `8c467e3` |
 | 6 | `[fetchEmails]` prod-visible breadcrumb | Diagnostic for stages 7/8 | shipped commit `2b33f19` |
+| 7 | Lazy-load S/MIME stack (pkijs/asn1js/webcrypto-liner) | Stage 4 (–1.15 MB on inbox path) | shipped commit `a9f83ed` |
+| 8 | deploy-ec2.sh reuse xtask pack tarball | Operator throughput (–60-120s per deploy) | shipped commit `878bfbe` (verified: 88s end-to-end deploy) |
+| 9 | `optimizePackageImports` for barrel libs | Stage 4 (defensive; Turbopack support varies) | shipped commit `17e765d` |
+| 10 | Bundle-size budget gate in `xtask release` | Regression guard | shipped commit `17e765d` |
+| 11 | Middleware fast-path skip for static/_next/api | Per-request microtask cost on every page | shipped commit `943e795` |
+| 12 | Newsreader font trim 6 variants → 1 | First-paint critical path (–~150 KB woff2) | shipped commit `943e795` |
 
 ### 5.2 Second-pass interventions (queued, prioritized by ToC step 4)
 
@@ -341,6 +347,34 @@ landed in commit `2b33f19` already prints the per-fetch breakdown.
 Capture the line from DevTools after each significant change.
 
 ---
+
+## 7.5 Empirical state after first-pass interventions
+
+Measured post-shipping (commit `17e765d`/`943e795`, build manifest):
+
+- **Inbox initial-paint JS payload**: ~446 KB across 5 files in
+  `rootMainFiles`. No heavy libraries leak into the entry path:
+  React (227 KB), app shell (135 KB), boot scripts (~80 KB),
+  turbopack runtime (10 KB).
+- **Largest chunk overall**: 750 KB (lazy asn1js, never loaded
+  unless the user opens an S/MIME message).
+- **Bundle budget**: 1500 KB per chunk; current largest is 50% under
+  budget, so future regressions like the original 1.83 MB locale
+  catalog get caught by `xtask release` before deploy.
+- **Cold-load on-wire HTML**: 31 KB brotli-compressed (down from
+  131 KB raw — already efficient).
+- **Deploy pipeline wall-clock**: 88 s for the full flow (verify +
+  build + pack + scp + remote install + restart), down from a
+  previous baseline of 3–6 minutes.
+
+The remaining cold-load constraint is **network RTT × request count**
+(see §3.1 falsification test). Bundle work has largely diminished:
+shrinking the entry path further yields sub-100 ms gains on most
+connections, while the four remaining big levers (service worker
+cache, JMAP back-reference batching, critical CSS inline, OrdoEpistola
+server-side timing) target *different* constraints. Continue with
+§5.2 row 3 (server-side observability) once OrdoEpistola recovers —
+that experiment decides whether OrdoDB is a real constraint.
 
 ## 8. Summary in one paragraph
 
