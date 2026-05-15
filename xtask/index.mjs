@@ -99,8 +99,16 @@ function pack(restArgs = []) {
         ? resolve(restArgs[0])
         : join(DIST, `ordo-nuntius-${sha}-${stamp}.tar.gz`);
 
+    // Wipe dist/ before every pack so old tarballs and any leftover
+    // stage-* dirs from interrupted runs don't accumulate. Without this,
+    // each deploy added a new ~400MB tarball alongside the previous ones;
+    // over time the directory grew to multi-GB and `deploy-ec2.sh`'s scp
+    // step (which packs from dist/) ballooned correspondingly. If a
+    // caller explicitly passed an outfile outside dist/ (e.g.
+    // `pack /tmp/foo.tgz`), the cleanup only affects dist/ — their
+    // chosen path is untouched.
+    rmSync(DIST, { recursive: true, force: true });
     const stage = join(DIST, `stage-${stamp}`);
-    rmSync(stage, { recursive: true, force: true });
     mkdirSync(stage, { recursive: true });
     mkdirSync(DIST, { recursive: true });
 
