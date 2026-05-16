@@ -377,6 +377,19 @@ export const useAuthStore = create<AuthState>()(
           const client = new JMAPClient(serverUrl, username, effectivePassword);
           await client.connect();
 
+          // Inbox emails are the cold-load critical path. Fire the prefetch
+          // immediately after connect resolves so Mailbox/get + the
+          // speculative-parallel Email/query overlap with identities/
+          // stalwart-context/session-write that run below. The email-store
+          // promise is coalesced by __prefetchPromise so the later
+          // page-mount call is a no-op when this one is still in flight.
+          // Dynamic import avoids a static circular dep with email-store.
+          const earlyPrefetch = import('@/stores/email-store').then(({ useEmailStore }) => {
+            return useEmailStore.getState().prefetchInitialData(client);
+          }).catch((err) => {
+            debug.error('Early initial data prefetch failed:', err);
+          });
+
           // Resolve account/slot info up front so writes can start immediately.
           const accountStore = useAccountStore.getState();
           const accountId = generateAccountId(username, serverUrl);
@@ -512,14 +525,11 @@ export const useAuthStore = create<AuthState>()(
             activeAccountId: accountId,
           });
 
-          // Kick off mailbox/quota/email fetches now so they overlap with the
-          // soft-nav + home-page hydration that follows login. Dynamic import
-          // avoids a static circular dep with email-store.
-          import('@/stores/email-store').then(({ useEmailStore }) => {
-            useEmailStore.getState().prefetchInitialData(client).catch((err) => {
-              debug.error('Initial data prefetch failed:', err);
-            });
-          }).catch(() => {});
+          // Inbox prefetch was already kicked off right after client.connect()
+          // above; this awaitless re-attach exists only so an early failure
+          // surfaces as a debug.error in the same scope as the rest of the
+          // login flow (the early earlyPrefetch already swallowed its own).
+          void earlyPrefetch;
 
           // Schedule token refresh for TOTP-upgraded sessions
           if (upgradedToOAuth && oauthExpiresIn > 0) {
@@ -656,6 +666,14 @@ export const useAuthStore = create<AuthState>()(
           const client = JMAPClient.withBearer(serverUrl, access_token, '', () => refreshFn());
           await client.connect();
 
+          // Inbox prefetch in parallel with everything below — see comment
+          // on the password-login earlyPrefetch for details.
+          const earlyPrefetch = import('@/stores/email-store').then(({ useEmailStore }) => {
+            return useEmailStore.getState().prefetchInitialData(client);
+          }).catch((err) => {
+            debug.error('Early initial data prefetch failed (OAuth):', err);
+          });
+
           const jmapUsername = client.getUsername();
           const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), jmapUsername);
           // For OAuth/OIDC, the JMAP session account name may be the
@@ -718,11 +736,9 @@ export const useAuthStore = create<AuthState>()(
             activeAccountId: accountId,
           });
 
-          import('@/stores/email-store').then(({ useEmailStore }) => {
-            useEmailStore.getState().prefetchInitialData(client).catch((err) => {
-              debug.error('Initial data prefetch failed:', err);
-            });
-          }).catch(() => {});
+          // Prefetch was kicked off earlier (see earlyPrefetch above); this
+          // attach exists only so debug.error in the same scope is consistent.
+          void earlyPrefetch;
 
           scheduleRefresh(expires_in, get().refreshAccessToken, accountId);
 
@@ -799,6 +815,14 @@ export const useAuthStore = create<AuthState>()(
           const client = JMAPClient.withBearer(ssoServerUrl, access_token, '', () => refreshFn());
           await client.connect();
 
+          // Inbox prefetch in parallel with everything below — see comment
+          // on the password-login earlyPrefetch for details.
+          const earlyPrefetch = import('@/stores/email-store').then(({ useEmailStore }) => {
+            return useEmailStore.getState().prefetchInitialData(client);
+          }).catch((err) => {
+            debug.error('Early initial data prefetch failed (SSO):', err);
+          });
+
           const jmapUsername = client.getUsername();
           const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), jmapUsername);
           // For SSO/OIDC, the JMAP session account name may be the
@@ -856,11 +880,8 @@ export const useAuthStore = create<AuthState>()(
             activeAccountId: accountId,
           });
 
-          import('@/stores/email-store').then(({ useEmailStore }) => {
-            useEmailStore.getState().prefetchInitialData(client).catch((err) => {
-              debug.error('Initial data prefetch failed:', err);
-            });
-          }).catch(() => {});
+          // Prefetch was kicked off earlier (see earlyPrefetch above).
+          void earlyPrefetch;
 
           scheduleRefresh(expires_in, get().refreshAccessToken, accountId);
 
