@@ -171,6 +171,12 @@ export default function LoginPage() {
   // here masks that cold-start behind UI time the user is already spending
   // on the form. Fire-and-forget: failures are silent, the real auth call
   // will still work, it just won't benefit from a warm cache.
+  //
+  // Also prefetch the inbox route's chunks so the post-login soft-nav is
+  // parser-only (no network wait). Combined with the JMAP prewarm + the
+  // instant-from-cache hydrate in email-store.prefetchInitialData, the
+  // user-perceived "login → inbox visible" budget collapses to roughly
+  // (auth RTT + React mount), under Gmail's 2s bar on a warm session.
   useEffect(() => {
     if (typeof window === "undefined") return;
     void fetch(getPathPrefix() + "/jmap/session", {
@@ -178,7 +184,13 @@ export default function LoginPage() {
       cache: "no-store",
       keepalive: true,
     }).catch(() => {});
-  }, []);
+    try {
+      router.prefetch("/");
+    } catch {
+      // router.prefetch is best-effort; older next-intl versions may not
+      // expose it on the wrapped router. Silent on miss.
+    }
+  }, [router]);
 
   useEffect(() => {
     if (serverUrl) {

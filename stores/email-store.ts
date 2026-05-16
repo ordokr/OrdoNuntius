@@ -11,6 +11,7 @@ import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, type UnifiedAccountClien
 import { useAuthStore } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
 import { getLastInbox, setLastInbox } from "@/lib/last-inbox";
+import { getCachedInbox, setCachedInbox } from "@/lib/cached-inbox-emails";
 
 interface EmailStore {
   emails: Email[];
@@ -326,8 +327,14 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     // refreshes (after a move/archive that may have created new folders) must
     // not flash the list's loading state, which hides the results-count bar
     // and dims the list while folders re-fetch.
+    //
+    // Additionally: if emails are already populated (instant-render-from-cache
+    // path in prefetchInitialData), skip the loading flash entirely. The user
+    // is seeing their inbox; flipping isLoading=true would replace it with a
+    // spinner for the few hundred ms until Mailbox/get resolves.
     const isInitialLoad = get().mailboxes.length === 0;
-    if (isInitialLoad) set({ isLoading: true, error: null });
+    const hasVisibleEmails = get().emails.length > 0;
+    if (isInitialLoad && !hasVisibleEmails) set({ isLoading: true, error: null });
     try {
       const mailboxes = await client.getAllMailboxes();
 
@@ -386,6 +393,30 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         const accountId = client.getAccountId();
         const speculativeId = getLastInbox(accountId);
         const emailsPerPage = useSettingsStore.getState().emailsPerPage;
+
+        // Gmail-style instant-from-cache render: hydrate the email list
+        // from localStorage SYNCHRONOUSLY before any JMAP roundtrip starts.
+        // The user sees their last-seen inbox while the network catches
+        // up; fresh data swaps in when fetchEmails/the speculative query
+        // resolves below. We only hydrate when the store is empty so an
+        // already-populated session (e.g. user navigated back) isn't
+        // clobbered.
+        if (get().emails.length === 0) {
+          const cached = getCachedInbox(accountId);
+          if (cached && cached.emails.length > 0) {
+            set({
+              emails: cached.emails as Email[],
+              selectedMailbox: cached.mailboxId,
+              totalEmails: cached.total,
+              hasMoreEmails: cached.hasMore,
+              isLoading: false,
+            });
+            console.info(
+              `[prefetch] instant render from cache: ${cached.emails.length}/${cached.total} emails ` +
+              `(saved ${Math.round((Date.now() - cached.savedAt) / 1000)}s ago)`,
+            );
+          }
+        }
 
         const mailboxesPromise = get().fetchMailboxes(client);
         const quotaPromise = get().fetchQuota(client);
@@ -478,6 +509,19 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         totalEmails: result.total,
         isLoading: false
       });
+      // Persist the freshly-fetched page for the next cold-load's instant
+      // render. Skip shared mailboxes and keyword-filtered views — those
+      // have different identity semantics and would corrupt the cache when
+      // restored against an unfiltered inbox view.
+      if (mailbox && !mailbox.isShared && !selectedKeyword && jmapMailboxId) {
+        setCachedInbox(
+          client.getAccountId(),
+          jmapMailboxId,
+          result.emails,
+          result.total,
+          result.hasMore,
+        );
+      }
     } catch (error) {
       console.error('Failed to fetch emails:', error);
       set({
