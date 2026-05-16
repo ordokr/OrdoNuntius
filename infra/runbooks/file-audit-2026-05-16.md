@@ -67,16 +67,16 @@ file in this index — visited when its turn arrives.)
  18. [x] `components/email/email-list.tsx` — hoisted `LoadingSkeleton` to module scope (was a per-render component-type creation forcing remounts).
  19. [x] `components/layout/sidebar.tsx` — memoized `buildMailboxTree` + `ownTree`/`sharedAccounts` derivations (fixed keyboard-nav effect re-installing listener every render); hoisted `getUnifiedIcon` out of render.
  20. [x] `components/layout/navigation-rail.tsx` — memoized `visibleSidebarApps` (stable empty-array reference for memoized children).
- 21. [~] `lib/auth/session-secret.ts`
- 22. [ ] `lib/auth/session-cookie.ts`
- 23. [ ] `lib/auth/verify-jmap-auth.ts`
- 24. [ ] `lib/auth/active-account-slot.ts`
- 25. [ ] `lib/auth/crypto.ts`
- 26. [ ] `lib/account-utils.ts`
- 27. [ ] `lib/account-state-manager.ts`
- 28. [ ] `stores/identity-store.ts`
- 29. [ ] `hooks/use-identity-sync.ts`
- 30. [ ] `components/layout/mobile-header.tsx`
+ 21. [x] `lib/auth/session-secret.ts` — removed redundant `|| ''` (default already supplied to `configManager.get`).
+ 22. [s] `lib/auth/session-cookie.ts` — 8 lines, trivially clean.
+ 23. [s] `lib/auth/verify-jmap-auth.ts` — clean SSRF-aware verifier.
+ 24. [s] `lib/auth/active-account-slot.ts` — 18 lines, clean.
+ 25. [x] `lib/auth/crypto.ts` — extracted `encryptJson`/`decryptJson` primitives (95→62 lines); 4 near-identical AES-GCM scaffolds collapsed to one.
+ 26. [x] `lib/account-utils.ts` — hoisted `AVATAR_COLORS` array out of `generateAvatarColor` (was re-allocated per call).
+ 27. [s] `lib/account-state-manager.ts` — logged: `clearAllStores` hard-codes email-store's default shape (drift risk; email-store should expose `clearState()`); `restoreAccount` uses partial setState and silently depends on caller having cleared first.
+ 28. [s] `stores/identity-store.ts` — clean. Correct partialize (only sub-addressing data + preferredPrimary persisted; identities are server-side).
+ 29. [s] `hooks/use-identity-sync.ts` — 31 lines, clean.
+ 30. [s] `components/layout/mobile-header.tsx` — clean. Logged: `MobileViewerHeader` is exported but unused anywhere; its `onDelete`/`onArchive` props are placeholders.
  31. [ ] `components/email/email-viewer.tsx`
  32. [ ] `components/email/thread-conversation-view.tsx`
  33. [ ] `lib/email-threading.ts`

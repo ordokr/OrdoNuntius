@@ -20,75 +20,59 @@ function getKey(): Buffer {
   return createHash('sha256').update(secret).digest();
 }
 
-export function encryptSession(serverUrl: string, username: string, password: string): string {
+// Shared AES-256-GCM primitives. Both session and payload tokens use the
+// same wire shape (iv ‖ tag ‖ ciphertext, base64-encoded); only the
+// outer JSON schema differs.
+function encryptJson(value: unknown): string {
   const key = getKey();
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv(ALGORITHM, key, iv);
-
-  const payload = JSON.stringify({ v: 1, serverUrl, username, password });
-  const encrypted = Buffer.concat([cipher.update(payload, 'utf8'), cipher.final()]);
+  const json = JSON.stringify(value);
+  const encrypted = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
-
   return Buffer.concat([iv, tag, encrypted]).toString('base64');
+}
+
+function decryptJson<T>(token: string, context: string): T | null {
+  try {
+    const key = getKey();
+    const data = Buffer.from(token, 'base64');
+    if (data.length < IV_LENGTH + TAG_LENGTH) return null;
+
+    const iv = data.subarray(0, IV_LENGTH);
+    const tag = data.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
+    const encrypted = data.subarray(IV_LENGTH + TAG_LENGTH);
+
+    const decipher = createDecipheriv(ALGORITHM, key, iv);
+    decipher.setAuthTag(tag);
+
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    return JSON.parse(decrypted.toString('utf8')) as T;
+  } catch (error) {
+    logger.warn(`${context} decryption failed`, {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    return null;
+  }
+}
+
+export function encryptSession(serverUrl: string, username: string, password: string): string {
+  return encryptJson({ v: 1, serverUrl, username, password });
 }
 
 export function decryptSession(token: string): { serverUrl: string; username: string; password: string } | null {
-  try {
-    const key = getKey();
-    const data = Buffer.from(token, 'base64');
-    if (data.length < IV_LENGTH + TAG_LENGTH) return null;
-
-    const iv = data.subarray(0, IV_LENGTH);
-    const tag = data.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
-    const encrypted = data.subarray(IV_LENGTH + TAG_LENGTH);
-
-    const decipher = createDecipheriv(ALGORITHM, key, iv);
-    decipher.setAuthTag(tag);
-
-    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-    const parsed = JSON.parse(decrypted.toString('utf8'));
-
-    if (parsed.v !== 1 || !parsed.serverUrl || !parsed.username || !parsed.password) return null;
-    return { serverUrl: parsed.serverUrl, username: parsed.username, password: parsed.password };
-  } catch (error) {
-    logger.warn('Session decryption failed', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-    return null;
-  }
+  const parsed = decryptJson<{ v?: number; serverUrl?: string; username?: string; password?: string }>(
+    token,
+    'Session',
+  );
+  if (!parsed || parsed.v !== 1 || !parsed.serverUrl || !parsed.username || !parsed.password) return null;
+  return { serverUrl: parsed.serverUrl, username: parsed.username, password: parsed.password };
 }
 
 export function encryptPayload(payload: Record<string, unknown>): string {
-  const key = getKey();
-  const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipheriv(ALGORITHM, key, iv);
-
-  const json = JSON.stringify(payload);
-  const encrypted = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-
-  return Buffer.concat([iv, tag, encrypted]).toString('base64');
+  return encryptJson(payload);
 }
 
 export function decryptPayload(token: string): Record<string, unknown> | null {
-  try {
-    const key = getKey();
-    const data = Buffer.from(token, 'base64');
-    if (data.length < IV_LENGTH + TAG_LENGTH) return null;
-
-    const iv = data.subarray(0, IV_LENGTH);
-    const tag = data.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
-    const encrypted = data.subarray(IV_LENGTH + TAG_LENGTH);
-
-    const decipher = createDecipheriv(ALGORITHM, key, iv);
-    decipher.setAuthTag(tag);
-
-    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-    return JSON.parse(decrypted.toString('utf8'));
-  } catch (error) {
-    logger.warn('Payload decryption failed', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-    return null;
-  }
+  return decryptJson<Record<string, unknown>>(token, 'Payload');
 }

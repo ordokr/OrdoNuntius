@@ -18,28 +18,31 @@ export function generateAccountId(username: string, serverUrl: string): string {
   }
 }
 
+// 12 distinct, accessible hues. Hoisted so generateAvatarColor doesn't
+// allocate a fresh array per call (called once per account added or
+// rendered in the account switcher).
+const AVATAR_COLORS = [
+  '#2563eb', // blue
+  '#7c3aed', // violet
+  '#db2777', // pink
+  '#dc2626', // red
+  '#ea580c', // orange
+  '#d97706', // amber
+  '#65a30d', // lime
+  '#16a34a', // green
+  '#0d9488', // teal
+  '#0891b2', // cyan
+  '#6366f1', // indigo
+  '#9333ea', // purple
+];
+
 /** Deterministic avatar/accent color from an email string */
 export function generateAvatarColor(email: string): string {
   let hash = 0;
   for (let i = 0; i < email.length; i++) {
     hash = ((hash << 5) - hash + email.charCodeAt(i)) | 0;
   }
-  // 12 distinct, accessible hues
-  const colors = [
-    '#2563eb', // blue
-    '#7c3aed', // violet
-    '#db2777', // pink
-    '#dc2626', // red
-    '#ea580c', // orange
-    '#d97706', // amber
-    '#65a30d', // lime
-    '#16a34a', // green
-    '#0d9488', // teal
-    '#0891b2', // cyan
-    '#6366f1', // indigo
-    '#9333ea', // purple
-  ];
-  return colors[Math.abs(hash) % colors.length];
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
 /** Get initials for an avatar from a display name or email */

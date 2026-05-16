@@ -22,8 +22,7 @@ export function getSessionSecret(): string {
   const fromFile = readFileEnv(process.env.SESSION_SECRET_FILE);
   if (fromFile) return fromFile;
 
-  const fromAdmin = configManager.get<string>('sessionSecret', '');
-  return fromAdmin || '';
+  return configManager.get<string>('sessionSecret', '');
 }
 
 export function hasSessionSecret(): boolean {
