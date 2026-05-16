@@ -455,41 +455,55 @@ export const useAuthStore = create<AuthState>()(
 
           const effectiveAuthMode = upgradedToOAuth ? 'oauth' : 'basic';
 
-          // Run the remaining independent requests in parallel. The session
-          // write and stalwart-context write are best-effort persistence; the
-          // outer login still succeeds even if they log a warning. Errors are
-          // caught locally so Promise.all doesn't reject on either.
-          const sessionWrite: Promise<unknown> = (rememberMe && !upgradedToOAuth)
-            ? apiFetch(`/api/auth/session?slot=${cookieSlot}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ serverUrl, username, password: effectivePassword, slot: cookieSlot }),
-              }).then((res) => {
-                if (!res.ok) debug.error('Failed to store session: server returned', res.status);
-              }).catch((err) => debug.error('Failed to store session:', err))
-            : Promise.resolve();
+          // sessionWrite/syncStalwartAuthContext used to be awaited via
+          // Promise.all alongside identitiesPromise — that gated isAuthenticated
+          // on three RTTs none of which the inbox list actually needs. They're
+          // now fire-and-forget: persistence side-effects keep happening, but
+          // navigation isn't blocked on them.
+          if (rememberMe && !upgradedToOAuth) {
+            apiFetch(`/api/auth/session?slot=${cookieSlot}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ serverUrl, username, password: effectivePassword, slot: cookieSlot }),
+            }).then((res) => {
+              if (!res.ok) debug.error('Failed to store session: server returned', res.status);
+            }).catch((err) => debug.error('Failed to store session:', err));
+          }
+          syncStalwartAuthContext(serverUrl, username, client.getAuthHeader(), cookieSlot)
+            .catch((err) => debug.warn('auth', 'stalwart-context failed:', err));
 
-          const [rawIdentities] = await Promise.all([
-            identitiesPromise,
-            sessionWrite,
-            syncStalwartAuthContext(serverUrl, username, client.getAuthHeader(), cookieSlot),
-          ]);
+          // Identities populate the auth store asynchronously. Compose/reply
+          // UIs (the only consumers) are lazy-loaded and ready by the time
+          // the user clicks Compose; the email list itself doesn't need them.
+          identitiesPromise
+            .then((rawIdentities) => {
+              const { identities, primaryIdentity } = loadIdentities(rawIdentities, username);
+              set({ identities, primaryIdentity });
+              accountStore.updateAccount(accountId, {
+                label: primaryIdentity?.name || username,
+                displayName: primaryIdentity?.name || username,
+                email: primaryIdentity?.email || username,
+              });
+            })
+            .catch((err) => debug.error('Identities fetch failed:', err));
 
-          const { identities, primaryIdentity } = loadIdentities(rawIdentities, username);
           initializeFeatureStores(client);
 
           // Store client in multi-account map
           clients.set(accountId, client);
           bindClientStatusHandlers(client, set, get, accountId);
 
+          // Account entry uses the username for label/display until the
+          // identitiesPromise above fills in primaryIdentity.name — see the
+          // .then() that calls accountStore.updateAccount above.
           accountStore.addAccount({
-            label: primaryIdentity?.name || username,
+            label: username,
             serverUrl,
             username,
             authMode: effectiveAuthMode,
             rememberMe: !!rememberMe,
-            displayName: primaryIdentity?.name || username,
-            email: primaryIdentity?.email || username,
+            displayName: username,
+            email: username,
             lastLoginAt: Date.now(),
             isConnected: true,
             hasError: false,
@@ -514,8 +528,11 @@ export const useAuthStore = create<AuthState>()(
             username,
             client,
             ...getClientRateLimitState(client),
-            identities,
-            primaryIdentity,
+            // identities and primaryIdentity stream in from identitiesPromise
+            // above. Default to empty/null so the inbox list (which doesn't
+            // need them) can render immediately.
+            identities: [],
+            primaryIdentity: null,
             authMode: effectiveAuthMode,
             rememberMe: !!rememberMe,
             accessToken: oauthAccessToken,
