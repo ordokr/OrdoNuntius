@@ -917,12 +917,18 @@ export function EmailViewer({
   // Detect if the email is a draft
   const isDraft = email?.keywords?.['$draft'] === true;
 
-  // Color options for email tags (from user-defined keyword settings)
-  const colorOptions = emailKeywords.map((kw) => ({
-    name: kw.label,
-    value: kw.id,
-    color: KEYWORD_PALETTE[kw.color]?.dot || 'bg-gray-500',
-  }));
+  // Color options for email tags (from user-defined keyword settings).
+  // Memoized so the array isn't a new reference on every render — would
+  // defeat any React.memo on the tag-picker subtree and recompute the
+  // KEYWORD_PALETTE lookup per render.
+  const colorOptions = useMemo(
+    () => emailKeywords.map((kw) => ({
+      name: kw.label,
+      value: kw.id,
+      color: KEYWORD_PALETTE[kw.color]?.dot || 'bg-gray-500',
+    })),
+    [emailKeywords],
+  );
 
   // Tablet list visibility
   const { isTablet, isMobile } = useDeviceDetection();
