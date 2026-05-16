@@ -8,12 +8,13 @@
 
 import { spawnSync, execSync } from "node:child_process";
 import {
-    cpSync, existsSync, lstatSync, mkdirSync, readdirSync, rmSync,
-    statSync, writeFileSync,
+    cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync,
+    rmSync, statSync, writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promises as dns } from "node:dns";
+import { brotliCompressSync, constants as zlibConstants } from "node:zlib";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist");
@@ -21,6 +22,44 @@ const DIST = join(ROOT, "dist");
 // at module top before main() is invoked below, otherwise checkBundleBudget
 // (called from release() via main()) hits the temporal dead zone.
 const CHUNK_SIZE_BUDGET_KB = 1500;
+
+// File extensions worth precompressing. Binary formats (images, fonts that
+// are already woff2-compressed, archives) get no useful brotli win and
+// would just bloat the tarball.
+const BROTLI_EXTS = new Set([".js", ".mjs", ".css", ".svg", ".json", ".txt", ".xml", ".html", ".webmanifest"]);
+const BROTLI_MIN_BYTES = 1024;
+
+function precompressBrotli(rootDir) {
+    if (!existsSync(rootDir)) return;
+    let count = 0;
+    let savedBytes = 0;
+    const walk = (dir) => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+            const full = join(dir, entry.name);
+            if (entry.isDirectory()) { walk(full); continue; }
+            if (!entry.isFile()) continue;
+            const ext = extname(entry.name).toLowerCase();
+            if (!BROTLI_EXTS.has(ext)) continue;
+            const stat = statSync(full);
+            if (stat.size < BROTLI_MIN_BYTES) continue;
+            const buf = readFileSync(full);
+            const compressed = brotliCompressSync(buf, {
+                params: {
+                    [zlibConstants.BROTLI_PARAM_QUALITY]: 11,
+                    [zlibConstants.BROTLI_PARAM_SIZE_HINT]: buf.length,
+                },
+            });
+            // Skip cases where compression made the file bigger (rare for
+            // already-minified output but possible for short JSON).
+            if (compressed.length >= buf.length) continue;
+            writeFileSync(full + ".br", compressed);
+            count++;
+            savedBytes += buf.length - compressed.length;
+        }
+    };
+    walk(rootDir);
+    console.log(`  brotli: ${count} files precompressed, ${(savedBytes / 1024).toFixed(1)} KB saved on the wire`);
+}
 
 const args = process.argv.slice(2);
 const command = args[0] || "help";
@@ -151,6 +190,15 @@ function pack(restArgs = []) {
         built_at: new Date().toISOString(),
         node: process.version,
     }, null, 2));
+
+    // Precompress static text assets with brotli max-quality. nginx
+    // brotli_static serves the .br variant directly, so requests pay
+    // zero compression CPU and the wire payload is ~10-15% smaller than
+    // on-the-fly brotli level 5. ~6KB saved on the largest CSS chunk,
+    // proportional savings across every JS chunk. Done at pack time
+    // (slow but one-shot) instead of build or request time.
+    precompressBrotli(join(stage, ".next", "static"));
+    precompressBrotli(join(stage, "public"));
 
     // --force-local: stop GNU tar from interpreting "C:\..." as host:path
     // (Windows-only quirk; harmless on Linux/macOS GNU tar).
