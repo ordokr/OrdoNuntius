@@ -1,4 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" role="img" aria-label="OrdoNuntius">
-  <text x="0" y="44" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="36" font-weight="700" fill="#ffffff" letter-spacing="-1">OrdoNuntius</text>
-  <text x="0" y="76" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="400" fill="#9ca3af" letter-spacing="0.5">The messenger for OrdoEpistola</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" aria-label="OrdoNuntius" role="img" viewBox="0 0 360 96"><text x="0" y="44" fill="#fff" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="36" font-weight="700" letter-spacing="-1">OrdoNuntius</text><text x="0" y="76" fill="#9ca3af" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="16" font-weight="400" letter-spacing=".5">The messenger for OrdoEpistola</text></svg>
