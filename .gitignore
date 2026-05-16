@@ -51,3 +51,7 @@ next-env.d.ts
 
 # Sibling repos
 /repos/
+
+# Throwaway scripts and Playwright artifacts
+/tmp/
+/test-results/

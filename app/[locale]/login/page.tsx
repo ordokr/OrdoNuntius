@@ -165,6 +165,21 @@ export default function LoginPage() {
     initializeTheme();
   }, [initializeTheme]);
 
+  // Warm Stalwart's JMAP session endpoint while the user reads the login
+  // form. Cold first hit is ~5s (Stalwart spins up auth/session/cap state);
+  // subsequent hits return in ~200ms. Firing an anonymous discovery fetch
+  // here masks that cold-start behind UI time the user is already spending
+  // on the form. Fire-and-forget: failures are silent, the real auth call
+  // will still work, it just won't benefit from a warm cache.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    void fetch(getPathPrefix() + "/jmap/session", {
+      credentials: "omit",
+      cache: "no-store",
+      keepalive: true,
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (serverUrl) {
       document.title = appName;
@@ -652,6 +667,10 @@ export default function LoginPage() {
                 <img
                   src={resolvedTheme === 'dark' ? loginLogoDarkUrl : loginLogoLightUrl}
                   alt={appName}
+                  width={80}
+                  height={80}
+                  loading="eager"
+                  decoding="async"
                   className="max-w-20 max-h-20 object-contain"
                 />
               </div>
@@ -802,6 +821,10 @@ export default function LoginPage() {
               <img
                 src={resolvedTheme === 'dark' ? loginLogoDarkUrl : loginLogoLightUrl}
                 alt={appName}
+                width={64}
+                height={64}
+                loading="eager"
+                decoding="async"
                 className="max-w-16 max-h-16 object-contain"
               />
             </div>
