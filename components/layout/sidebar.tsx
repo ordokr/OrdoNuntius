@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect, useMemo, ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
@@ -74,6 +74,18 @@ interface SidebarProps {
 const ROW_PX_BASE = 8;
 const CHEVRON_SLOT = 20;
 const INDENT_STEP = 12;
+
+const getUnifiedIcon = (role: UnifiedMailboxRole) => {
+  switch (role) {
+    case 'inbox': return Inbox;
+    case 'sent': return Send;
+    case 'drafts': return File;
+    case 'trash': return Trash2;
+    case 'archive': return Archive;
+    case 'junk': return Ban;
+    default: return Folder;
+  }
+};
 
 const getIconForMailbox = (role?: string, name?: string, hasChildren?: boolean, isExpanded?: boolean, _isShared?: boolean, id?: string) => {
   const lowerName = name?.toLowerCase() || "";
@@ -724,21 +736,19 @@ export function Sidebar({
     });
   };
 
-  const mailboxTree = buildMailboxTree(mailboxes);
-  const ownTree = mailboxTree.filter(n => !n.id.startsWith('shared-account-'));
-  const sharedAccounts = mailboxTree.filter(n => n.id.startsWith('shared-account-'));
-
-  const getUnifiedIcon = (role: UnifiedMailboxRole) => {
-    switch (role) {
-      case 'inbox': return Inbox;
-      case 'sent': return Send;
-      case 'drafts': return File;
-      case 'trash': return Trash2;
-      case 'archive': return Archive;
-      case 'junk': return Ban;
-      default: return Folder;
-    }
-  };
+  // Memoized so the keyboard-nav useEffect below doesn't re-install its
+  // listener on every Sidebar render (mailboxTree is a dep). Also avoids
+  // re-walking the mailbox list when only an unrelated piece of state
+  // changed (selection, expanded set, etc.).
+  const mailboxTree = useMemo(() => buildMailboxTree(mailboxes), [mailboxes]);
+  const ownTree = useMemo(
+    () => mailboxTree.filter(n => !n.id.startsWith('shared-account-')),
+    [mailboxTree],
+  );
+  const sharedAccounts = useMemo(
+    () => mailboxTree.filter(n => n.id.startsWith('shared-account-')),
+    [mailboxTree],
+  );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

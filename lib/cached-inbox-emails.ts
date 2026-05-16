@@ -56,6 +56,8 @@ function writeCache(cache: Cache): void {
 }
 
 function slim(email: Email): SlimEmail {
+  // eslint allows underscore-prefixed unused destructure names via
+  // varsIgnorePattern; the `void` discards previously here were noise.
   const {
     textBody: _t,
     htmlBody: _h,
@@ -65,7 +67,6 @@ function slim(email: Email): SlimEmail {
     bodyStructure: _bs,
     ...rest
   } = email;
-  void _t; void _h; void _bv; void _a; void _hd; void _bs;
   return rest as SlimEmail;
 }
 

@@ -57,17 +57,17 @@ file in this index — visited when its turn arrives.)
   8. [s] `stores/auth-store.ts` — no in-file change; logged **multi-account refresh race** (singleton `refreshPromise` short-circuits before per-account map at refreshAccessToken:932; `scheduleRefresh`'s captured `refreshFn` reads `activeAccountId` at fire-time, so a token refresh scheduled by account A and fired after a switch to B will refresh B). Requires tier-2 refactor with test coverage; outside the inside-file-only constraint.
   9. [s] `lib/jmap/client.ts` — 5469 lines, ~100 methods. Skipped this pass (deserves its own dedicated audit). Logged findings: `authenticatedFetch` repeats header+auth construction 4×; hardcoded 1s network retry; `headers as Record<string,string>` cast is unsafe for `Headers` instance / array forms.
  10. [s] `app/[locale]/page.tsx` — 2733 lines, 59 top-level state/handlers. Lint-clean. Touched repeatedly in earlier perf passes (lazy viewers, route prefetch, dead-prop cleanup). Skipped this pass; deserves its own decomposition session (state regrouping into useReducer, useEffect consolidation, sub-component extraction).
- 11. [~] `stores/email-store.ts`
- 12. [ ] `lib/cached-inbox-emails.ts`
- 13. [ ] `lib/last-inbox.ts`
- 14. [ ] `lib/jmap/types.ts`
- 15. [ ] `lib/jmap/client-interface.ts`
- 16. [ ] `lib/jmap/search-utils.ts`
- 17. [ ] `stores/account-store.ts`
- 18. [ ] `components/email/email-list.tsx`
- 19. [ ] `components/layout/sidebar.tsx`
- 20. [ ] `components/layout/navigation-rail.tsx`
- 21. [ ] `lib/auth/session-secret.ts`
+ 11. [s] `stores/email-store.ts` — 2302 lines, ~50 actions. Heavily touched in earlier perf passes; deserves dedicated decomposition into slices (mailbox/email/selection/search/thread).
+ 12. [x] `lib/cached-inbox-emails.ts` — removed redundant `void _x` discard lines in `slim()`.
+ 13. [s] `lib/last-inbox.ts` — clean. Logged: read/write/clear pattern duplicated with `lib/cached-inbox-emails.ts`; candidate for shared `lib/local-storage-cache.ts`.
+ 14. [s] `lib/jmap/types.ts` — pure types + unified-mailbox constants; no runtime logic to audit.
+ 15. [s] `lib/jmap/client-interface.ts` — pure interface, no logic.
+ 16. [x] `lib/jmap/search-utils.ts` — removed dead branch in `buildJMAPFilter` (`mailboxId ? {inMailbox: mailboxId} : {}` was unreachable because mailboxId is already pushed into conditions earlier).
+ 17. [s] `stores/account-store.ts` — clean. Logged: `getNextCookieSlot` is unbounded (safe today because addAccount validates first; defensive bound check would harden).
+ 18. [x] `components/email/email-list.tsx` — hoisted `LoadingSkeleton` to module scope (was a per-render component-type creation forcing remounts).
+ 19. [x] `components/layout/sidebar.tsx` — memoized `buildMailboxTree` + `ownTree`/`sharedAccounts` derivations (fixed keyboard-nav effect re-installing listener every render); hoisted `getUnifiedIcon` out of render.
+ 20. [x] `components/layout/navigation-rail.tsx` — memoized `visibleSidebarApps` (stable empty-array reference for memoized children).
+ 21. [~] `lib/auth/session-secret.ts`
  22. [ ] `lib/auth/session-cookie.ts`
  23. [ ] `lib/auth/verify-jmap-auth.ts`
  24. [ ] `lib/auth/active-account-slot.ts`

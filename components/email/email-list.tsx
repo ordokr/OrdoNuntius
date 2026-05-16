@@ -19,6 +19,31 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { SearchChips } from "@/components/search/search-chips";
 import { isFilterEmpty, DEFAULT_SEARCH_FILTERS } from "@/lib/jmap/search-utils";
 
+// Hoisted out of EmailList so a new component type isn't created on
+// every EmailList render — that would force React to unmount/remount
+// the skeleton subtree instead of reusing it.
+function LoadingSkeleton() {
+  return (
+    <div className="animate-in fade-in duration-200">
+      {[...Array(8)].map((_, i) => (
+        <div key={i} className="border-b border-border px-4 py-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 bg-muted/50 rounded-full" />
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-2">
+                <div className="h-4 bg-muted/50 rounded w-32" />
+                <div className="h-3 bg-muted/50 rounded w-16" />
+              </div>
+              <div className="h-4 bg-muted/50 rounded w-3/4 mb-2" />
+              <div className="h-3 bg-muted/50 rounded w-full" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface EmailListProps {
   emails: Email[];
   selectedEmailId?: string;
@@ -111,26 +136,6 @@ export function EmailList({
     overscan: 5,
     getItemKey: (index) => threadGroups[index]?.threadId ?? String(index),
   });
-
-  const LoadingSkeleton = () => (
-    <div className="animate-in fade-in duration-200">
-      {[...Array(8)].map((_, i) => (
-        <div key={i} className="border-b border-border px-4 py-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-muted/50 rounded-full" />
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-2">
-                <div className="h-4 bg-muted/50 rounded w-32" />
-                <div className="h-3 bg-muted/50 rounded w-16" />
-              </div>
-              <div className="h-4 bg-muted/50 rounded w-3/4 mb-2" />
-              <div className="h-3 bg-muted/50 rounded w-full" />
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
 
   const hasSelection = selectedEmailIds.size > 0;
 

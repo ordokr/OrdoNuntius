@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Mail, Calendar, BookUser, HardDrive, Settings, Keyboard, Plus, Shield, LogOut, Check } from "lucide-react";
 import { AccountSwitcher } from "./account-switcher";
@@ -176,7 +176,12 @@ export function NavigationRail({
   const showRailAccountList = useSettingsStore((s) => s.showRailAccountList);
   const sidebarAppsEnabled = usePolicyStore((s) => s.isFeatureEnabled('sidebarAppsEnabled'));
   const filesEnabled = usePolicyStore((s) => s.isFeatureEnabled('filesEnabled'));
-  const visibleSidebarApps = sidebarAppsEnabled ? sidebarApps : [];
+  // Memoize so disabled-feature path doesn't allocate a fresh [] each
+  // render — preserves prop identity for any memoized children below.
+  const visibleSidebarApps = useMemo(
+    () => (sidebarAppsEnabled ? sidebarApps : []),
+    [sidebarAppsEnabled, sidebarApps],
+  );
   const [isStalwartAdmin, setIsStalwartAdmin] = useState(false);
   const hasUpdate = useUpdateStore(selectHasUpdate);
   const updateSeverity = useUpdateStore((s) => s.status?.severity);

@@ -100,18 +100,12 @@ export function buildJMAPFilter(
     conditions.push({ inMailbox: mailboxId });
   }
 
-  if (conditions.length === 0) {
-    return mailboxId ? { inMailbox: mailboxId } : {};
-  }
-
-  if (conditions.length === 1) {
-    return conditions[0];
-  }
-
-  return {
-    operator: "AND",
-    conditions,
-  };
+  // mailboxId is already pushed into conditions above (line ~100) when
+  // present, so the conditions array is non-empty whenever mailboxId is
+  // set — the empty-array branch implies no mailbox and no filters.
+  if (conditions.length === 0) return {};
+  if (conditions.length === 1) return conditions[0];
+  return { operator: "AND", conditions };
 }
 
 export function isFilterEmpty(filters: SearchFilters): boolean {
