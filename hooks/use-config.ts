@@ -4,6 +4,24 @@ import { useState, useEffect } from 'react';
 import { usePolicyStore } from '@/stores/policy-store';
 import { apiFetch } from '@/lib/browser-navigation';
 import type { PublicJmapServerEntry } from '@/lib/admin/jmap-servers';
+import type { SettingsPolicy } from '@/lib/admin/types';
+
+// SSR-inlined bootstrap payload (see lib/admin/bootstrap-payload.ts).
+// Reading from the inline <script> tag avoids a network roundtrip on
+// cold load. The hydrate happens lazily on first access so SSR/tests
+// without the script tag still fall back to fetch.
+const BOOTSTRAP_SCRIPT_ID = "__ORDO_BOOTSTRAP__";
+
+function readInlineBootstrap(): { config: ConfigData; policy: unknown } | null {
+  if (typeof document === "undefined") return null;
+  const el = document.getElementById(BOOTSTRAP_SCRIPT_ID);
+  if (!el || !el.textContent) return null;
+  try {
+    return JSON.parse(el.textContent);
+  } catch {
+    return null;
+  }
+}
 
 interface ConfigData {
   appName: string;
@@ -41,6 +59,27 @@ interface AppConfig extends ConfigData {
 
 let configCache: ConfigData | null = null;
 let configPromise: Promise<ConfigData> | null = null;
+
+// Eagerly hydrate from the SSR-inlined bootstrap payload. This runs once
+// at module load on the client and populates the cache + the policy store
+// synchronously — by the time any component calls useConfig(), the data
+// is already there. Falls through to fetch on the rare path where the
+// script tag is missing (legacy preview environments, error pages, etc.).
+if (typeof window !== "undefined" && !configCache) {
+  const inline = readInlineBootstrap();
+  if (inline) {
+    configCache = inline.config;
+    if (inline.policy && typeof inline.policy === "object") {
+      // Hydrate the policy store from the same payload — saves a second
+      // RTT to /api/admin/policy that was previously chained off the
+      // config fetch.
+      usePolicyStore.setState({
+        policy: inline.policy as SettingsPolicy,
+        loaded: true,
+      });
+    }
+  }
+}
 
 export async function fetchConfig(): Promise<ConfigData> {
   // Return cached config if available
