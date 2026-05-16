@@ -12,6 +12,12 @@ import {
 } from "@/lib/admin/bootstrap-payload";
 import "./globals.css";
 
+// Read once at module load; env doesn't change within a process. The
+// fallback chain is runtime APP_NAME → build-time NEXT_PUBLIC_APP_NAME →
+// default. Used three times below; module-scope avoids the repetition.
+const APP_NAME =
+  process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Webmail";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -40,12 +46,12 @@ export async function generateMetadata(): Promise<Metadata> {
   const faviconUrl = configManager.get<string>("faviconUrl", "/branding/OrdoNuntius_Favicon.svg");
 
   return {
-    title: process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Webmail",
+    title: APP_NAME,
     description: "Minimalist webmail client using JMAP protocol",
     appleWebApp: {
       capable: true,
       statusBarStyle: "black-translucent",
-      title: process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Webmail",
+      title: APP_NAME,
     },
     formatDetection: {
       telephone: false,
@@ -74,10 +80,7 @@ export default async function RootLayout({
         <meta name="theme-color" content="#FAF8F3" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta
-          name="apple-mobile-web-app-title"
-          content={process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Webmail"}
-        />
+        <meta name="apple-mobile-web-app-title" content={APP_NAME} />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         {parentOrigin && (
           <meta name="parent-origin" content={parentOrigin} />

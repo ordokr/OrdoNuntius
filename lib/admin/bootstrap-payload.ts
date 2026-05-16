@@ -111,9 +111,10 @@ export async function getPublicConfig(): Promise<PublicConfigPayload> {
 }
 
 export async function getBootstrapPayload(): Promise<BootstrapPayload> {
-  // ensureLoaded is idempotent and runs first inside getPublicConfig;
-  // running both in sequence is fine because the second await is a
-  // no-op when the config is already loaded.
+  // getPublicConfig already does ensureLoaded; getPolicy then reads the
+  // in-memory policyCache so no second I/O. Concurrent SSR renders all
+  // share configManager's singleton — first one warms the cache, rest
+  // are free.
   const config = await getPublicConfig();
   const policy = configManager.getPolicy();
   return { config, policy };

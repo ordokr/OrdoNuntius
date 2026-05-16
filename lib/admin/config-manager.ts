@@ -27,6 +27,10 @@ class ConfigManager {
   private adminConfig: Record<string, unknown> = {};
   private policyCache: SettingsPolicy = { ...DEFAULT_POLICY };
   private loaded = false;
+  // Coalesce concurrent first-callers. Without this, on cold-boot a burst
+  // of incoming requests would each fire their own load() and 2-N×
+  // duplicate the disk read of config.json + policy.json.
+  private loadPromise: Promise<void> | null = null;
 
   /** Load admin config and policy from disk. Called once at startup and on reload. */
   async load(): Promise<void> {
@@ -48,7 +52,11 @@ class ConfigManager {
 
   /** Ensure config is loaded (no-op if already loaded). */
   async ensureLoaded(): Promise<void> {
-    if (!this.loaded) await this.load();
+    if (this.loaded) return;
+    if (!this.loadPromise) {
+      this.loadPromise = this.load().finally(() => { this.loadPromise = null; });
+    }
+    return this.loadPromise;
   }
 
   /**
@@ -172,7 +180,7 @@ class ConfigManager {
       features: { ...DEFAULT_FEATURE_GATES, ...(policy.features || {}) },
       themePolicy: { ...DEFAULT_THEME_POLICY, ...(policy.themePolicy || {}) },
     };
-    await this.writeJsonFile('policy.json', this.policyCache as unknown as Record<string, unknown>);
+    await this.writeJsonFile('policy.json', this.policyCache);
   }
 
   /**
@@ -194,7 +202,7 @@ class ConfigManager {
     }
   }
 
-  private async writeJsonFile(filename: string, data: Record<string, unknown>): Promise<void> {
+  private async writeJsonFile(filename: string, data: unknown): Promise<void> {
     await ensureConfigDir();
     const targetPath = getConfigPath(filename);
     const tmpPath = targetPath + '.tmp';

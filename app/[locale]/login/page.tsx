@@ -530,12 +530,19 @@ export default function LoginPage() {
 
     // Resolve the JMAP URL to send to the callback. Server-list entries win
     // over the custom-endpoint input, which wins over the global server URL.
+    // Guard the write — without an actual URL the callback reads "" from
+    // sessionStorage and JMAPClient hits "" at the server-URL hostname,
+    // failing opaquely. Better to no-op here.
     const oauthServerUrl = selectedServer?.url
       || (allowCustomJmapEndpoint ? jmapEndpoint : configuredServerUrl);
+    if (!oauthServerUrl) {
+      setOauthLoading(false);
+      return;
+    }
 
     sessionStorage.setItem("oauth_code_verifier", verifier);
     sessionStorage.setItem("oauth_state", state);
-    sessionStorage.setItem("oauth_server_url", oauthServerUrl!);
+    sessionStorage.setItem("oauth_server_url", oauthServerUrl);
     if (selectedServer?.id) {
       sessionStorage.setItem("oauth_server_id", selectedServer.id);
     } else {
@@ -615,61 +622,66 @@ export default function LoginPage() {
   const currentThemeOption = THEME_OPTIONS.find(o => o.value === theme) || THEME_OPTIONS[2];
   const CurrentThemeIcon = currentThemeOption.icon;
 
+  // Bound once and rendered in both the demo-mode tree and the full-form
+  // tree. Previously the entire 50-line dropdown was duplicated verbatim,
+  // including all the conditional class strings — easy to drift.
+  const themeToggle = (
+    <div className="absolute top-5 right-5" ref={themeMenuRef} suppressHydrationWarning>
+      <button
+        type="button"
+        onClick={() => setShowThemeMenu(!showThemeMenu)}
+        className={cn(
+          "flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-all duration-200",
+          showThemeMenu
+            ? "bg-secondary border-border text-foreground shadow-md"
+            : "bg-background/60 backdrop-blur-sm border-border/50 text-muted-foreground hover:text-foreground hover:bg-secondary/80 hover:border-border"
+        )}
+        aria-label={`Theme: ${currentThemeOption.label}`}
+        aria-expanded={showThemeMenu}
+        aria-haspopup="listbox"
+      >
+        <CurrentThemeIcon className="w-4 h-4" />
+        <span className="hidden sm:inline" suppressHydrationWarning>{currentThemeOption.label}</span>
+      </button>
+      {showThemeMenu && (
+        <div
+          className="absolute right-0 top-full mt-2 w-40 rounded-xl border border-border bg-background shadow-lg overflow-hidden animate-fade-in z-50"
+          role="listbox"
+          aria-label="Theme selection"
+        >
+          {THEME_OPTIONS.map((option) => {
+            const Icon = option.icon;
+            const isActive = theme === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={isActive}
+                onClick={() => handleThemeSelect(option.value)}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3.5 py-2.5 text-sm transition-colors",
+                  isActive
+                    ? "bg-primary/10 text-foreground font-medium"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                <span className="flex-1 text-left">{option.label}</span>
+                {isActive && <Check className="w-3.5 h-3.5 text-primary" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
   // Demo-only mode: show only a large demo login button
   if (demoMode && !isAddAccountMode) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background via-muted/10 to-muted/30 relative px-4">
-        {/* Theme toggle */}
-        <div className="absolute top-5 right-5" ref={themeMenuRef} suppressHydrationWarning>
-          <button
-            type="button"
-            onClick={() => setShowThemeMenu(!showThemeMenu)}
-            className={cn(
-              "flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-all duration-200",
-              showThemeMenu
-                ? "bg-secondary border-border text-foreground shadow-md"
-                : "bg-background/60 backdrop-blur-sm border-border/50 text-muted-foreground hover:text-foreground hover:bg-secondary/80 hover:border-border"
-            )}
-            aria-label={`Theme: ${currentThemeOption.label}`}
-            aria-expanded={showThemeMenu}
-            aria-haspopup="listbox"
-          >
-            <CurrentThemeIcon className="w-4 h-4" />
-            <span className="hidden sm:inline" suppressHydrationWarning>{currentThemeOption.label}</span>
-          </button>
-
-          {showThemeMenu && (
-            <div
-              className="absolute right-0 top-full mt-2 w-40 rounded-xl border border-border bg-background shadow-lg overflow-hidden animate-fade-in z-50"
-              role="listbox"
-              aria-label="Theme selection"
-            >
-              {THEME_OPTIONS.map((option) => {
-                const Icon = option.icon;
-                const isActive = theme === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="option"
-                    aria-selected={isActive}
-                    onClick={() => handleThemeSelect(option.value)}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-3.5 py-2.5 text-sm transition-colors",
-                      isActive
-                        ? "bg-primary/10 text-foreground font-medium"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    )}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="flex-1 text-left">{option.label}</span>
-                    {isActive && <Check className="w-3.5 h-3.5 text-primary" />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        {themeToggle}
 
         <div className="w-full max-w-[440px] mx-auto">
           <div className="rounded-2xl border border-border/60 bg-background/80 backdrop-blur-sm shadow-xl shadow-black/5 dark:shadow-black/20 overflow-hidden">
@@ -772,57 +784,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background via-muted/10 to-muted/30 relative px-4">
-      {/* Theme toggle - top right, dropdown style */}
-      <div className="absolute top-5 right-5" ref={themeMenuRef} suppressHydrationWarning>
-        <button
-          type="button"
-          onClick={() => setShowThemeMenu(!showThemeMenu)}
-          className={cn(
-            "flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-all duration-200",
-            showThemeMenu
-              ? "bg-secondary border-border text-foreground shadow-md"
-              : "bg-background/60 backdrop-blur-sm border-border/50 text-muted-foreground hover:text-foreground hover:bg-secondary/80 hover:border-border"
-          )}
-          aria-label={`Theme: ${currentThemeOption.label}`}
-          aria-expanded={showThemeMenu}
-          aria-haspopup="listbox"
-        >
-          <CurrentThemeIcon className="w-4 h-4" />
-          <span className="hidden sm:inline" suppressHydrationWarning>{currentThemeOption.label}</span>
-        </button>
-
-        {showThemeMenu && (
-          <div
-            className="absolute right-0 top-full mt-2 w-40 rounded-xl border border-border bg-background shadow-lg overflow-hidden animate-fade-in z-50"
-            role="listbox"
-            aria-label="Theme selection"
-          >
-            {THEME_OPTIONS.map((option) => {
-              const Icon = option.icon;
-              const isActive = theme === option.value;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="option"
-                  aria-selected={isActive}
-                  onClick={() => handleThemeSelect(option.value)}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3.5 py-2.5 text-sm transition-colors",
-                    isActive
-                      ? "bg-primary/10 text-foreground font-medium"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span className="flex-1 text-left">{option.label}</span>
-                  {isActive && <Check className="w-3.5 h-3.5 text-primary" />}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {themeToggle}
 
       <div className="w-full max-w-[400px] mx-auto">
         {/* Card container */}

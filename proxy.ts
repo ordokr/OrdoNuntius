@@ -13,11 +13,18 @@ const intlMiddleware = createIntlMiddleware(routing);
 // requests for API routes, Next internals and static assets.
 const PROXY_SKIP_PATTERN = /^\/(?:api|_next)(?:\/|$)|\.[^/]+$/;
 
+// "Either this exact path OR a child of it." Tighter than bare
+// startsWith(prefix), which would treat /api/setupfoo as a setup
+// path. Used by every prefix check below so a future /api/setupX
+// route can't accidentally inherit setup-route behavior.
+function isPathOrChild(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(prefix + "/");
+}
+
 function isSetupPath(pathname: string): boolean {
   return (
-    pathname === "/setup" ||
-    pathname.startsWith("/setup/") ||
-    pathname.startsWith("/api/setup")
+    isPathOrChild(pathname, "/setup") ||
+    isPathOrChild(pathname, "/api/setup")
   );
 }
 
@@ -81,9 +88,6 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Note: the static-asset / API / _next skip happens at the top of this
-  // function before the awaits above, so no second check is needed here.
-
   const nonce = crypto.randomUUID();
   const isDev = process.env.NODE_ENV === "development";
 
@@ -129,9 +133,9 @@ export async function proxy(request: NextRequest) {
   ].join("; ");
 
   // Skip intl middleware for routes outside the localized app tree.
-  const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
-  const isProtocolRoute = pathname === '/protocol' || pathname.startsWith('/protocol/');
-  const isSetupRoute = pathname === '/setup' || pathname.startsWith('/setup/');
+  const isAdminRoute = isPathOrChild(pathname, "/admin");
+  const isProtocolRoute = isPathOrChild(pathname, "/protocol");
+  const isSetupRoute = isPathOrChild(pathname, "/setup");
 
   // When localePrefix is 'always', paths that already have a locale prefix
   // (e.g. /en/settings) should not be re-processed by the intl middleware -
