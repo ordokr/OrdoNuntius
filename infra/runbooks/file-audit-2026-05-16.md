@@ -42,6 +42,8 @@ file in this index — visited when its turn arrives.)
 | 6 | `app/[locale]/login/page.tsx` | `app/[locale]/auth/callback/page.tsx` | Verify it handles empty `oauth_server_url` from sessionStorage (related to `oauthServerUrl!` bug just patched here). | low |
 | 7 | `app/[locale]/login/page.tsx` | Same file (defer for tier-2 pass) | Consider consolidating ~15 useState into useReducer groups (form / UI / OAuth / theme / suggestions). Large refactor, low ROI today. | low |
 | 8 | `app/[locale]/login/page.tsx` | Same file | `handleSubmit`/`handleDevLogin`/`handleDemoLogin` each `router.push('/')` after success — redundant with the `useEffect` on `isAuthenticated`, causing two navigations. Trim later. | trivial |
+| 9 | `stores/auth-store.ts` | Same file (tier-2) | Multi-account refresh race: singleton `refreshPromise` short-circuits before per-account map; `scheduleRefresh` callback reads `activeAccountId` at fire-time not schedule-time. Fix together with test coverage. | **high** (multi-account correctness) |
+| 10 | `stores/auth-store.ts` | Same file (tier-2) | Three login methods (password/OAuth/server-SSO) share ~80 lines of post-connect boilerplate (cookieSlot, snapshot/clear, accountStore.addAccount, set, scheduleRefresh, notifyParent, fetchConfig→settingsSync). Extract a shared `finalizeLogin()` helper. | medium |
 
 ## Files (hot-path-first, then alphabetical)
 
@@ -50,12 +52,12 @@ file in this index — visited when its turn arrives.)
   3. [x] `lib/admin/bootstrap-payload.ts` — clarified `getBootstrapPayload` comment. File otherwise clean.
   4. [x] `lib/admin/config-manager.ts` — coalesced concurrent `ensureLoaded` first-callers (avoids duplicate disk reads on cold-boot bursts); removed `as unknown as Record<>` double-cast in `setPolicy` by widening `writeJsonFile` param to `unknown`.
   5. [x] `app/[locale]/login/page.tsx` — fixed `oauthServerUrl!` non-null assertion (real bug: would write `""` to sessionStorage and break OAuth callback); deduplicated 50-line theme-toggle dropdown (was repeated verbatim between demo-mode and full-form renders), shrunk file 1316→1278 lines. Many other findings noted as external.
-  6. [ ] `hooks/use-config.ts`
-  7. [ ] `lib/browser-navigation.ts`
-  8. [ ] `stores/auth-store.ts`
-  9. [ ] `lib/jmap/client.ts`
- 10. [ ] `app/[locale]/page.tsx`
- 11. [ ] `stores/email-store.ts`
+  6. [x] `hooks/use-config.ts` — extracted `appConfigFrom` projection + `CONFIG_DEFAULTS`, killing a 3× DRY (236→187 lines); skipped redundant `setConfig` when SSR-inline bootstrap already populated cache at init; stale doc comment refreshed.
+  7. [s] `lib/browser-navigation.ts` — no changes needed; correctly memoized hot path, clean separation between build-time + runtime prefix resolution, no dead code.
+  8. [s] `stores/auth-store.ts` — no in-file change; logged **multi-account refresh race** (singleton `refreshPromise` short-circuits before per-account map at refreshAccessToken:932; `scheduleRefresh`'s captured `refreshFn` reads `activeAccountId` at fire-time, so a token refresh scheduled by account A and fired after a switch to B will refresh B). Requires tier-2 refactor with test coverage; outside the inside-file-only constraint.
+  9. [s] `lib/jmap/client.ts` — 5469 lines, ~100 methods. Skipped this pass (deserves its own dedicated audit). Logged findings: `authenticatedFetch` repeats header+auth construction 4×; hardcoded 1s network retry; `headers as Record<string,string>` cast is unsafe for `Headers` instance / array forms.
+ 10. [s] `app/[locale]/page.tsx` — 2733 lines, 59 top-level state/handlers. Lint-clean. Touched repeatedly in earlier perf passes (lazy viewers, route prefetch, dead-prop cleanup). Skipped this pass; deserves its own decomposition session (state regrouping into useReducer, useEffect consolidation, sub-component extraction).
+ 11. [~] `stores/email-store.ts`
  12. [ ] `lib/cached-inbox-emails.ts`
  13. [ ] `lib/last-inbox.ts`
  14. [ ] `lib/jmap/types.ts`

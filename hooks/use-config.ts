@@ -12,17 +12,6 @@ import type { SettingsPolicy } from '@/lib/admin/types';
 // without the script tag still fall back to fetch.
 const BOOTSTRAP_SCRIPT_ID = "__ORDO_BOOTSTRAP__";
 
-function readInlineBootstrap(): { config: ConfigData; policy: unknown } | null {
-  if (typeof document === "undefined") return null;
-  const el = document.getElementById(BOOTSTRAP_SCRIPT_ID);
-  if (!el || !el.textContent) return null;
-  try {
-    return JSON.parse(el.textContent);
-  } catch {
-    return null;
-  }
-}
-
 interface ConfigData {
   appName: string;
   jmapServerUrl: string;
@@ -57,6 +46,61 @@ interface AppConfig extends ConfigData {
   error: string | null;
 }
 
+function readInlineBootstrap(): { config: ConfigData; policy: unknown } | null {
+  if (typeof document === "undefined") return null;
+  const el = document.getElementById(BOOTSTRAP_SCRIPT_ID);
+  if (!el || !el.textContent) return null;
+  try {
+    return JSON.parse(el.textContent);
+  } catch {
+    return null;
+  }
+}
+
+// Default values used when no config has loaded yet. Two surfaces care:
+// fresh page render before the inline-bootstrap path has run (rare; this
+// module runs synchronously at import time), and tests / non-SSR
+// environments where neither the inline script nor the fetch has
+// completed.
+const CONFIG_DEFAULTS: ConfigData = {
+  appName: "Webmail",
+  jmapServerUrl: "",
+  oauthEnabled: false,
+  oauthOnly: false,
+  oauthClientId: "",
+  oauthIssuerUrl: "",
+  rememberMeEnabled: false,
+  settingsSyncEnabled: false,
+  // Stalwart features are on-by-default; matches bootstrap-payload.ts.
+  stalwartFeaturesEnabled: true,
+  devMode: false,
+  faviconUrl: "/branding/OrdoNuntius_Favicon.svg",
+  appLogoLightUrl: "",
+  appLogoDarkUrl: "",
+  loginLogoLightUrl: "/branding/OrdoNuntius_Logo_Color.svg",
+  loginLogoDarkUrl: "/branding/OrdoNuntius_Logo_White.svg",
+  loginCompanyName: "",
+  loginImprintUrl: "",
+  loginPrivacyPolicyUrl: "",
+  loginWebsiteUrl: "",
+  demoMode: false,
+  autoSsoEnabled: false,
+  allowCustomJmapEndpoint: false,
+  jmapServers: [],
+  jmapServerAutoPickByDomain: false,
+  embeddedMode: false,
+  parentOrigin: "",
+};
+
+function appConfigFrom(
+  data: ConfigData | null,
+  isLoading: boolean,
+  error: string | null,
+): AppConfig {
+  const src = data ?? CONFIG_DEFAULTS;
+  return { ...src, jmapServers: src.jmapServers ?? [], isLoading, error };
+}
+
 let configCache: ConfigData | null = null;
 let configPromise: Promise<ConfigData> | null = null;
 
@@ -82,27 +126,17 @@ if (typeof window !== "undefined" && !configCache) {
 }
 
 export async function fetchConfig(): Promise<ConfigData> {
-  // Return cached config if available
-  if (configCache) {
-    return configCache;
-  }
+  if (configCache) return configCache;
+  if (configPromise) return configPromise;
 
-  // If a fetch is already in progress, wait for it
-  if (configPromise) {
-    return configPromise;
-  }
-
-  // Start a new fetch
   configPromise = apiFetch('/api/config')
     .then((res) => {
-      if (!res.ok) {
-        throw new Error('Failed to fetch config');
-      }
+      if (!res.ok) throw new Error('Failed to fetch config');
       return res.json();
     })
     .then((data) => {
       configCache = data;
-      // Fetch admin policy alongside config (non-blocking)
+      // Fetch admin policy alongside config (non-blocking).
       usePolicyStore.getState().fetchPolicy();
       return data;
     })
@@ -114,121 +148,39 @@ export async function fetchConfig(): Promise<ConfigData> {
 }
 
 /**
- * Hook to fetch runtime configuration
+ * Hook to fetch runtime configuration.
  *
- * Fetches app configuration from /api/config endpoint, which reads
- * environment variables at runtime (not build time).
- *
- * The config is cached after first fetch to avoid unnecessary requests.
+ * In the normal cold-load flow, the SSR-inlined bootstrap script populates
+ * `configCache` at module load — so useState's initializer already has the
+ * full config and no network roundtrip is needed. The fetch fallback only
+ * triggers when the inline script is missing (admin pages without the
+ * shared layout, tests, error pages).
  */
 export function useConfig(): AppConfig {
-  const [config, setConfig] = useState<AppConfig>({
-    appName: configCache?.appName || 'Webmail',
-    jmapServerUrl: configCache?.jmapServerUrl || '',
-    oauthEnabled: configCache?.oauthEnabled || false,
-    oauthOnly: configCache?.oauthOnly || false,
-    oauthClientId: configCache?.oauthClientId || '',
-    oauthIssuerUrl: configCache?.oauthIssuerUrl || '',
-    rememberMeEnabled: configCache?.rememberMeEnabled || false,
-    settingsSyncEnabled: configCache?.settingsSyncEnabled || false,
-    stalwartFeaturesEnabled: configCache?.stalwartFeaturesEnabled ?? true,
-    devMode: configCache?.devMode || false,
-    faviconUrl: configCache?.faviconUrl || '/branding/OrdoNuntius_Favicon.svg',
-    appLogoLightUrl: configCache?.appLogoLightUrl || '',
-    appLogoDarkUrl: configCache?.appLogoDarkUrl || '',
-    loginLogoLightUrl: configCache?.loginLogoLightUrl || '/branding/OrdoNuntius_Logo_Color.svg',
-    loginLogoDarkUrl: configCache?.loginLogoDarkUrl || '/branding/OrdoNuntius_Logo_White.svg',
-    loginCompanyName: configCache?.loginCompanyName || '',
-    loginImprintUrl: configCache?.loginImprintUrl || '',
-    loginPrivacyPolicyUrl: configCache?.loginPrivacyPolicyUrl || '',
-    loginWebsiteUrl: configCache?.loginWebsiteUrl || '',
-    demoMode: configCache?.demoMode || false,
-    autoSsoEnabled: configCache?.autoSsoEnabled || false,
-    allowCustomJmapEndpoint: configCache?.allowCustomJmapEndpoint || false,
-    jmapServers: configCache?.jmapServers || [],
-    jmapServerAutoPickByDomain: configCache?.jmapServerAutoPickByDomain || false,
-    embeddedMode: configCache?.embeddedMode || false,
-    parentOrigin: configCache?.parentOrigin || '',
-    isLoading: !configCache,
-    error: null,
-  });
+  const [config, setConfig] = useState<AppConfig>(() =>
+    appConfigFrom(configCache, !configCache, null),
+  );
 
   useEffect(() => {
-    // If already cached, no need to fetch
     if (configCache) {
-      setConfig({
-        appName: configCache.appName,
-        jmapServerUrl: configCache.jmapServerUrl,
-        oauthEnabled: configCache.oauthEnabled,
-        oauthOnly: configCache.oauthOnly,
-        oauthClientId: configCache.oauthClientId,
-        oauthIssuerUrl: configCache.oauthIssuerUrl,
-        rememberMeEnabled: configCache.rememberMeEnabled,
-        settingsSyncEnabled: configCache.settingsSyncEnabled,
-        stalwartFeaturesEnabled: configCache.stalwartFeaturesEnabled,
-        devMode: configCache.devMode,
-        faviconUrl: configCache.faviconUrl,
-        appLogoLightUrl: configCache.appLogoLightUrl,
-        appLogoDarkUrl: configCache.appLogoDarkUrl,
-        loginLogoLightUrl: configCache.loginLogoLightUrl,
-        loginLogoDarkUrl: configCache.loginLogoDarkUrl,
-        loginCompanyName: configCache.loginCompanyName,
-        loginImprintUrl: configCache.loginImprintUrl,
-        loginPrivacyPolicyUrl: configCache.loginPrivacyPolicyUrl,
-        loginWebsiteUrl: configCache.loginWebsiteUrl,
-        demoMode: configCache.demoMode,
-        autoSsoEnabled: configCache.autoSsoEnabled,
-        allowCustomJmapEndpoint: configCache.allowCustomJmapEndpoint,
-        jmapServers: configCache.jmapServers || [],
-        jmapServerAutoPickByDomain: configCache.jmapServerAutoPickByDomain || false,
-        embeddedMode: configCache.embeddedMode,
-        parentOrigin: configCache.parentOrigin,
-        isLoading: false,
-        error: null,
-      });
+      // useState's initializer already read configCache; we only need to
+      // re-set if the cache was populated AFTER our mount (another
+      // component triggered fetchConfig in parallel). isLoading is the
+      // marker: true ⇒ initializer didn't have cache yet.
+      if (config.isLoading) {
+        setConfig(appConfigFrom(configCache, false, null));
+      }
       return;
     }
 
     fetchConfig()
-      .then((data) => {
-        setConfig({
-          appName: data.appName,
-          jmapServerUrl: data.jmapServerUrl,
-          oauthEnabled: data.oauthEnabled,
-          oauthOnly: data.oauthOnly,
-          oauthClientId: data.oauthClientId,
-          oauthIssuerUrl: data.oauthIssuerUrl,
-          rememberMeEnabled: data.rememberMeEnabled,
-          settingsSyncEnabled: data.settingsSyncEnabled,
-          stalwartFeaturesEnabled: data.stalwartFeaturesEnabled,
-          devMode: data.devMode,
-          faviconUrl: data.faviconUrl,
-          appLogoLightUrl: data.appLogoLightUrl,
-          appLogoDarkUrl: data.appLogoDarkUrl,
-          loginLogoLightUrl: data.loginLogoLightUrl,
-          loginLogoDarkUrl: data.loginLogoDarkUrl,
-          loginCompanyName: data.loginCompanyName,
-          loginImprintUrl: data.loginImprintUrl,
-          loginPrivacyPolicyUrl: data.loginPrivacyPolicyUrl,
-          loginWebsiteUrl: data.loginWebsiteUrl,
-          demoMode: data.demoMode,
-          autoSsoEnabled: data.autoSsoEnabled,
-          allowCustomJmapEndpoint: data.allowCustomJmapEndpoint,
-          jmapServers: data.jmapServers || [],
-          jmapServerAutoPickByDomain: data.jmapServerAutoPickByDomain || false,
-          embeddedMode: data.embeddedMode,
-          parentOrigin: data.parentOrigin,
-          isLoading: false,
-          error: null,
-        });
-      })
+      .then((data) => setConfig(appConfigFrom(data, false, null)))
       .catch((err) => {
-        setConfig((prev) => ({
-          ...prev,
-          isLoading: false,
-          error: err.message,
-        }));
+        setConfig((prev) => ({ ...prev, isLoading: false, error: err.message }));
       });
+    // The cache and fetch helpers are module-level singletons; we only
+    // want this to run on mount, never on config-state changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return config;
