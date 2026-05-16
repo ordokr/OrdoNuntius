@@ -39,7 +39,7 @@ file in this index — visited when its turn arrives.)
 | 3 | `proxy.ts` | `app/api/admin/branding/...` GET route | Allowed during wizard bootstrap as "public read endpoint". Verify no auth-gated info leaks. | low |
 | 4 | `lib/admin/bootstrap-payload.ts` | `hooks/use-config.ts` | Duplicate hardcoded `"__ORDO_BOOTSTRAP__"` literal. Dedupe via shared module that doesn't pull server-only deps into client bundle. | low |
 | 5 | `lib/admin/bootstrap-payload.ts` | `lib/auth/session-secret.ts::hasSessionSecret` | Called 2× per SSR render here; verify it's a pure cheap read. | trivial |
-| 6 | `app/[locale]/login/page.tsx` | `app/[locale]/auth/callback/page.tsx` | Verify it handles empty `oauth_server_url` from sessionStorage (related to `oauthServerUrl!` bug just patched here). | low |
+| 6 | `app/[locale]/login/page.tsx` | `app/[locale]/auth/callback/page.tsx` | ~~Verify it handles empty `oauth_server_url` from sessionStorage~~ — **RESOLVED**: callback already guards at line 48. | ~~low~~ resolved |
 | 7 | `app/[locale]/login/page.tsx` | Same file (defer for tier-2 pass) | Consider consolidating ~15 useState into useReducer groups (form / UI / OAuth / theme / suggestions). Large refactor, low ROI today. | low |
 | 8 | `app/[locale]/login/page.tsx` | Same file | `handleSubmit`/`handleDevLogin`/`handleDemoLogin` each `router.push('/')` after success — redundant with the `useEffect` on `isAuthenticated`, causing two navigations. Trim later. | trivial |
 | 9 | `stores/auth-store.ts` | Same file (tier-2) | Multi-account refresh race: singleton `refreshPromise` short-circuits before per-account map; `scheduleRefresh` callback reads `activeAccountId` at fire-time not schedule-time. Fix together with test coverage. | **high** (multi-account correctness) |
@@ -87,16 +87,16 @@ file in this index — visited when its turn arrives.)
  38. [s] `lib/smime/pkcs12-import.ts` — skipped; ditto.
  39. [s] `lib/smime/certificate-utils.ts` — skipped; ditto.
  40. [s] `lib/smime/crypto-engine.ts` — skipped; webcrypto-liner engine setup, ditto.
- 41. [ ] `app/[locale]/auth/callback/page.tsx`
- 42. [ ] `app/[locale]/calendar/page.tsx`
- 43. [ ] `app/[locale]/contacts/page.tsx`
- 44. [ ] `app/[locale]/error.tsx`
- 45. [ ] `app/[locale]/files/page.tsx`
- 46. [ ] `app/[locale]/layout.tsx`
- 47. [ ] `app/[locale]/settings/page.tsx`
- 48. [ ] `app/admin/_tabs/_jmap-servers-section.tsx`
- 49. [ ] `app/admin/_tabs/auth.tsx`
- 50. [ ] `app/admin/_tabs/branding.tsx`
+ 41. [s] `app/[locale]/auth/callback/page.tsx` — clean. Already guards `!serverUrl` at line 48, **resolves external finding #6**.
+ 42. [s] `app/[locale]/calendar/page.tsx` — 1584 lines, 46 hook calls; skipped for dedicated pass.
+ 43. [s] `app/[locale]/contacts/page.tsx` — 886 lines, large feature page; skipped.
+ 44. [s] `app/[locale]/error.tsx` — standard Next error boundary, clean.
+ 45. [s] `app/[locale]/files/page.tsx` — 518 lines, large feature page; skipped.
+ 46. [s] `app/[locale]/layout.tsx` — 46 lines, clean nested-provider tree.
+ 47. [s] `app/[locale]/settings/page.tsx` — 962 lines, large feature page; skipped.
+ 48. [s] `app/admin/_tabs/_jmap-servers-section.tsx` — admin-only, skipped.
+ 49. [s] `app/admin/_tabs/auth.tsx` — admin-only, skipped.
+ 50. [s] `app/admin/_tabs/branding.tsx` — admin-only, skipped.
  51. [ ] `app/admin/_tabs/dashboard.tsx`
  52. [ ] `app/admin/_tabs/logs.tsx`
  53. [ ] `app/admin/_tabs/marketplace.tsx`
