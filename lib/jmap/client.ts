@@ -345,8 +345,22 @@ function sanitizeIdentityDisplayName(name: string | undefined | null): string {
   return name.replace(/\s*<[^>]*>\s*$/, '').trim();
 }
 
+// btoa() rejects non-Latin1 code points with InvalidCharacterError, which
+// means passwords containing any character outside U+0080–U+00FF (any
+// accented Latin, CJK, emoji, etc.) make login throw at construction time.
+// Encode as UTF-8 first, then map each byte to a Latin1 char that btoa
+// accepts. Same wire output as `Buffer.from(s).toString('base64')` would
+// produce in Node — but works in the browser where Buffer isn't available.
+function utf8ToBase64(input: string): string {
+  const bytes = new TextEncoder().encode(input);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
 export class JMAPClient implements IJMAPClient {
   private static readonly RATE_LIMIT_TOAST_THROTTLE_MS = 10_000;
+  private static readonly NETWORK_RETRY_DELAY_MS = 1_000;
 
   private serverUrl: string;
   private username: string;
@@ -378,7 +392,7 @@ export class JMAPClient implements IJMAPClient {
     this.serverUrl = serverUrl.replace(/\/$/, '');
     this.username = username;
     this.password = password;
-    this.authHeader = `Basic ${btoa(`${username}:${password}`)}`;
+    this.authHeader = `Basic ${utf8ToBase64(`${username}:${password}`)}`;
   }
 
   static withBearer(
@@ -418,7 +432,7 @@ export class JMAPClient implements IJMAPClient {
   /** Update basic-auth credentials with a new password (e.g. password$newTotp). */
   updateBasicAuth(newPassword: string): void {
     this.password = newPassword;
-    this.authHeader = `Basic ${btoa(`${this.username}:${newPassword}`)}`;
+    this.authHeader = `Basic ${utf8ToBase64(`${this.username}:${newPassword}`)}`;
   }
 
   getAuthHeader(): string {
@@ -429,6 +443,18 @@ export class JMAPClient implements IJMAPClient {
     return this.serverUrl;
   }
 
+  /**
+   * Build a Headers object from the caller's HeadersInit (object, array,
+   * or Headers instance) and overlay the current Authorization. Avoids
+   * the unsafe `init.headers as Record<string,string>` spread that
+   * silently mangles array-form and Headers-instance inputs.
+   */
+  private withAuthHeaders(init?: Parameters<typeof fetch>[1]): Headers {
+    const merged = new Headers(init?.headers);
+    merged.set('Authorization', this.authHeader);
+    return merged;
+  }
+
   private async authenticatedFetch(url: string, init?: Parameters<typeof fetch>[1]): Promise<Response> {
     // Short-circuit: if rate-limited, reject immediately without sending a request
     if (this.isRateLimited()) {
@@ -437,16 +463,15 @@ export class JMAPClient implements IJMAPClient {
       throw new RateLimitError(remaining);
     }
 
-    const headers = { ...init?.headers as Record<string, string>, 'Authorization': this.authHeader };
     let response: Response;
 
     try {
-      response = await fetch(url, { ...init, headers });
+      response = await fetch(url, { ...init, headers: this.withAuthHeaders(init) });
     } catch (error) {
       // Network error: retry once after brief delay (transient proxy/connection issues)
       if (this.reconnecting) throw error;
-      await new Promise(r => setTimeout(r, 1000));
-      response = await fetch(url, { ...init, headers });
+      await new Promise(r => setTimeout(r, JMAPClient.NETWORK_RETRY_DELAY_MS));
+      response = await fetch(url, { ...init, headers: this.withAuthHeaders(init) });
     }
 
     // Handle 429 rate limiting - stop immediately, do not retry
@@ -461,8 +486,7 @@ export class JMAPClient implements IJMAPClient {
         const newToken = await this.onTokenRefresh();
         if (newToken) {
           this.updateAccessToken(newToken);
-          const retryHeaders = { ...init?.headers as Record<string, string>, 'Authorization': this.authHeader };
-          response = await fetch(url, { ...init, headers: retryHeaders });
+          response = await fetch(url, { ...init, headers: this.withAuthHeaders(init) });
         }
       } else if (this.authMode === 'basic' && !this.reconnecting && url !== `${this.serverUrl}/.well-known/jmap`) {
         // JMAP session may have expired - re-establish and retry once
@@ -470,8 +494,7 @@ export class JMAPClient implements IJMAPClient {
         try {
           await this.refreshSession();
           this.connectionChangeCallback?.(true);
-          const retryHeaders = { ...init?.headers as Record<string, string>, 'Authorization': this.authHeader };
-          response = await fetch(url, { ...init, headers: retryHeaders });
+          response = await fetch(url, { ...init, headers: this.withAuthHeaders(init) });
         } catch {
           // Session refresh failed - if TOTP was used, try re-auth with fresh TOTP
           if (this.onTotpRequired && this.basePassword) {
@@ -481,8 +504,7 @@ export class JMAPClient implements IJMAPClient {
                 this.updateBasicAuth(`${this.basePassword}$${newTotp}`);
                 await this.refreshSession();
                 this.connectionChangeCallback?.(true);
-                const retryHeaders = { ...init?.headers as Record<string, string>, 'Authorization': this.authHeader };
-                response = await fetch(url, { ...init, headers: retryHeaders });
+                response = await fetch(url, { ...init, headers: this.withAuthHeaders(init) });
               }
             } catch {
               // TOTP re-auth also failed - return original 401
@@ -830,64 +852,62 @@ export class JMAPClient implements IJMAPClient {
 
   async getAllMailboxes(): Promise<Mailbox[]> {
     try {
-      const allMailboxes: Mailbox[] = [];
       const accountIds = Object.keys(this.accounts);
 
       if (accountIds.length === 0) {
         return this.getMailboxes();
       }
 
-      for (const accountId of accountIds) {
+      // Fan out per-account Mailbox/get in parallel. The previous serial
+      // loop paid (RTT × number-of-accounts) on every cold load whenever
+      // shared accounts were present — for 3 connected accounts on a
+      // 200ms RTT that's 600ms of avoidable latency at sidebar render.
+      const perAccount = await Promise.all(accountIds.map(async (accountId) => {
         const account = this.accounts[accountId];
         const isPrimary = accountId === this.accountId;
 
         try {
           const response = await this.request([
-            ["Mailbox/get", {
-              accountId: accountId,
-            }, "0"]
+            ["Mailbox/get", { accountId }, "0"],
           ]);
 
-          if (response.methodResponses?.[0]?.[0] === "Mailbox/get") {
-            const rawMailboxes = (response.methodResponses[0][1].list || []) as JMAPMailbox[];
+          if (response.methodResponses?.[0]?.[0] !== "Mailbox/get") return [];
+          const rawMailboxes = (response.methodResponses[0][1].list || []) as JMAPMailbox[];
 
-            debug.log('jmap', `[JMAP Mailbox] getAllMailboxes: account ${accountId} returned ${rawMailboxes.length} mailboxes (isPrimary: ${isPrimary})`);
+          debug.log('jmap', `[JMAP Mailbox] getAllMailboxes: account ${accountId} returned ${rawMailboxes.length} mailboxes (isPrimary: ${isPrimary})`);
 
-            // Warn if response might be truncated
-            const maxObjects = this.getMaxObjectsInGet();
-            if (rawMailboxes.length >= maxObjects) {
-              debug.warn('jmap', 
-                `[JMAP Mailbox] Account ${accountId}: response contains ${rawMailboxes.length} mailboxes which equals maxObjectsInGet (${maxObjects}). ` +
-                `Some mailboxes may be missing.`
-              );
-            }
-
-            const mailboxes = rawMailboxes.map((mb) => ({
-              id: isPrimary ? mb.id : `${accountId}:${mb.id}`,
-              originalId: mb.id,
-              name: mb.name,
-              parentId: mb.parentId ? (isPrimary ? mb.parentId : `${accountId}:${mb.parentId}`) : undefined,
-              role: mb.role || undefined,
-              sortOrder: mb.sortOrder ?? 0,
-              totalEmails: mb.totalEmails ?? 0,
-              unreadEmails: mb.unreadEmails ?? 0,
-              totalThreads: mb.totalThreads ?? 0,
-              unreadThreads: mb.unreadThreads ?? 0,
-              myRights: mb.myRights || DEFAULT_MAILBOX_RIGHTS,
-              isSubscribed: mb.isSubscribed ?? true,
-              accountId,
-              accountName: account?.name || (isPrimary ? this.username : accountId),
-              isShared: !isPrimary,
-            }) as Mailbox);
-
-            allMailboxes.push(...mailboxes);
+          const maxObjects = this.getMaxObjectsInGet();
+          if (rawMailboxes.length >= maxObjects) {
+            debug.warn('jmap',
+              `[JMAP Mailbox] Account ${accountId}: response contains ${rawMailboxes.length} mailboxes which equals maxObjectsInGet (${maxObjects}). ` +
+              `Some mailboxes may be missing.`
+            );
           }
+
+          return rawMailboxes.map((mb) => ({
+            id: isPrimary ? mb.id : `${accountId}:${mb.id}`,
+            originalId: mb.id,
+            name: mb.name,
+            parentId: mb.parentId ? (isPrimary ? mb.parentId : `${accountId}:${mb.parentId}`) : undefined,
+            role: mb.role || undefined,
+            sortOrder: mb.sortOrder ?? 0,
+            totalEmails: mb.totalEmails ?? 0,
+            unreadEmails: mb.unreadEmails ?? 0,
+            totalThreads: mb.totalThreads ?? 0,
+            unreadThreads: mb.unreadThreads ?? 0,
+            myRights: mb.myRights || DEFAULT_MAILBOX_RIGHTS,
+            isSubscribed: mb.isSubscribed ?? true,
+            accountId,
+            accountName: account?.name || (isPrimary ? this.username : accountId),
+            isShared: !isPrimary,
+          }) as Mailbox);
         } catch (error) {
           console.error(`Failed to fetch mailboxes for account ${accountId}:`, error);
+          return [];
         }
-      }
+      }));
 
-      return allMailboxes;
+      return perAccount.flat();
     } catch (error) {
       console.error("Failed to fetch all mailboxes:", error);
       return this.getMailboxes();

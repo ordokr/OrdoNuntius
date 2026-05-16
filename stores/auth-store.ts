@@ -929,11 +929,18 @@ export const useAuthStore = create<AuthState>()(
       },
 
       refreshAccessToken: async () => {
-        if (refreshPromise) return refreshPromise;
-
+        // Coalesce per-account first. The legacy singleton `refreshPromise`
+        // used to short-circuit BEFORE the map check, which would hand a
+        // caller asking about account B the in-flight promise belonging to
+        // account A — leaking A's token to B's client. The singleton path
+        // now only fires when there's no activeAccountId at all (rare:
+        // pre-login bootstrap).
         const accountId = get().activeAccountId;
-        if (accountId && refreshPromises.has(accountId)) {
-          return refreshPromises.get(accountId)!;
+        if (accountId) {
+          const existing = refreshPromises.get(accountId);
+          if (existing) return existing;
+        } else if (refreshPromise) {
+          return refreshPromise;
         }
 
         const account = accountId ? useAccountStore.getState().getAccountById(accountId) : null;
@@ -977,13 +984,19 @@ export const useAuthStore = create<AuthState>()(
             get().logout();
             return null;
           } finally {
-            refreshPromise = null;
-            if (accountId) refreshPromises.delete(accountId);
+            if (accountId) {
+              refreshPromises.delete(accountId);
+            } else {
+              refreshPromise = null;
+            }
           }
         })();
 
-        refreshPromise = promise;
-        if (accountId) refreshPromises.set(accountId, promise);
+        if (accountId) {
+          refreshPromises.set(accountId, promise);
+        } else {
+          refreshPromise = promise;
+        }
 
         return promise;
       },
@@ -1304,9 +1317,13 @@ export const useAuthStore = create<AuthState>()(
           const activeId = get().activeAccountId;
           const targetId = activeId || defaultAccount?.id || accounts[0].id;
 
-          // Try to connect all accounts
-          for (const account of accounts) {
-            if (clients.has(account.id)) continue; // Already connected
+          // Restore accounts in parallel. The previous serial for-loop paid
+          // (auth-RTT + JMAP-connect-RTT) sequentially per account — for N
+          // accounts that's N× the latency. Promise.all overlaps them; per-
+          // account failures stay isolated because each branch swallows its
+          // own error and just leaves that account flagged as not-connected.
+          await Promise.all(accounts.map(async (account) => {
+            if (clients.has(account.id)) return; // Already connected
 
             // Basic auth without rememberMe leaves nothing to restore - the
             // user logged in without persisting credentials. Evict silently
@@ -1314,7 +1331,7 @@ export const useAuthStore = create<AuthState>()(
             if (account.authMode === 'basic' && !account.rememberMe) {
               evictAccount(account.id);
               accountStore.removeAccount(account.id);
-              continue;
+              return;
             }
 
             try {
@@ -1355,7 +1372,7 @@ export const useAuthStore = create<AuthState>()(
                   hasError: true,
                   errorMessage: 'Temporarily rate limited by server',
                 });
-                continue;
+                return;
               }
               // Remove unrestorable accounts so the user is prompted to log in
               // again rather than seeing a stale error entry forever.
@@ -1363,7 +1380,7 @@ export const useAuthStore = create<AuthState>()(
               accountStore.removeAccount(account.id);
               apiFetch(`/api/auth/session?slot=${account.cookieSlot}`, { method: 'DELETE' }).catch(() => {});
             }
-          }
+          }));
 
           // Activate the target account
           const targetClient = clients.get(targetId);
