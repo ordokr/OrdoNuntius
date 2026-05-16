@@ -360,6 +360,9 @@ function EmailCard({
         // Use shared sanitization config as base (more secure)
         const sanitizeConfig = { ...EMAIL_SANITIZE_CONFIG };
 
+        // DOMPurify hooks are process-global. addHook → sanitize → removeHook
+        // must run as a single try/finally so a throw inside sanitize doesn't
+        // orphan the hook on the global instance.
         DOMPurify.addHook('afterSanitizeAttributes', (node) => {
           const htmlNode = node as HTMLElement;
 
@@ -409,8 +412,12 @@ function EmailCard({
           }
         });
 
-        const sanitized = DOMPurify.sanitize(htmlContent, sanitizeConfig);
-        DOMPurify.removeHook('afterSanitizeAttributes');
+        let sanitized: string;
+        try {
+          sanitized = DOMPurify.sanitize(htmlContent, sanitizeConfig);
+        } finally {
+          DOMPurify.removeHook('afterSanitizeAttributes');
+        }
 
         let finalHtml = sanitized;
         if (blockedExternalContent) {

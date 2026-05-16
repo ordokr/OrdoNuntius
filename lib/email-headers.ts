@@ -201,37 +201,29 @@ interface ListHeaders {
   listPost?: string;
 }
 
+function firstHeader(headers: Record<string, string | string[]>, name: string): string | undefined {
+  const v = headers[name];
+  if (!v) return undefined;
+  return Array.isArray(v) ? v[0] : v;
+}
+
 export function extractListHeaders(headers: Record<string, string | string[]>): ListHeaders {
   const result: ListHeaders = {};
 
-  if (headers['List-Id']) {
-    result.listId = Array.isArray(headers['List-Id'])
-      ? headers['List-Id'][0]
-      : headers['List-Id'];
-  }
+  const listId = firstHeader(headers, 'List-Id');
+  if (listId) result.listId = listId;
 
-  if (headers['List-Unsubscribe']) {
-    const unsub = Array.isArray(headers['List-Unsubscribe'])
-      ? headers['List-Unsubscribe'][0]
-      : headers['List-Unsubscribe'];
-
+  const unsub = firstHeader(headers, 'List-Unsubscribe');
+  if (unsub) {
     const parsed = parseUnsubscribeUrls(unsub);
-    if (parsed.preferred) {
-      result.listUnsubscribe = parsed;
-    }
+    if (parsed.preferred) result.listUnsubscribe = parsed;
   }
 
-  if (headers['List-Help']) {
-    result.listHelp = Array.isArray(headers['List-Help'])
-      ? headers['List-Help'][0]
-      : headers['List-Help'];
-  }
+  const listHelp = firstHeader(headers, 'List-Help');
+  if (listHelp) result.listHelp = listHelp;
 
-  if (headers['List-Post']) {
-    result.listPost = Array.isArray(headers['List-Post'])
-      ? headers['List-Post'][0]
-      : headers['List-Post'];
-  }
+  const listPost = firstHeader(headers, 'List-Post');
+  if (listPost) result.listPost = listPost;
 
   return result;
 }

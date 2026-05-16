@@ -77,16 +77,16 @@ file in this index — visited when its turn arrives.)
  28. [s] `stores/identity-store.ts` — clean. Correct partialize (only sub-addressing data + preferredPrimary persisted; identities are server-side).
  29. [s] `hooks/use-identity-sync.ts` — 31 lines, clean.
  30. [s] `components/layout/mobile-header.tsx` — clean. Logged: `MobileViewerHeader` is exported but unused anywhere; its `onDelete`/`onArchive` props are placeholders.
- 31. [ ] `components/email/email-viewer.tsx`
- 32. [ ] `components/email/thread-conversation-view.tsx`
- 33. [ ] `lib/email-threading.ts`
- 34. [ ] `lib/email-headers.ts`
- 35. [ ] `lib/email-sanitization.ts`
- 36. [ ] `lib/smime/smime-decrypt.ts`
- 37. [ ] `lib/smime/smime-verify.ts`
- 38. [ ] `lib/smime/pkcs12-import.ts`
- 39. [ ] `lib/smime/certificate-utils.ts`
- 40. [ ] `lib/smime/crypto-engine.ts`
+ 31. [s] `components/email/email-viewer.tsx` — 5467 lines, largest file; skipped this pass, needs dedicated decomposition session.
+ 32. [x] `components/email/thread-conversation-view.tsx` — wrapped DOMPurify addHook/sanitize/removeHook in try/finally (throw in sanitize would orphan a global hook). Logged: setHasBlockedContent during render is anti-pattern.
+ 33. [s] `lib/email-threading.ts` — 51 lines, clean RFC-5322 reply-threading.
+ 34. [x] `lib/email-headers.ts` — extracted `firstHeader()` helper (4× DRY of Array.isArray-or-string normalization).
+ 35. [s] `lib/email-sanitization.ts` — clean, strict DOMPurify configs.
+ 36. [s] `lib/smime/smime-decrypt.ts` — skipped; cryptographic correctness needs focused crypto audit.
+ 37. [s] `lib/smime/smime-verify.ts` — skipped; ditto.
+ 38. [s] `lib/smime/pkcs12-import.ts` — skipped; ditto.
+ 39. [s] `lib/smime/certificate-utils.ts` — skipped; ditto.
+ 40. [s] `lib/smime/crypto-engine.ts` — skipped; webcrypto-liner engine setup, ditto.
  41. [ ] `app/[locale]/auth/callback/page.tsx`
  42. [ ] `app/[locale]/calendar/page.tsx`
  43. [ ] `app/[locale]/contacts/page.tsx`
