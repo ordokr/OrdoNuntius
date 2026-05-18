@@ -432,27 +432,27 @@ file in this index — visited when its turn arrives.)
 382. [ ] `next-env.d.ts`
 383. [ ] `next.config.ts`
 384. [ ] `playwright.config.ts`
-385. [ ] `stores/account-security-store.ts`
-386. [ ] `stores/admin-tab-store.ts`
-387. [ ] `stores/calendar-notification-store.ts`
-388. [ ] `stores/calendar-store.ts`
-389. [ ] `stores/contact-store.ts`
-390. [ ] `stores/file-store.ts`
-391. [ ] `stores/filter-store.ts`
-392. [ ] `stores/locale-store.ts`
-393. [ ] `stores/plugin-store.ts`
-394. [ ] `stores/policy-store.ts`
-395. [ ] `stores/settings-store.ts`
-396. [ ] `stores/smime-store.ts`
-397. [ ] `stores/task-store.ts`
-398. [ ] `stores/template-store.ts`
-399. [ ] `stores/theme-store.ts`
-400. [ ] `stores/toast-store.ts`
-401. [ ] `stores/totp-reauth-store.ts`
-402. [ ] `stores/ui-store.ts`
-403. [ ] `stores/update-store.ts`
-404. [ ] `stores/vacation-store.ts`
-405. [ ] `stores/webdav-store.ts`
-406. [ ] `tailwind.config.ts`
-407. [ ] `vitest.config.ts`
-408. [ ] `vitest.setup.ts`
+385. [s] `stores/account-security-store.ts` — clean; `fetchAll` uses Promise.allSettled (correct RTT-min pattern).
+386. [s] `stores/admin-tab-store.ts` — clean.
+387. [s] `stores/calendar-notification-store.ts` — clean.
+388. [s] `stores/calendar-store.ts` — clean.
+389. [s] `stores/contact-store.ts` — clean.
+390. [s] `stores/file-store.ts` — clean.
+391. [s] `stores/filter-store.ts` — clean.
+392. [s] `stores/locale-store.ts` — clean, 18-line persisted store.
+393. [s] `stores/plugin-store.ts` — clean.
+394. [s] `stores/policy-store.ts` — clean.
+395. [s] `stores/settings-store.ts` — clean.
+396. [s] `stores/smime-store.ts` — clean.
+397. [s] `stores/task-store.ts` — clean; pessimistic update pattern (await server before local state). Per RTT-min rule, optimistic-then-rollback would feel snappier; tier-2.
+398. [s] `stores/template-store.ts` — clean; `getRecent` already O(N+R) with byId Map.
+399. [s] `stores/theme-store.ts` — clean. `syncServerThemes` does serial per-theme `await downloadThemeCSS` + `await pluginStorage.saveThemeCSS` — Promise.all would parallelize. Per RTT-min rule, logged for tier-2.
+400. [s] `stores/toast-store.ts` — clean.
+401. [s] `stores/totp-reauth-store.ts` — clean.
+402. [x] `stores/ui-store.ts` — extracted `persistColumnsToStorage` helper, killing 4× repeated `try { localStorage.setItem("column-widths", JSON.stringify(...)) } catch { }` block.
+403. [s] `stores/update-store.ts` — clean.
+404. [s] `stores/vacation-store.ts` — clean.
+405. [s] `stores/webdav-store.ts` — clean.
+406. [s] `tailwind.config.ts` — config file.
+407. [s] `vitest.config.ts` — config file.
+408. [s] `vitest.setup.ts` — test setup.

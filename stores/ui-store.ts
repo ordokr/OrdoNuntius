@@ -61,6 +61,12 @@ interface UIState {
 
 // Column widths are hydrated from localStorage by the page component on mount
 
+function persistColumnsToStorage(widths: { sidebarWidth: number; emailListWidth: number; emailListHeight: number }): void {
+  try {
+    localStorage.setItem("column-widths", JSON.stringify(widths));
+  } catch { /* localStorage may be unavailable */ }
+}
+
 export const useUIStore = create<UIState>((set, get) => ({
   // Initial state (SSR-safe defaults)
   activeView: "list",
@@ -97,33 +103,25 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   resetSidebarWidth: () => {
     set({ sidebarWidth: SIDEBAR_DEFAULT });
-    const { emailListWidth, emailListHeight } = get();
-    try {
-      localStorage.setItem("column-widths", JSON.stringify({ sidebarWidth: SIDEBAR_DEFAULT, emailListWidth, emailListHeight }));
-    } catch { /* localStorage may be unavailable */ }
+    const { sidebarWidth, emailListWidth, emailListHeight } = get();
+    persistColumnsToStorage({ sidebarWidth, emailListWidth, emailListHeight });
   },
 
   resetEmailListWidth: () => {
     set({ emailListWidth: EMAIL_LIST_DEFAULT });
-    const { sidebarWidth, emailListHeight } = get();
-    try {
-      localStorage.setItem("column-widths", JSON.stringify({ sidebarWidth, emailListWidth: EMAIL_LIST_DEFAULT, emailListHeight }));
-    } catch { /* localStorage may be unavailable */ }
+    const { sidebarWidth, emailListWidth, emailListHeight } = get();
+    persistColumnsToStorage({ sidebarWidth, emailListWidth, emailListHeight });
   },
 
   resetEmailListHeight: () => {
     set({ emailListHeight: EMAIL_LIST_HEIGHT_DEFAULT });
-    const { sidebarWidth, emailListWidth } = get();
-    try {
-      localStorage.setItem("column-widths", JSON.stringify({ sidebarWidth, emailListWidth, emailListHeight: EMAIL_LIST_HEIGHT_DEFAULT }));
-    } catch { /* localStorage may be unavailable */ }
+    const { sidebarWidth, emailListWidth, emailListHeight } = get();
+    persistColumnsToStorage({ sidebarWidth, emailListWidth, emailListHeight });
   },
 
   persistColumnWidths: () => {
     const { sidebarWidth, emailListWidth, emailListHeight } = get();
-    try {
-      localStorage.setItem("column-widths", JSON.stringify({ sidebarWidth, emailListWidth, emailListHeight }));
-    } catch { /* localStorage may be unavailable */ }
+    persistColumnsToStorage({ sidebarWidth, emailListWidth, emailListHeight });
   },
 
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
