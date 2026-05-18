@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { Mail, Phone, Building, ExternalLink, Copy, Send, UserPlus } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import { useContactStore, getContactDisplayName } from "@/stores/contact-store";
+import { useContactStore, getContactDisplayName, findContactByEmail } from "@/stores/contact-store";
 import { toast } from "@/stores/toast-store";
 import type { ContactCard } from "@/lib/jmap/types";
 
@@ -28,13 +28,11 @@ export function RecipientPopover({ name, email, displayLabel, onViewContact, cla
   const popoverRef = useRef<HTMLDivElement>(null);
   const contacts = useContactStore((s) => s.contacts);
 
-  // Find matching contact by email
-  const contact = contacts.find((c) => {
-    if (!c.emails) return false;
-    return Object.values(c.emails).some(
-      (e) => e.address.toLowerCase() === email.toLowerCase()
-    );
-  });
+  // Find matching contact by email. O(1) via the shared email-index
+  // Map in contact-store; was O(N×M) per popover open. The same
+  // index is reused by Avatar so the build cost amortises across
+  // every visible avatar + popover.
+  const contact = findContactByEmail(contacts, email);
 
   const contactName = contact ? getContactDisplayName(contact) : name;
   const emails = contact?.emails ? Object.values(contact.emails) : [];

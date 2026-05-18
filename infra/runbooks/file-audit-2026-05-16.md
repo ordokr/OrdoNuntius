@@ -300,7 +300,7 @@ file in this index — visited when its turn arrives.)
 250. [s] `components/tour/tour-provider.tsx` — clean.
 251. [s] `components/tour/tour-steps.ts` — clean data file.
 252. [s] `components/trusted-senders-modal.tsx` — clean.
-253. [s] `components/ui/avatar.tsx` — clean. Module-scope memo caches for emailHash/initials/bgColor; contact-photo lookup is O(N×M) per render but memoized on `[contactPhotoUri, email, contacts]`. Tier-2: a contacts-by-email Map in the store would convert per-render lookup from O(N) to O(1).
+253. [x] `components/ui/avatar.tsx` — **tier-2 resolved**: added `findContactByEmail` to `stores/contact-store.ts` backed by a `WeakMap<ContactCard[], Map<email, contact>>` lazy index (rebuilds only when the contacts array reference changes). Avatar's contact-photo lookup drops from O(N×M) to O(1). The same index also serves `components/email/recipient-popover.tsx` whose inline `contacts.find(...)` was the same scan — both consumers now share one index build per render.
 254. [s] `components/ui/button.tsx` — 42 lines, clean variant table.
 255. [s] `components/ui/confirm-dialog.tsx` — clean. Note: `onConfirm` is invoked synchronously inside a try/finally that always calls onClose — if onConfirm returns a rejected promise, the rejection is unhandled. Acceptable as a fire-and-forget contract.
 256. [s] `components/ui/context-menu.tsx` — clean, properly uses useLayoutEffect for viewport clamping before paint. The `onClose` prop is destructured-and-renamed (`_onClose`) because closing is parent-controlled — confusing API but not a bug.

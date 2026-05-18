@@ -17,6 +17,45 @@ interface ContactSearchIndex {
 }
 const _contactSearchIndex = new WeakMap<ContactCard, ContactSearchIndex>();
 
+// Email → contact index. Avatar's per-row lookup walks every contact ×
+// every email per render before this — O(N×M) per visible email row.
+// Building a Map once per contact-array reference and caching it
+// against that same reference (so identity-equal arrays share the
+// index) makes Avatar's lookup O(1). Recomputes when contacts mutates.
+const _contactByEmailIndex = new WeakMap<readonly ContactCard[], Map<string, ContactCard>>();
+function getContactByEmailIndex(contacts: readonly ContactCard[]): Map<string, ContactCard> {
+  const cached = _contactByEmailIndex.get(contacts);
+  if (cached) return cached;
+  const index = new Map<string, ContactCard>();
+  for (const contact of contacts) {
+    if (!contact.emails) continue;
+    for (const e of Object.values(contact.emails)) {
+      if (!e.address) continue;
+      const key = e.address.toLowerCase();
+      // First-wins: if two contacts share an email, the earlier-listed
+      // one wins. Matches the order-dependent behavior of the prior
+      // for-of-Object.values lookup loop in Avatar.
+      if (!index.has(key)) index.set(key, contact);
+    }
+  }
+  _contactByEmailIndex.set(contacts, index);
+  return index;
+}
+
+/**
+ * O(1) lookup of a contact by any of its email addresses. The index
+ * is built lazily and cached against the contacts array's identity,
+ * so back-to-back lookups (e.g. the avatar in every visible email
+ * row) share one index build.
+ */
+export function findContactByEmail(
+  contacts: readonly ContactCard[],
+  email: string,
+): ContactCard | undefined {
+  if (!email) return undefined;
+  return getContactByEmailIndex(contacts).get(email.toLowerCase());
+}
+
 function getContactSearchIndex(contact: ContactCard): ContactSearchIndex {
   const cached = _contactSearchIndex.get(contact);
   if (cached) return cached;
