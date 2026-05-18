@@ -10,8 +10,8 @@
 // the rendering critical path; both clear together on cache miss.
 
 import type { Email } from "@/lib/jmap/types";
+import { createAccountKeyedCache } from "@/lib/account-keyed-cache";
 
-const STORAGE_KEY = "ordo:inboxEmails:v1";
 const MAX_EMAILS = 50;
 
 // Drop heavyweight fields. List rendering only needs metadata; the body
@@ -31,33 +31,9 @@ export interface CachedInbox {
   savedAt: number;
 }
 
-type Cache = Record<string, CachedInbox>;
-
-function readCache(): Cache {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? (parsed as Cache) : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeCache(cache: Cache): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
-  } catch {
-    // Quota exceeded or private mode — silent. We'll just miss the
-    // instant-render benefit until next successful write.
-  }
-}
+const cache = createAccountKeyedCache<CachedInbox>("ordo:inboxEmails:v1");
 
 function slim(email: Email): SlimEmail {
-  // eslint allows underscore-prefixed unused destructure names via
-  // varsIgnorePattern; the `void` discards previously here were noise.
   const {
     textBody: _t,
     htmlBody: _h,
@@ -71,9 +47,7 @@ function slim(email: Email): SlimEmail {
 }
 
 export function getCachedInbox(accountId: string): CachedInbox | null {
-  if (!accountId) return null;
-  const cache = readCache();
-  return cache[accountId] ?? null;
+  return cache.get(accountId);
 }
 
 export function setCachedInbox(
@@ -83,31 +57,17 @@ export function setCachedInbox(
   total: number,
   hasMore: boolean,
 ): void {
-  if (!accountId || !mailboxId) return;
-  const cache = readCache();
-  cache[accountId] = {
+  if (!mailboxId) return;
+  cache.set(accountId, {
     accountId,
     mailboxId,
     emails: emails.slice(0, MAX_EMAILS).map(slim),
     total,
     hasMore,
     savedAt: Date.now(),
-  };
-  writeCache(cache);
+  });
 }
 
 export function clearCachedInbox(accountId?: string): void {
-  if (!accountId) {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore
-    }
-    return;
-  }
-  const cache = readCache();
-  if (!(accountId in cache)) return;
-  delete cache[accountId];
-  writeCache(cache);
+  cache.clear(accountId);
 }

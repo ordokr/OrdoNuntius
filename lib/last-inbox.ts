@@ -8,57 +8,23 @@
 // prefetch path re-issues Email/query against the correct ID and discards
 // the speculative result.
 
-const STORAGE_KEY = "ordo:lastInbox:v1";
+import { createAccountKeyedCache } from "@/lib/account-keyed-cache";
 
-type Cache = Record<string, string>;
-
-function readCache(): Cache {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? (parsed as Cache) : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeCache(cache: Cache): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
-  } catch {
-    // quota or private-mode — best-effort
-  }
-}
+const cache = createAccountKeyedCache<string>("ordo:lastInbox:v1");
 
 export function getLastInbox(accountId: string): string | null {
-  if (!accountId) return null;
-  const cache = readCache();
-  return cache[accountId] ?? null;
+  return cache.get(accountId);
 }
 
 export function setLastInbox(accountId: string, mailboxId: string): void {
-  if (!accountId || !mailboxId) return;
-  const cache = readCache();
-  if (cache[accountId] === mailboxId) return;
-  cache[accountId] = mailboxId;
-  writeCache(cache);
+  if (!mailboxId) return;
+  // Skip the write entirely if the value is unchanged — avoids a useless
+  // JSON.stringify + setItem on every login when the cached inbox is still
+  // the same one the server resolves to.
+  if (cache.get(accountId) === mailboxId) return;
+  cache.set(accountId, mailboxId);
 }
 
 export function clearLastInbox(accountId?: string): void {
-  if (!accountId) {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore
-    }
-    return;
-  }
-  const cache = readCache();
-  if (!(accountId in cache)) return;
-  delete cache[accountId];
-  writeCache(cache);
+  cache.clear(accountId);
 }
