@@ -35,7 +35,10 @@ export function formatDate(date: Date | string): string {
   if (hours < 24) return `${hours}h ago`;
   if (days < 7) return `${days}d ago`;
 
-  return d.toLocaleDateString("en-US", {
+  // Was hardcoded `"en-US"` — every email in the inbox list older than 7
+  // days rendered with US month names regardless of the user's locale.
+  // Passing `undefined` lets Intl pick up the document/browser locale.
+  return d.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
