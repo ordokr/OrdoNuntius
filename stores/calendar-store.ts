@@ -21,23 +21,19 @@ export function isCalendarViewMode(value: unknown): value is CalendarViewMode {
 
 function mapCalendarIdsToStoreIds(
   calendarIds: Record<string, boolean> | undefined,
-  calendars: Calendar[],
-  targetAccountId?: string
+  calendarByOriginal: Map<string, Calendar>,
 ): Record<string, boolean> | undefined {
-  if (!calendarIds) {
-    return undefined;
+  if (!calendarIds) return undefined;
+
+  // Was O(K × C): for each key, `.find()` over all calendars. Now O(K)
+  // using a pre-built originalId → Calendar Map (caller builds it once
+  // per `mapServerEventToStoreEvent` invocation).
+  const out: Record<string, boolean> = {};
+  for (const calendarId in calendarIds) {
+    const matched = calendarByOriginal.get(calendarId);
+    out[matched?.id || calendarId] = calendarIds[calendarId];
   }
-
-  return Object.fromEntries(
-    Object.entries(calendarIds).map(([calendarId, included]) => {
-      const matchedCalendar = calendars.find((calendar) =>
-        (calendar.originalId || calendar.id) === calendarId
-        && (!targetAccountId || calendar.accountId === targetAccountId)
-      );
-
-      return [matchedCalendar?.id || calendarId, included];
-    })
-  );
+  return out;
 }
 
 function mapServerEventToStoreEvent(
@@ -45,18 +41,20 @@ function mapServerEventToStoreEvent(
   calendars: Calendar[],
   targetAccountId?: string
 ): CalendarEvent {
-  const mappedCalendarIds = mapCalendarIdsToStoreIds(event.calendarIds, calendars, targetAccountId) || event.calendarIds;
-  // Was O(K × C) — for each key in event.calendarIds, scanned all calendars.
-  // Now O(C + K) — build a lookup once (filtering by targetAccountId in the
-  // same pass), then probe each key directly. Calendars are typically ~50
-  // and this can be called once per event in bulk-fetch flows.
+  // Build originalId → Calendar lookup once. Previously each event built
+  // its own Map AND `mapCalendarIdsToStoreIds` did O(K × C) finds — two
+  // separate scans of `calendars` per event. Sharing the Map and threading
+  // it through cuts both paths to O(C + K).
   const calendarByOriginal = new Map<string, Calendar>();
   for (const calendar of calendars) {
     if (targetAccountId && calendar.accountId !== targetAccountId) continue;
     calendarByOriginal.set(calendar.originalId || calendar.id, calendar);
   }
+
+  const mappedCalendarIds = mapCalendarIdsToStoreIds(event.calendarIds, calendarByOriginal) || event.calendarIds;
+
   let matchedCalendar: Calendar | undefined;
-  for (const calendarId of Object.keys(event.calendarIds || {})) {
+  for (const calendarId in event.calendarIds || {}) {
     const candidate = calendarByOriginal.get(calendarId);
     if (candidate) { matchedCalendar = candidate; break; }
   }

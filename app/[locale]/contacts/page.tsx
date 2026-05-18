@@ -161,13 +161,14 @@ export default function ContactsPage() {
   );
   const selectedGroupMembers = useMemo(() => selectedGroupId ? getGroupMembers(selectedGroupId) : [], [selectedGroupId, getGroupMembers]);
 
-  // Collect all unique keywords across contacts
+  // Collect all unique keywords across contacts. `for...in` over
+  // c.keywords drops the per-contact `Object.entries` allocation.
   const allKeywords = useMemo(() => {
     const kws = new Set<string>();
     for (const contact of individuals) {
       if (!contact.keywords) continue;
-      for (const [kw, active] of Object.entries(contact.keywords)) {
-        if (active) kws.add(kw);
+      for (const kw in contact.keywords) {
+        if (contact.keywords[kw]) kws.add(kw);
       }
     }
     return Array.from(kws).sort((a, b) => a.localeCompare(b));
@@ -177,7 +178,17 @@ export default function ContactsPage() {
   const displayedContacts = useMemo(() => {
     if (activeCategory === "all") return individuals;
     if (activeCategory === "uncategorized") {
-      return individuals.filter(c => !c.keywords || Object.keys(c.keywords).filter(k => c.keywords![k]).length === 0);
+      // Was: `Object.keys(c.keywords).filter(k => c.keywords![k]).length === 0`
+      // — allocates a keys-array AND a filtered-array per contact just to
+      // check emptiness. `for...in` short-circuits at the first active
+      // keyword without allocating.
+      return individuals.filter(c => {
+        if (!c.keywords) return true;
+        for (const k in c.keywords) {
+          if (c.keywords[k]) return false;
+        }
+        return true;
+      });
     }
     if ("addressBookId" in activeCategory) {
       const bookId = activeCategory.addressBookId;

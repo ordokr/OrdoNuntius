@@ -229,6 +229,25 @@ export function ThemesTab() {
     }
   }
 
+  // Was: sequential `for (...) { await apiFetch(...) }` — N admin RTT
+  // for N themes. With 20 themes that's a 4s admin wait. Parallel
+  // fan-out collapses it to 1 RTT. allSettled so one failure doesn't
+  // strand the rest, and we count failures the same way we did before.
+  async function batchToggleThemes(targets: typeof themes, enabled: boolean): Promise<number> {
+    const results = await Promise.allSettled(
+      targets.map(t => apiFetch('/api/admin/themes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: t.id, enabled }),
+      })),
+    );
+    let failed = 0;
+    for (const r of results) {
+      if (r.status === 'rejected' || !r.value.ok) failed++;
+    }
+    return failed;
+  }
+
   async function forceEnableAll() {
     setMessage(null);
     const disabled = themes.filter(t => !t.enabled);
@@ -236,22 +255,11 @@ export function ThemesTab() {
       setMessage({ type: 'success', text: 'All themes are already enabled' });
       return;
     }
-    let failed = 0;
-    for (const t of disabled) {
-      const res = await apiFetch('/api/admin/themes', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: t.id, enabled: true }),
-      });
-      if (!res.ok) failed++;
-    }
-    if (failed === 0) {
-      await fetchThemes();
-      setMessage({ type: 'success', text: `All ${disabled.length} theme(s) enabled` });
-    } else {
-      await fetchThemes();
-      setMessage({ type: 'error', text: `${failed} theme(s) failed to enable` });
-    }
+    const failed = await batchToggleThemes(disabled, true);
+    await fetchThemes();
+    setMessage(failed === 0
+      ? { type: 'success', text: `All ${disabled.length} theme(s) enabled` }
+      : { type: 'error', text: `${failed} theme(s) failed to enable` });
   }
 
   async function forceDisableAll() {
@@ -261,22 +269,11 @@ export function ThemesTab() {
       setMessage({ type: 'success', text: 'All themes are already disabled' });
       return;
     }
-    let failed = 0;
-    for (const t of enabled) {
-      const res = await apiFetch('/api/admin/themes', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: t.id, enabled: false }),
-      });
-      if (!res.ok) failed++;
-    }
-    if (failed === 0) {
-      await fetchThemes();
-      setMessage({ type: 'success', text: `All ${enabled.length} theme(s) disabled` });
-    } else {
-      await fetchThemes();
-      setMessage({ type: 'error', text: `${failed} theme(s) failed to disable` });
-    }
+    const failed = await batchToggleThemes(enabled, false);
+    await fetchThemes();
+    setMessage(failed === 0
+      ? { type: 'success', text: `All ${enabled.length} theme(s) disabled` }
+      : { type: 'error', text: `${failed} theme(s) failed to disable` });
   }
 
   async function deleteTheme(id: string, name: string) {
