@@ -13,8 +13,10 @@ import { getLastInbox, setLastInbox } from "@/lib/last-inbox";
 import { getCachedInbox, setCachedInbox } from "@/lib/cached-inbox-emails";
 import { createUnifiedSlice, type UnifiedSlice } from "@/stores/email-slices/unified";
 import { createThreadSlice, type ThreadSlice } from "@/stores/email-slices/thread";
+import { createSpamSlice, type SpamSlice } from "@/stores/email-slices/spam";
+import { getNextSelectedEmail, getNextSelectedEmailAfterRemoval } from "@/stores/email-slices/_helpers";
 
-interface EmailStore extends UnifiedSlice, ThreadSlice {
+interface EmailStore extends UnifiedSlice, ThreadSlice, SpamSlice {
   emails: Email[];
   mailboxes: Mailbox[];
   selectedEmail: Email | null;
@@ -98,12 +100,7 @@ interface EmailStore extends UnifiedSlice, ThreadSlice {
   batchMoveToMailbox: (client: IJMAPClient, mailboxId: string) => Promise<void>;
   batchArchive: (client: IJMAPClient) => Promise<void>;
 
-  // Spam operations
-  spamUndoCache: Map<string, { emailId: string; originalMailboxId: string; accountId?: string }>;
-  markAsSpam: (client: IJMAPClient, emailId: string) => Promise<void>;
-  undoSpam: (client: IJMAPClient, emailId: string) => Promise<void>;
-  batchMarkAsSpam: (client: IJMAPClient, emailIds: string[]) => Promise<void>;
-  batchUndoSpam: (client: IJMAPClient, emailIds: string[]) => Promise<void>;
+  // Spam operations live in the `SpamSlice` mixed in above (see stores/email-slices/spam.ts).
 
   // Push notification handlers
   setPushConnected: (connected: boolean) => void;
@@ -138,35 +135,9 @@ interface EmailStore extends UnifiedSlice, ThreadSlice {
   clearState: () => void;
 }
 
-// Helper: compute the next email to select when removing one from the list
-function getNextSelectedEmailAfterRemoval(state: { emails: Email[]; selectedEmail: Email | null }, removedEmailIds: Set<string>): Email | null {
-  if (!state.selectedEmail || !removedEmailIds.has(state.selectedEmail.id)) {
-    return state.selectedEmail;
-  }
-
-  const idx = state.emails.findIndex(e => e.id === state.selectedEmail?.id);
-  if (idx === -1) return null;
-
-  for (let nextIndex = idx + 1; nextIndex < state.emails.length; nextIndex++) {
-    const candidate = state.emails[nextIndex];
-    if (!removedEmailIds.has(candidate.id)) {
-      return candidate;
-    }
-  }
-
-  for (let prevIndex = idx - 1; prevIndex >= 0; prevIndex--) {
-    const candidate = state.emails[prevIndex];
-    if (!removedEmailIds.has(candidate.id)) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
-function getNextSelectedEmail(state: { emails: Email[]; selectedEmail: Email | null }, removedEmailId: string): Email | null {
-  return getNextSelectedEmailAfterRemoval(state, new Set([removedEmailId]));
-}
+// `getNextSelectedEmail` + `getNextSelectedEmailAfterRemoval` live in
+// `stores/email-slices/_helpers.ts` so slices can import them without
+// pulling in the entire composed store (circular-import risk).
 
 // Find the trash mailbox for a given account scope. Prefers JMAP role, but
 // falls back to name matching ("trash" / "deleted") so users with custom or
@@ -205,6 +176,11 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
     get as Parameters<typeof createThreadSlice>[1],
     store as Parameters<typeof createThreadSlice>[2],
   ),
+  ...createSpamSlice(
+    set as Parameters<typeof createSpamSlice>[0],
+    get as Parameters<typeof createSpamSlice>[1],
+    store as Parameters<typeof createSpamSlice>[2],
+  ),
 
   emails: [],
   mailboxes: [],
@@ -238,9 +214,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
   externalSearchResults: [],
 
   // Unified mailbox state initial values are provided by the UnifiedSlice spread above.
-
-  // Spam undo cache
-  spamUndoCache: new Map(),
+  // Spam undo cache initial value is provided by the SpamSlice spread above.
 
   setEmails: (emails) => set({ emails }),
   setMailboxes: (mailboxes) => set({ mailboxes }),
@@ -1598,143 +1572,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
     }
   },
 
-  // Spam operations
-  markAsSpam: async (client, emailId) => {
-    const { selectedMailbox, mailboxes, emails } = get();
-    const email = emails.find(e => e.id === emailId);
-    if (!email) return;
-
-    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
-    if (!currentMailbox) return;
-
-    // Was: get().spamUndoCache.set(...) — in-place mutation bypassing
-    // the zustand setter. Works at runtime but breaks immutability so
-    // dev tools / subscribers don't see the change, and the previous
-    // Map reference leaks into any component that subscribed to
-    // spamUndoCache. Replace with a proper immutable update.
-    set(state => {
-      const nextCache = new Map(state.spamUndoCache);
-      nextCache.set(emailId, {
-        emailId,
-        originalMailboxId: currentMailbox.originalId || currentMailbox.id,
-        accountId: currentMailbox.accountId,
-      });
-      return { spamUndoCache: nextCache };
-    });
-
-    try {
-      await client.markAsSpam(emailId, currentMailbox.accountId);
-
-      set(state => ({
-        emails: state.emails.filter(e => e.id !== emailId),
-        selectedEmail: getNextSelectedEmail(state, emailId),
-      }));
-    } catch (error) {
-      console.error('Failed to mark as spam:', error);
-      throw error;
-    }
-  },
-
-  undoSpam: async (client, emailId) => {
-    const { mailboxes, selectedMailbox } = get();
-
-    // Try cache first (preserves exact original mailbox for toast undo)
-    const cachedData = get().spamUndoCache.get(emailId);
-
-    let targetMailboxId: string;
-    let accountId: string | undefined;
-
-    if (cachedData) {
-      // Use cached original mailbox (more accurate for immediate undo)
-      targetMailboxId = cachedData.originalMailboxId;
-      accountId = cachedData.accountId;
-      // Was: get().spamUndoCache.delete(emailId) — in-place mutation
-      // bypassing zustand. Now uses an immutable copy via the setter.
-      set(state => {
-        const nextCache = new Map(state.spamUndoCache);
-        nextCache.delete(emailId);
-        return { spamUndoCache: nextCache };
-      });
-    } else {
-      // Fall back to finding Inbox (generic "not spam" button/menu)
-      const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
-      accountId = currentMailbox?.accountId;
-
-      // Find inbox in same account
-      const inboxMailbox = mailboxes.find(m =>
-        m.role === 'inbox' &&
-        (accountId ? m.accountId === accountId : !m.accountId)
-      );
-
-      if (!inboxMailbox) {
-        throw new Error('Inbox not found');
-      }
-
-      targetMailboxId = inboxMailbox.originalId || inboxMailbox.id;
-    }
-
-    try {
-      await client.undoSpam(emailId, targetMailboxId, accountId);
-      await get().fetchEmails(client, selectedMailbox);
-    } catch (error) {
-      console.error('Failed to restore email:', error);
-      throw error;
-    }
-  },
-
-  batchMarkAsSpam: async (client, emailIds) => {
-    const { selectedMailbox, mailboxes } = get();
-
-    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
-    if (!currentMailbox) return;
-
-    try {
-      for (const emailId of emailIds) {
-        await client.markAsSpam(emailId, currentMailbox.accountId);
-      }
-
-      set(state => ({
-        emails: state.emails.filter(e => !emailIds.includes(e.id)),
-        selectedEmail: emailIds.includes(state.selectedEmail?.id || '') ? null : state.selectedEmail,
-        selectedEmailIds: new Set(),
-      }));
-    } catch (error) {
-      console.error('Failed to batch mark as spam:', error);
-      throw error;
-    }
-  },
-
-  batchUndoSpam: async (client: IJMAPClient, emailIds: string[]) => {
-    const { mailboxes, selectedMailbox } = get();
-
-    // Find inbox (batch operations don't preserve original mailboxes)
-    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
-    const accountId = currentMailbox?.accountId;
-
-    const inboxMailbox = mailboxes.find(m =>
-      m.role === 'inbox' &&
-      (accountId ? m.accountId === accountId : !m.accountId)
-    );
-
-    if (!inboxMailbox) {
-      throw new Error('Inbox not found');
-    }
-
-    try {
-      for (const emailId of emailIds) {
-        await client.undoSpam(emailId, inboxMailbox.originalId || inboxMailbox.id, accountId);
-      }
-
-      set(state => ({
-        emails: state.emails.filter(e => !emailIds.includes(e.id)),
-        selectedEmail: emailIds.includes(state.selectedEmail?.id || '') ? null : state.selectedEmail,
-        selectedEmailIds: new Set(),
-      }));
-    } catch (error) {
-      console.error('Failed to batch restore emails:', error);
-      throw error;
-    }
-  },
+  // Spam operations are provided by the SpamSlice spread above.
 
   // Push notification handlers
   setPushConnected: (connected) => {
