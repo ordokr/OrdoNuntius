@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -474,11 +474,24 @@ export function EmailComposer({
     selectedIdentityId,
   ]);
 
-  const composerSignatureHtml = signatureIdentity?.htmlSignature
-    ? `<div>${sanitizeEmailHtml(signatureIdentity.htmlSignature)}</div>`
-    : signatureIdentity?.textSignature
-      ? `<div>${getPlainTextSignature(signatureIdentity).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>`
-      : '';
+  // sanitizeEmailHtml runs DOMPurify; doing it on every keystroke (this
+  // component re-renders on every recipient/body/subject keypress) is
+  // wasteful when the only thing that changes the signature HTML is the
+  // identity itself.
+  const composerSignatureHtml = useMemo(() => {
+    if (signatureIdentity?.htmlSignature) {
+      return `<div>${sanitizeEmailHtml(signatureIdentity.htmlSignature)}</div>`;
+    }
+    if (signatureIdentity?.textSignature) {
+      const escaped = getPlainTextSignature(signatureIdentity)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+      return `<div>${escaped}</div>`;
+    }
+    return '';
+  }, [signatureIdentity]);
   const getAutocomplete = useContactStore((s) => s.getAutocomplete);
   const addToTrustedSendersBook = useContactStore((s) => s.addToTrustedSendersBook);
   const addTrustedSender = useSettingsStore((s) => s.addTrustedSender);
@@ -487,11 +500,13 @@ export function EmailComposer({
   const sendRawEmail = useEmailStore((s) => s.sendRawEmail);
   const smimeStore = useSmimeStore();
 
-  // Determine S/MIME availability for the selected identity
+  // Determine S/MIME availability for the selected identity. canSmimeEncrypt
+  // does a cert-lookup over every recipient on every keystroke without this
+  // memo — composer re-renders constantly while typing.
   const currentSmimeIdentityId = selectedIdentityId || primaryIdentity?.id;
   const smimeKeyRecord = currentSmimeIdentityId ? smimeStore.getKeyRecordForIdentity(currentSmimeIdentityId) : undefined;
   const canSmimeSign = !!smimeKeyRecord;
-  const canSmimeEncrypt = (() => {
+  const canSmimeEncrypt = useMemo(() => {
     if (!smimeKeyRecord) return false;
     const toAddrs = to.split(',').map(e => e.trim()).filter(Boolean);
     const ccAddrs = cc.split(',').map(e => e.trim()).filter(Boolean);
@@ -500,7 +515,7 @@ export function EmailComposer({
     if (allRecipients.length === 0) return false;
     const { missing } = smimeStore.getRecipientCerts(allRecipients);
     return missing.length === 0;
-  })();
+  }, [smimeKeyRecord, to, cc, bcc, smimeStore]);
 
   // Initialize S/MIME defaults from store when identity changes
   useEffect(() => {

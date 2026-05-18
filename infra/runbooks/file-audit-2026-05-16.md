@@ -207,18 +207,18 @@ file in this index — visited when its turn arrives.)
 157. [ ] `components/contacts/contact-list.tsx`
 158. [ ] `components/contacts/contact-print.ts`
 159. [ ] `components/contacts/contacts-sidebar.tsx`
-160. [ ] `components/email/calendar-invitation-banner.tsx`
-161. [ ] `components/email/email-composer.tsx`
+160. [s] `components/email/calendar-invitation-banner.tsx` — clean. 1118 lines but per-email lookups (`.find()`, `getInvitationMethod`, `findParticipantByEmail`) only run for the one currently-open invitation email at a time; not heavily rendered.
+161. [x] `components/email/email-composer.tsx` — **2 perf fixes**: (1) memoized `composerSignatureHtml` (was running DOMPurify via `sanitizeEmailHtml` on every keystroke); (2) memoized `canSmimeEncrypt` (was doing recipient-cert lookup on every keystroke). Composer re-renders on every recipient/subject/body keypress, so per-render work matters.
 162. [x] `components/email/email-context-menu.tsx` — removed dead `_tColor` useTranslations call; memoized `colorOptions` and `(moveTargetIds, moveTree)` (context menu stays mounted, was rebuilding mailbox tree on every parent render).
 163. [s] `components/email/email-hover-actions.tsx` — clean. Trivial `hoverBackgroundClassName` alias of prop; not worth a commit.
 164. [s] `components/email/email-identity-badge.tsx` — clean.
 165. [s] `components/email/email-list-item.tsx` — clean. Hardcoded English "No preview available" at line 320 — i18n bug but cross-locale fix (logged).
 166. [s] `components/email/recipient-popover.tsx` — clean. Hardcoded English action labels ("Copy", "Email", "View contact", "Copied!") — i18n bug; cross-locale.
 167. [s] `components/email/resizable-image.tsx` — clean Tiptap node-view.
-168. [ ] `components/email/rich-text-editor.tsx`
+168. [s] `components/email/rich-text-editor.tsx` — clean Tiptap setup. Hardcoded English toolbar `title` attrs ("Bold", "Italic", etc.) — i18n bug, cross-locale.
 169. [s] `components/email/smime-status-banner.tsx` — clean.
 170. [s] `components/email/thread-email-item.tsx` — clean. Same hardcoded "Unknown"/"No preview" English (cross-locale).
-171. [ ] `components/email/thread-list-item.tsx`
+171. [s] `components/email/thread-list-item.tsx` — clean, already heavily optimized in earlier perf passes (granular selectors, hoisted prop pattern, memoized component). Same hardcoded "(no subject)" / "No preview available" i18n concern as siblings.
 172. [x] `components/email/unsubscribe-banner.tsx` — **real UX bug fixed**: mobile `ConfirmDialog` was showing the `success_http`/`success_mailto` strings ("Unsubscribe page opened in new tab" / "Unsubscribe request sent to your email client") as the *pre-action* confirmation message — telling the user the action had completed while still asking them to confirm. Now shows the destination URL. Also dropped the unused `senderEmail` prop from the interface + both callsites in `email-viewer.tsx`.
 173. [ ] `components/error/error-boundary.tsx`
 174. [ ] `components/error/error-fallbacks.tsx`
