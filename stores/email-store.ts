@@ -1,8 +1,7 @@
 import { create } from "zustand";
-import { Email, Mailbox, StateChange } from "@/lib/jmap/types";
+import { Email, Mailbox } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useSettingsStore } from "@/stores/settings-store";
-import { useCalendarStore } from "@/stores/calendar-store";
 import { DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { emailHooks } from "@/lib/plugin-hooks";
 import { fetchUnifiedEmails, type UnifiedAccountClient } from "@/lib/unified-mailbox";
@@ -14,9 +13,10 @@ import { createUnifiedSlice, type UnifiedSlice } from "@/stores/email-slices/uni
 import { createThreadSlice, type ThreadSlice } from "@/stores/email-slices/thread";
 import { createSpamSlice, type SpamSlice } from "@/stores/email-slices/spam";
 import { createSearchSlice, type SearchSlice } from "@/stores/email-slices/search";
+import { createPushSlice, type PushSlice } from "@/stores/email-slices/push";
 import { getNextSelectedEmail, getNextSelectedEmailAfterRemoval } from "@/stores/email-slices/_helpers";
 
-interface EmailStore extends UnifiedSlice, ThreadSlice, SpamSlice, SearchSlice {
+interface EmailStore extends UnifiedSlice, ThreadSlice, SpamSlice, SearchSlice, PushSlice {
   emails: Email[];
   mailboxes: Mailbox[];
   selectedEmail: Email | null;
@@ -31,9 +31,9 @@ interface EmailStore extends UnifiedSlice, ThreadSlice, SpamSlice, SearchSlice {
   selectedEmailIds: Set<string>; // Track selected emails for batch operations
   hasMoreEmails: boolean; // Track if more emails are available to load
   totalEmails: number; // Total number of emails in the current mailbox/query
-  isPushConnected: boolean; // Track if push notifications are connected
-  lastPushUpdate: number | null; // Timestamp of last push update
-  newEmailNotification: Email | null; // New email notification for toast
+  // Push-notification state (isPushConnected / lastPushUpdate /
+  // newEmailNotification) lives in the `PushSlice` mixed in above
+  // (see stores/email-slices/push.ts).
 
   // Thread expansion state + actions live in the `ThreadSlice` mixed in above
   // (see stores/email-slices/thread.ts).
@@ -96,11 +96,9 @@ interface EmailStore extends UnifiedSlice, ThreadSlice, SpamSlice, SearchSlice {
   // Spam operations live in the `SpamSlice` mixed in above (see stores/email-slices/spam.ts).
 
   // Push notification handlers
-  setPushConnected: (connected: boolean) => void;
-  handleStateChange: (change: StateChange, client: IJMAPClient) => Promise<void>;
-  refreshCurrentMailbox: (client: IJMAPClient) => Promise<void>;
-  handleNewEmailNotification: (email: Email) => void;
-  clearNewEmailNotification: () => void;
+  // Push-notification actions (setPushConnected / handleStateChange /
+  // refreshCurrentMailbox / handleNewEmailNotification /
+  // clearNewEmailNotification) are provided by the PushSlice.
 
   // Thread expansion actions live in the `ThreadSlice` mixed in above.
 
@@ -179,6 +177,11 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
     get as Parameters<typeof createSearchSlice>[1],
     store as Parameters<typeof createSearchSlice>[2],
   ),
+  ...createPushSlice(
+    set as Parameters<typeof createPushSlice>[0],
+    get as Parameters<typeof createPushSlice>[1],
+    store as Parameters<typeof createPushSlice>[2],
+  ),
 
   emails: [],
   mailboxes: [],
@@ -195,9 +198,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
   lastSelectedEmailId: null,
   hasMoreEmails: false,
   totalEmails: 0,
-  isPushConnected: false,
-  lastPushUpdate: null,
-  newEmailNotification: null,
+  // Push state initial values are provided by the PushSlice spread above.
 
   // Thread expansion state initial values are provided by the ThreadSlice spread above.
 
@@ -1468,169 +1469,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
 
   // Spam operations are provided by the SpamSlice spread above.
 
-  // Push notification handlers
-  setPushConnected: (connected) => {
-    set({ isPushConnected: connected });
-  },
-
-  handleStateChange: async (change, client) => {
-    try {
-      // Update last push update timestamp
-      set({ lastPushUpdate: Date.now() });
-
-      // Get the current account ID from the client (assuming primary account)
-      const accountId = client.getAccountId();
-
-      // Check if there are changes for this account
-      const accountChanges = change.changed[accountId];
-      if (!accountChanges) return;
-
-      // Handle Email state changes - refresh current mailbox
-      if (accountChanges.Email) {
-        await get().refreshCurrentMailbox(client);
-        get().fetchTagCounts(client);
-      }
-
-      // Handle Mailbox state changes - refresh mailbox list
-      if (accountChanges.Mailbox) {
-        await get().fetchMailboxes(client);
-      }
-
-      // Handle Calendar/CalendarEvent state changes - refresh calendar data
-      if (accountChanges.Calendar || accountChanges.CalendarEvent) {
-        const calendarStore = useCalendarStore.getState();
-        if (calendarStore.supportsCalendar) {
-          calendarStore.fetchCalendars(client);
-          const { dateRange, selectedCalendarIds } = calendarStore;
-          if (dateRange && selectedCalendarIds.length > 0) {
-            calendarStore.fetchEvents(client, dateRange.start, dateRange.end);
-          }
-          // Refresh tasks when calendar events change (e.g. task created via CalDAV)
-          const { useTaskStore } = await import('./task-store');
-          const taskStore = useTaskStore.getState();
-          if (taskStore.tasks.length > 0 || calendarStore.viewMode === 'tasks') {
-            taskStore.fetchTasks(client);
-          }
-        }
-      }
-
-      // Handle SieveScript state changes - refresh filter rules
-      if (accountChanges.SieveScript) {
-        const { useFilterStore } = await import('./filter-store');
-        const filterStore = useFilterStore.getState();
-        if (filterStore.isSupported) {
-          filterStore.fetchFilters(client).catch((err) => {
-            console.error('Failed to refresh filters:', err);
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Failed to handle state change:', error);
-      set({
-        error: error instanceof Error ? error.message : "Failed to handle push notification"
-      });
-    }
-  },
-
-  refreshCurrentMailbox: async (client) => {
-    const { selectedMailbox } = get();
-
-    // Only refresh if a mailbox is currently selected
-    if (!selectedMailbox) return;
-
-    try {
-      // Fetch emails for the current mailbox without clearing the list first
-      // This provides a smoother update experience
-      const mailboxes = get().mailboxes;
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
-      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
-      const jmapMailboxId = mailbox?.originalId || selectedMailbox;
-
-      // Get emails per page from settings
-      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
-
-      // Respect active search filters / query so that a push-triggered refresh
-      // does not silently replace a filtered list with an unfiltered one.
-      const { searchQuery, searchFilters } = get();
-      const hasFilters = !isFilterEmpty(searchFilters);
-
-      let result;
-      if (hasFilters || searchQuery) {
-        const filter = buildJMAPFilter(searchQuery, searchFilters, jmapMailboxId);
-        result = await client.advancedSearchEmails(filter, accountId, emailsPerPage, 0);
-      } else {
-        result = await client.getEmails(jmapMailboxId, accountId, emailsPerPage, 0);
-      }
-
-      const currentEmails = get().emails;
-
-      // Only notify for genuinely new incoming mail in the Inbox.
-      // Without these guards the toast/sound also fires when sending,
-      // saving drafts, or moving/deleting the top message in any mailbox,
-      // because all of those change the first-email id of the current view.
-      const newFirst = result.emails[0];
-      if (
-        newFirst &&
-        mailbox?.role === 'inbox' &&
-        !currentEmails.some(e => e.id === newFirst.id)
-      ) {
-        get().handleNewEmailNotification(newFirst);
-      }
-
-      // Merge the refreshed first page with the existing loaded emails.
-      // This avoids discarding already-loaded pages which would cause the
-      // virtual list to shrink and then rapidly re-load (scroll bounce).
-      // Build the merged list: start with the fresh first page, then append
-      // existing emails beyond that page (if any), skipping duplicates and
-      // emails removed from the first page (e.g. deleted or moved).
-      const merged: Email[] = [...result.emails];
-      const mergedIds = new Set(result.emails.map((e: Email) => e.id));
-
-      for (const email of currentEmails) {
-        if (!mergedIds.has(email.id)) {
-          merged.push(email);
-          mergedIds.add(email.id);
-        }
-      }
-
-      // Check if anything actually changed to avoid unnecessary re-renders
-      const hasChanged =
-        currentEmails.length !== merged.length ||
-        merged.some((email, i) => {
-          const curr = currentEmails[i];
-          if (!curr) return true;
-          return (
-            curr.id !== email.id ||
-            curr.threadId !== email.threadId ||
-            JSON.stringify(curr.keywords) !== JSON.stringify(email.keywords)
-          );
-        });
-
-      if (hasChanged) {
-        // hasMore should reflect whether there are still more emails beyond
-        // what we have loaded, using the fresh total from the server.
-        const hasMore = merged.length < (result.total || 0);
-        set({
-          emails: merged,
-          hasMoreEmails: hasMore,
-          totalEmails: result.total,
-        });
-      }
-    } catch (error) {
-      console.error('Failed to refresh current mailbox:', error);
-      // Don't set error state for background refreshes to avoid disrupting the UI
-    }
-  },
-
-  handleNewEmailNotification: (email) => {
-    // Set the new email notification state
-    // This can be consumed by a toast component
-    set({ newEmailNotification: email });
-  },
-
-  clearNewEmailNotification: () => {
-    set({ newEmailNotification: null });
-  },
+  // Push notification handlers are provided by the PushSlice spread above.
 
   // Thread expansion actions are provided by the ThreadSlice spread above.
 
