@@ -12,8 +12,9 @@ import { useAccountStore } from "@/stores/account-store";
 import { getLastInbox, setLastInbox } from "@/lib/last-inbox";
 import { getCachedInbox, setCachedInbox } from "@/lib/cached-inbox-emails";
 import { createUnifiedSlice, type UnifiedSlice } from "@/stores/email-slices/unified";
+import { createThreadSlice, type ThreadSlice } from "@/stores/email-slices/thread";
 
-interface EmailStore extends UnifiedSlice {
+interface EmailStore extends UnifiedSlice, ThreadSlice {
   emails: Email[];
   mailboxes: Mailbox[];
   selectedEmail: Email | null;
@@ -32,10 +33,8 @@ interface EmailStore extends UnifiedSlice {
   lastPushUpdate: number | null; // Timestamp of last push update
   newEmailNotification: Email | null; // New email notification for toast
 
-  // Thread expansion state
-  expandedThreadIds: Set<string>;
-  threadEmailsCache: Map<string, Email[]>;
-  isLoadingThread: string | null;
+  // Thread expansion state + actions live in the `ThreadSlice` mixed in above
+  // (see stores/email-slices/thread.ts).
 
   // Keyword/tag filter
   selectedKeyword: string | null;
@@ -113,11 +112,7 @@ interface EmailStore extends UnifiedSlice {
   handleNewEmailNotification: (email: Email) => void;
   clearNewEmailNotification: () => void;
 
-  // Thread expansion actions
-  toggleThreadExpansion: (threadId: string) => void;
-  fetchThreadEmails: (client: IJMAPClient, threadId: string) => Promise<Email[]>;
-  collapseAllThreads: () => void;
-  updateThreadCache: (threadId: string, emails: Email[]) => void;
+  // Thread expansion actions live in the `ThreadSlice` mixed in above.
 
   // Mailbox management
   createMailbox: (client: IJMAPClient, name: string, parentId?: string) => Promise<void>;
@@ -205,6 +200,11 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
     get as Parameters<typeof createUnifiedSlice>[1],
     store as Parameters<typeof createUnifiedSlice>[2],
   ),
+  ...createThreadSlice(
+    set as Parameters<typeof createThreadSlice>[0],
+    get as Parameters<typeof createThreadSlice>[1],
+    store as Parameters<typeof createThreadSlice>[2],
+  ),
 
   emails: [],
   mailboxes: [],
@@ -225,10 +225,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
   lastPushUpdate: null,
   newEmailNotification: null,
 
-  // Thread expansion state
-  expandedThreadIds: new Set(),
-  threadEmailsCache: new Map(),
-  isLoadingThread: null,
+  // Thread expansion state initial values are provided by the ThreadSlice spread above.
 
   // Keyword/tag filter
   selectedKeyword: null,
@@ -1903,81 +1900,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
     set({ newEmailNotification: null });
   },
 
-  // Thread expansion actions
-  toggleThreadExpansion: (threadId) => {
-    const { expandedThreadIds } = get();
-    const newExpandedThreadIds = new Set(expandedThreadIds);
-
-    if (newExpandedThreadIds.has(threadId)) {
-      newExpandedThreadIds.delete(threadId);
-    } else {
-      newExpandedThreadIds.add(threadId);
-    }
-
-    set({ expandedThreadIds: newExpandedThreadIds });
-  },
-
-  fetchThreadEmails: async (client, threadId) => {
-    const { threadEmailsCache, selectedMailbox, mailboxes } = get();
-
-    // Check if we already have this thread cached
-    const cachedEmails = threadEmailsCache.get(threadId);
-    if (cachedEmails && cachedEmails.length > 0) {
-      return cachedEmails;
-    }
-
-    // Set loading state
-    set({ isLoadingThread: threadId });
-
-    try {
-      // Determine accountId for shared folders
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
-      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
-
-      // Fetch all emails in the thread
-      const emails = await client.getThreadEmails(threadId, accountId);
-
-      // Bounded LRU. Without the cap, a user expanding many threads
-      // during one mailbox session keeps growing this Map until the
-      // mailbox switches (which resets it). 64 threads × ~50 emails
-      // × ~2KB each ≈ 6 MB ceiling — generous but bounded.
-      const MAX_THREAD_CACHE = 64;
-      const newCache = new Map(get().threadEmailsCache);
-      // Map iteration order is insertion order, so delete-then-set
-      // moves the entry to the end. When over capacity, drop oldest.
-      newCache.delete(threadId);
-      newCache.set(threadId, emails);
-      while (newCache.size > MAX_THREAD_CACHE) {
-        const oldestKey = newCache.keys().next().value;
-        if (oldestKey === undefined) break;
-        newCache.delete(oldestKey);
-      }
-
-      set({
-        threadEmailsCache: newCache,
-        isLoadingThread: null
-      });
-
-      return emails;
-    } catch (error) {
-      console.error('Failed to fetch thread emails:', error);
-      set({ isLoadingThread: null });
-      return [];
-    }
-  },
-
-  collapseAllThreads: () => {
-    set({
-      expandedThreadIds: new Set(),
-      isLoadingThread: null
-    });
-  },
-
-  updateThreadCache: (threadId, emails) => {
-    const newCache = new Map(get().threadEmailsCache);
-    newCache.set(threadId, emails);
-    set({ threadEmailsCache: newCache });
-  },
+  // Thread expansion actions are provided by the ThreadSlice spread above.
 
   // Mailbox management
   createMailbox: async (client, name, parentId) => {
