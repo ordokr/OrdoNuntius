@@ -5,12 +5,15 @@ import { usePolicyStore } from '@/stores/policy-store';
 import { apiFetch } from '@/lib/browser-navigation';
 import type { PublicJmapServerEntry } from '@/lib/admin/jmap-servers';
 import type { SettingsPolicy } from '@/lib/admin/types';
+// Pull the script-tag ID from the shared dep-free module so we don't
+// drag configManager / hasSessionSecret into the client bundle just
+// to know which <script> to read.
+import { BOOTSTRAP_SCRIPT_ID } from '@/lib/bootstrap-constants';
 
 // SSR-inlined bootstrap payload (see lib/admin/bootstrap-payload.ts).
 // Reading from the inline <script> tag avoids a network roundtrip on
 // cold load. The hydrate happens lazily on first access so SSR/tests
 // without the script tag still fall back to fetch.
-const BOOTSTRAP_SCRIPT_ID = "__ORDO_BOOTSTRAP__";
 
 interface ConfigData {
   appName: string;

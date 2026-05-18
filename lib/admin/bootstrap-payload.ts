@@ -67,6 +67,11 @@ export async function getPublicConfig(): Promise<PublicConfigPayload> {
   );
   const allowedFrameAncestors = configManager.get<string>("allowedFrameAncestors", "");
 
+  // Pull once per render. hasSessionSecret() walks env vars + does a
+  // synchronous readFileSync when SESSION_SECRET_FILE is set; calling
+  // it twice per SSR pass would double the disk hit on container
+  // deployments that mount the secret as a file.
+  const sessionSecretAvailable = hasSessionSecret();
   return {
     appName,
     jmapServerUrl,
@@ -74,9 +79,9 @@ export async function getPublicConfig(): Promise<PublicConfigPayload> {
     oauthOnly,
     oauthClientId: configManager.get<string>("oauthClientId", ""),
     oauthIssuerUrl: configManager.get<string>("oauthIssuerUrl", ""),
-    rememberMeEnabled: hasSessionSecret(),
+    rememberMeEnabled: sessionSecretAvailable,
     settingsSyncEnabled:
-      configManager.get<boolean>("settingsSyncEnabled", false) && hasSessionSecret(),
+      configManager.get<boolean>("settingsSyncEnabled", false) && sessionSecretAvailable,
     stalwartFeaturesEnabled,
     devMode: configManager.get<boolean>("devMode", false),
     faviconUrl: configManager.get<string>(
@@ -120,12 +125,8 @@ export async function getBootstrapPayload(): Promise<BootstrapPayload> {
   return { config, policy };
 }
 
-// XSS-safe JSON serialization for embedding inside <script type="application/json">.
-// Escaping `<` prevents a `</script>` substring inside any string value from
-// closing the wrapping script tag prematurely. JSON has no semantic difference
-// between '<' and '<'; the consumer parses with JSON.parse which restores it.
-export function serializeForScriptTag(payload: unknown): string {
-  return JSON.stringify(payload).replace(/</g, "\\u003c");
-}
-
-export const BOOTSTRAP_SCRIPT_ID = "__ORDO_BOOTSTRAP__";
+// Re-export from the shared dep-free constants module so the existing
+// server-side import paths keep working. The client-side consumer
+// (hooks/use-config.ts) imports directly from bootstrap-constants to
+// avoid pulling configManager / hasSessionSecret into the client bundle.
+export { BOOTSTRAP_SCRIPT_ID, serializeForScriptTag } from "@/lib/bootstrap-constants";

@@ -591,29 +591,28 @@ export default function LoginPage() {
 
     if (success) {
       saveUsername(formData.username);
-      router.push('/');
+      // Normal login: the useEffect watching isAuthenticated handles
+      // the redirect (and restores any saved-redirect-after-login
+      // path). Pushing here would double-navigate AND skip the saved
+      // path. In add-account mode, the useEffect is gated by
+      // !isAddAccountMode so we push manually.
+      if (isAddAccountMode) router.push('/');
     }
   };
 
   const handleDevLogin = async () => {
     const success = await login(serverUrl, "dev@localhost", "dev");
-    if (success) {
-      let redirectTo = '/';
-      try {
-        const saved = sessionStorage.getItem('redirect_after_login');
-        if (saved) {
-          sessionStorage.removeItem('redirect_after_login');
-          redirectTo = saved;
-        }
-      } catch { /* ignore */ }
-      router.push(redirectTo);
+    if (success && isAddAccountMode) {
+      // See handleSubmit: useEffect handles the normal-mode redirect.
+      router.push('/');
     }
   };
 
   const handleDemoLogin = async () => {
     setDemoLoading(true);
     const success = await loginDemo();
-    if (success) {
+    if (success && isAddAccountMode) {
+      // See handleSubmit: useEffect handles the normal-mode redirect.
       router.push('/');
     }
     setDemoLoading(false);
