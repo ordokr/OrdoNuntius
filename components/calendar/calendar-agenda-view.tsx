@@ -50,9 +50,12 @@ export function CalendarAgendaView({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const grouped = useMemo(() => {
-    const sorted = [...events].sort((a, b) =>
-      getEventStartDate(a).getTime() - getEventStartDate(b).getTime()
-    );
+    // Schwartzian: each `getEventStartDate(ev)` does a `parseISO`, so the
+    // raw comparator parses both sides per comparison across an
+    // O(N log N) sort. Pre-compute event-start ms once per event.
+    const decorated = events.map(ev => ({ ev, ms: getEventStartDate(ev).getTime() }));
+    decorated.sort((a, b) => a.ms - b.ms);
+    const sorted = decorated.map(d => d.ev);
 
     const groups: DayGroup[] = [];
     const groupMap = new Map<string, DayGroup>();

@@ -29,19 +29,26 @@ export function getEventStartDate(
 }
 
 export function packWeekSegments(rawSegments: CalendarWeekSegment[]): CalendarWeekSegment[] {
-  rawSegments.sort((left, right) => {
-    if (left.startIndex !== right.startIndex) return left.startIndex - right.startIndex;
-    if (left.span !== right.span) return right.span - left.span;
-    if (left.event.showWithoutTime !== right.event.showWithoutTime) {
-      return left.event.showWithoutTime ? -1 : 1;
+  // Schwartzian: the comparator's tie-breaker is
+  // `getEventStartDate(s.event).getTime()` which does a `parseISO` per
+  // call. Pre-compute startMs per segment so each is parsed exactly
+  // once, regardless of how often the comparator runs.
+  const decorated = rawSegments.map(segment => ({
+    segment,
+    startMs: getEventStartDate(segment.event).getTime(),
+  }));
+  decorated.sort((left, right) => {
+    if (left.segment.startIndex !== right.segment.startIndex) return left.segment.startIndex - right.segment.startIndex;
+    if (left.segment.span !== right.segment.span) return right.segment.span - left.segment.span;
+    if (left.segment.event.showWithoutTime !== right.segment.event.showWithoutTime) {
+      return left.segment.event.showWithoutTime ? -1 : 1;
     }
-    const timeDiff = getEventStartDate(left.event).getTime() - getEventStartDate(right.event).getTime();
-    if (timeDiff !== 0) return timeDiff;
-    return (left.event.title || "").localeCompare(right.event.title || "");
+    if (left.startMs !== right.startMs) return left.startMs - right.startMs;
+    return (left.segment.event.title || "").localeCompare(right.segment.event.title || "");
   });
 
   const rowEndIndices: number[] = [];
-  return rawSegments.map((segment) => {
+  return decorated.map(({ segment }) => {
     const segmentEndIndex = segment.startIndex + segment.span - 1;
     let row = rowEndIndices.findIndex((endIndex) => endIndex < segment.startIndex);
     if (row === -1) {

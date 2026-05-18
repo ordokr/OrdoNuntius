@@ -433,7 +433,6 @@ export function FileBrowser({
   // Filter and sort resources
   const displayResources = useMemo(() => {
     let filtered = resources;
-    // In sidebar mode, folders are shown in the sidebar tree - hide them from the main list
     if (folderLayout === "sidebar") {
       filtered = filtered.filter(r => !r.isDirectory);
     }
@@ -442,10 +441,26 @@ export function FileBrowser({
       filtered = filtered.filter(r => r.name.toLowerCase().includes(q));
     }
 
-    const sorted = [...filtered].sort((a, b) => {
-      // Directories always first
-      if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+    // Schwartzian for the "modified" sort path: previously each comparison
+    // parsed both sides' lastModified strings via `new Date(...).getTime()`.
+    // Across an O(N log N) sort that's many redundant parses. Decorate once
+    // (only for the modified case), sort, then unwrap.
+    if (sortKey === "modified") {
+      const decorated = filtered.map(r => ({
+        r,
+        ms: new Date(r.lastModified || 0).getTime(),
+        isDir: r.isDirectory,
+      }));
+      decorated.sort((a, b) => {
+        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+        const cmp = a.ms - b.ms;
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+      return decorated.map(d => d.r);
+    }
 
+    const sorted = [...filtered].sort((a, b) => {
+      if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
       let cmp = 0;
       switch (sortKey) {
         case "name":
@@ -453,9 +468,6 @@ export function FileBrowser({
           break;
         case "size":
           cmp = a.contentLength - b.contentLength;
-          break;
-        case "modified":
-          cmp = new Date(a.lastModified || 0).getTime() - new Date(b.lastModified || 0).getTime();
           break;
       }
       return sortDir === "asc" ? cmp : -cmp;
