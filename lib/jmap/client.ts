@@ -412,6 +412,19 @@ export class JMAPClient implements IJMAPClient {
     this.authHeader = `Bearer ${token}`;
   }
 
+  /**
+   * Re-bind the 401 refresh callback after the client is already
+   * constructed. Used by auth-store to install an account-aware
+   * closure once the accountId is known (it isn't yet at withBearer
+   * time — the JMAP session has to resolve the username first). With
+   * an account-aware refresh, a scheduled timer or 401-retry for
+   * account A no longer mistakenly refreshes B when B is the active
+   * account at the moment the callback fires.
+   */
+  setOnTokenRefresh(onRefresh: () => Promise<string | null>): void {
+    this.onTokenRefresh = onRefresh;
+  }
+
   /** Upgrade an existing basic-auth client to bearer-token auth (e.g. after TOTP token exchange). */
   upgradeToBearer(accessToken: string, onRefresh?: () => Promise<string | null>): void {
     this.authMode = 'bearer';

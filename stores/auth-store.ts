@@ -40,7 +40,15 @@ interface AuthState {
   loginWithOAuth: (serverUrl: string, code: string, codeVerifier: string, redirectUri: string, serverId?: string) => Promise<boolean>;
   loginWithServerSso: (code: string, state: string) => Promise<boolean>;
   loginDemo: () => Promise<boolean>;
-  refreshAccessToken: () => Promise<string | null>;
+  /**
+   * Refresh the OAuth access token for an account. When `forAccountId` is
+   * omitted, refreshes the currently active account; when provided, refreshes
+   * THAT account regardless of which one is currently active. The optional
+   * arg is what makes scheduled timers safe across account switches —
+   * without it, a timer scheduled for account A but firing after the user
+   * switched to B would refresh B's token instead.
+   */
+  refreshAccessToken: (forAccountId?: string) => Promise<string | null>;
   logout: () => void;
   logoutAll: () => void;
   switchAccount: (accountId: string) => Promise<void>;
@@ -267,13 +275,20 @@ const clients = new Map<string, JMAPClient>();
 const refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const refreshPromises = new Map<string, Promise<string | null>>();
 
-function scheduleRefresh(expiresIn: number, refreshFn: () => Promise<string | null>, accountId?: string): void {
+function scheduleRefresh(
+  expiresIn: number,
+  refreshFn: (forAccountId?: string) => Promise<string | null>,
+  accountId?: string,
+): void {
   if (accountId) {
     const existing = refreshTimers.get(accountId);
     if (existing) clearTimeout(existing);
     const refreshAt = Math.max((expiresIn - 60) * 1000, 10_000);
     refreshTimers.set(accountId, setTimeout(() => {
-      refreshFn().catch((err) => {
+      // Pass accountId explicitly: this timer was scheduled for THIS
+      // account, so it must refresh THIS account even if the user has
+      // since switched to a different one.
+      refreshFn(accountId).catch((err) => {
         debug.error(`Scheduled token refresh failed for ${accountId}:`, err);
       });
     }, refreshAt));
@@ -711,6 +726,11 @@ export const useAuthStore = create<AuthState>()(
           }
 
           clients.set(accountId, client);
+          // Now that accountId is resolved, re-bind the refresh callback
+          // so a scheduled refresh (or 401-retry) for THIS account refreshes
+          // THIS account — not whichever one happens to be active when the
+          // callback fires.
+          client.setOnTokenRefresh(() => refreshFn(accountId));
           bindClientStatusHandlers(client, set, get, accountId);
 
           accountStore.addAccount({
@@ -857,6 +877,9 @@ export const useAuthStore = create<AuthState>()(
           }
 
           clients.set(accountId, client);
+          // Re-bind refresh callback with the now-known accountId; see
+          // matching comment in loginWithOAuth for the race this prevents.
+          client.setOnTokenRefresh(() => refreshFn(accountId));
           bindClientStatusHandlers(client, set, get, accountId);
 
           accountStore.addAccount({
@@ -928,14 +951,21 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      refreshAccessToken: async () => {
+      refreshAccessToken: async (forAccountId?: string) => {
+        // Resolve the target account: explicit param wins, else active.
+        // Resolving at call time (vs. read at fire time) is what kills the
+        // scheduleRefresh race — a timer scheduled for A but firing after
+        // the user switched to B used to refresh B's token because the old
+        // closure read `get().activeAccountId` fresh.
+        const accountId = forAccountId ?? get().activeAccountId;
+        const isActive = accountId !== null && accountId === get().activeAccountId;
+
         // Coalesce per-account first. The legacy singleton `refreshPromise`
         // used to short-circuit BEFORE the map check, which would hand a
         // caller asking about account B the in-flight promise belonging to
         // account A — leaking A's token to B's client. The singleton path
-        // now only fires when there's no activeAccountId at all (rare:
+        // now only fires when there's no accountId at all (rare:
         // pre-login bootstrap).
-        const accountId = get().activeAccountId;
         if (accountId) {
           const existing = refreshPromises.get(accountId);
           if (existing) return existing;
@@ -951,6 +981,17 @@ export const useAuthStore = create<AuthState>()(
             const res = await apiFetch(`/api/auth/token?slot=${slot}`, { method: 'PUT' });
 
             if (!res.ok) {
+              // Background refresh for a non-active account: don't tear down
+              // the whole session — just mark THAT account as errored. The
+              // user is still using a different active account.
+              if (!isActive && accountId) {
+                useAccountStore.getState().updateAccount(accountId, {
+                  isConnected: false,
+                  hasError: true,
+                  errorMessage: 'Token refresh failed',
+                });
+                return null;
+              }
               notifyParent('sso:session-expired');
               markSessionExpired();
               get().logout();
@@ -959,7 +1000,12 @@ export const useAuthStore = create<AuthState>()(
 
             const { access_token, expires_in } = await res.json();
 
-            get().client?.updateAccessToken(access_token);
+            // Update the right client. Was `get().client?.updateAccessToken`
+            // which always points at the ACTIVE client — if we're refreshing
+            // a non-active account, that would write A's new token into B's
+            // client. Use the per-account map instead.
+            const targetClient = accountId ? clients.get(accountId) : get().client;
+            targetClient?.updateAccessToken(access_token);
 
             if (account) {
               await syncStalwartAuthContext(
@@ -970,15 +1016,29 @@ export const useAuthStore = create<AuthState>()(
               );
             }
 
-            set({
-              accessToken: access_token,
-              tokenExpiresAt: Date.now() + expires_in * 1000,
-            });
+            // Store-level accessToken/tokenExpiresAt track the ACTIVE account;
+            // only mutate them when this refresh is for the active account.
+            if (isActive) {
+              set({
+                accessToken: access_token,
+                tokenExpiresAt: Date.now() + expires_in * 1000,
+              });
+            }
 
             scheduleRefresh(expires_in, get().refreshAccessToken, accountId ?? undefined);
             return access_token;
           } catch (error) {
             debug.error('Token refresh failed:', error);
+            // Same isolation as the !res.ok branch: don't tear down session
+            // if the refresh that failed was for a non-active account.
+            if (!isActive && accountId) {
+              useAccountStore.getState().updateAccount(accountId, {
+                isConnected: false,
+                hasError: true,
+                errorMessage: error instanceof Error ? error.message : 'Token refresh failed',
+              });
+              return null;
+            }
             notifyParent('sso:session-expired');
             markSessionExpired();
             get().logout();
@@ -1158,7 +1218,9 @@ export const useAuthStore = create<AuthState>()(
               if (res.ok) {
                 const { access_token, expires_in } = await res.json();
                 const refreshFn = get().refreshAccessToken;
-                targetClient = JMAPClient.withBearer(targetAccount.serverUrl, access_token, targetAccount.username, () => refreshFn());
+                // Bake accountId into the refresh closure from the start —
+                // unlike fresh logins, we already know it here.
+                targetClient = JMAPClient.withBearer(targetAccount.serverUrl, access_token, targetAccount.username, () => refreshFn(accountId));
                 bindClientStatusHandlers(targetClient, set, get, accountId);
                 await targetClient.connect();
                 clients.set(accountId, targetClient);
@@ -1340,7 +1402,9 @@ export const useAuthStore = create<AuthState>()(
                 if (res.ok) {
                   const { access_token, expires_in } = await res.json();
                   const refreshFn = get().refreshAccessToken;
-                  const client = JMAPClient.withBearer(account.serverUrl, access_token, account.username, () => refreshFn());
+                  // accountId is already known here (account.id) — bake it
+                  // into the refresh callback at construction time.
+                  const client = JMAPClient.withBearer(account.serverUrl, access_token, account.username, () => refreshFn(account.id));
                   bindClientStatusHandlers(client, set, get, account.id);
                   await client.connect();
                   clients.set(account.id, client);
@@ -1487,6 +1551,8 @@ export const useAuthStore = create<AuthState>()(
 
                 const accountId = generateAccountId(state.username || '', state.serverUrl);
                 clients.set(accountId, client);
+                // Re-bind once accountId is known.
+                client.setOnTokenRefresh(() => refreshFn(accountId));
                 bindClientStatusHandlers(client, set, get, accountId);
 
                 // Migrate to account registry
