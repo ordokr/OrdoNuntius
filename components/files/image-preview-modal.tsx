@@ -21,23 +21,36 @@ export function ImagePreviewModal({ name, onClose, onDownload, getImageUrl }: Im
   const [rotation, setRotation] = useState(0);
 
   useEffect(() => {
-    let revoke: string | null = null;
+    // The previous version had a memory leak: if cleanup ran before
+    // getImageUrl resolved (user closes the modal or changes `name`
+    // mid-load), the .then assigned the resolved URL to the outer
+    // `revoke` variable, but cleanup had already captured `revoke ===
+    // null` and returned — so the blob URL was never revoked. Race-
+    // guard with `cancelled` and revoke immediately on the late path.
+    let cancelled = false;
+    let acquiredUrl: string | null = null;
     setLoading(true);
     setError(false);
 
     getImageUrl(name)
       .then((url) => {
-        revoke = url;
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        acquiredUrl = url;
         setImageUrl(url);
         setLoading(false);
       })
       .catch(() => {
+        if (cancelled) return;
         setError(true);
         setLoading(false);
       });
 
     return () => {
-      if (revoke) URL.revokeObjectURL(revoke);
+      cancelled = true;
+      if (acquiredUrl) URL.revokeObjectURL(acquiredUrl);
     };
   }, [name, getImageUrl]);
 

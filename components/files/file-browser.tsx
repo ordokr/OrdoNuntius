@@ -222,9 +222,30 @@ function Thumbnail({ name, getImageUrl: fetchUrl, size = "sm" }: {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    // fetchUrl returns a `URL.createObjectURL(blob)` result (from
+    // client.fetchBlobAsObjectUrl). Previously the cleanup just flipped
+    // `cancelled` but never called URL.revokeObjectURL — so every
+    // thumbnail re-mount, name change, or modal close orphaned a blob
+    // URL. A folder with N image files leaked N blob URLs per
+    // re-render of the grid.
     let cancelled = false;
-    fetchUrl(name).then(url => { if (!cancelled) setSrc(url); }).catch(() => { if (!cancelled) setFailed(true); });
-    return () => { cancelled = true; };
+    let acquired: string | null = null;
+    fetchUrl(name)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        acquired = url;
+        setSrc(url);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+      if (acquired) URL.revokeObjectURL(acquired);
+    };
   }, [name, fetchUrl]);
 
   if (failed || !src) {

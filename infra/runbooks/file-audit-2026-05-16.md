@@ -223,14 +223,14 @@ file in this index — visited when its turn arrives.)
 173. [ ] `components/error/error-boundary.tsx`
 174. [ ] `components/error/error-fallbacks.tsx`
 175. [ ] `components/error/index.ts`
-176. [ ] `components/files/file-browser.tsx`
-177. [ ] `components/files/file-preview-modal.tsx`
-178. [ ] `components/files/file-upload-area.tsx`
-179. [ ] `components/files/files-settings-dialog.tsx`
-180. [ ] `components/files/folder-tree-sidebar.tsx`
-181. [ ] `components/files/image-preview-modal.tsx`
-182. [ ] `components/files/new-folder-dialog.tsx`
-183. [ ] `components/files/rename-dialog.tsx`
+176. [x] `components/files/file-browser.tsx` — **real memory-leak fix** in `Thumbnail` subcomponent: `getImageUrl` returns a `URL.createObjectURL` blob URL, but the effect's cleanup only flipped `cancelled` and never called `URL.revokeObjectURL`. Every thumbnail re-mount, `name` change, or modal close leaked a blob URL — a folder of N images leaked N URLs per re-render. Now revokes on cancel and on unmount. Same `acquired/cancelled` race-guard pattern as the image-preview-modal fix in this batch.
+177. [s] `components/files/file-preview-modal.tsx` — clean. Already does the correct race-guard pattern (cancelled flag + late assignment), so the analogous bug doesn't exist here.
+178. [s] `components/files/file-upload-area.tsx` — 88 lines, clean drop-zone.
+179. [s] `components/files/files-settings-dialog.tsx` — clean (escape + click-outside handlers).
+180. [s] `components/files/folder-tree-sidebar.tsx` — clean; `loadChildren` has `childrenCache` dep but the closure consistency is maintained.
+181. [x] `components/files/image-preview-modal.tsx` — **real memory-leak fix**: the effect captured `revoke` in the outer scope and only assigned it inside `.then`, but cleanup ran with `revoke === null` whenever the user closed the modal (or changed `name`) before `getImageUrl` resolved. The pending `.then` then assigned the URL but cleanup had already run — orphaned blob URL. Race-guarded with `cancelled` + `acquiredUrl` so the late-resolve path revokes immediately when cancelled.
+182. [s] `components/files/new-folder-dialog.tsx` — clean (escape handler missing but click-outside via overlay works).
+183. [s] `components/files/rename-dialog.tsx` — clean. Near-duplicate of new-folder-dialog; tier-2 DRY opportunity.
 184. [ ] `components/filters/filter-rule-modal.tsx`
 185. [ ] `components/filters/sieve-editor-modal.tsx`
 186. [ ] `components/identity/identity-form.tsx`
