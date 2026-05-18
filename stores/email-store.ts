@@ -1,19 +1,19 @@
 import { create } from "zustand";
 import { Email, Mailbox, StateChange } from "@/lib/jmap/types";
-import type { UnifiedMailboxRole } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { emailHooks } from "@/lib/plugin-hooks";
 import type { ExternalSearchResult } from "@/lib/plugin-types";
-import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
+import { fetchUnifiedEmails, type UnifiedAccountClient } from "@/lib/unified-mailbox";
 import { useAuthStore } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
 import { getLastInbox, setLastInbox } from "@/lib/last-inbox";
 import { getCachedInbox, setCachedInbox } from "@/lib/cached-inbox-emails";
+import { createUnifiedSlice, type UnifiedSlice } from "@/stores/email-slices/unified";
 
-interface EmailStore {
+interface EmailStore extends UnifiedSlice {
   emails: Email[];
   mailboxes: Mailbox[];
   selectedEmail: Email | null;
@@ -48,11 +48,8 @@ interface EmailStore {
   /** Plugin-contributed search results (CRM hits, Slack messages, etc.) populated by emailHooks.onProvideSearchResults. */
   externalSearchResults: ExternalSearchResult[];
 
-  // Unified mailbox state
-  isUnifiedView: boolean;
-  unifiedRole: UnifiedMailboxRole | null;
-  unifiedErrors: Map<string, string>; // accountId -> error message
-  unifiedCounts: UnifiedMailboxCounts[];
+  // Unified mailbox state + actions live in the `UnifiedSlice` mixed in above
+  // (see stores/email-slices/unified.ts).
 
   setEmails: (emails: Email[]) => void;
   setMailboxes: (mailboxes: Mailbox[]) => void;
@@ -130,11 +127,7 @@ interface EmailStore {
   emptyMailbox: (client: IJMAPClient, mailboxId: string) => Promise<void>;
   markMailboxAsRead: (client: IJMAPClient, mailboxId: string) => Promise<number>;
 
-  // Unified mailbox operations
-  fetchUnifiedEmails: (accounts: UnifiedAccountClient[], role: UnifiedMailboxRole) => Promise<void>;
-  loadMoreUnifiedEmails: (accounts: UnifiedAccountClient[]) => Promise<void>;
-  refreshUnifiedCounts: (accounts: UnifiedAccountClient[]) => Promise<void>;
-  exitUnifiedView: () => void;
+  // Unified mailbox operations live in the `UnifiedSlice` mixed in above.
 
   // Mock data for demo
   loadMockData: () => void;
@@ -202,7 +195,17 @@ function findTrashMailbox(
   });
 }
 
-export const useEmailStore = create<EmailStore>((set, get) => ({
+export const useEmailStore = create<EmailStore>((set, get, store) => ({
+  // Compose the unified-mailbox slice. `EmailStore` extends `UnifiedSlice` so
+  // the set/get/store closures are structurally compatible — the slice's
+  // StateCreator is typed against a smaller union but reads/writes only fields
+  // that also exist on the full store.
+  ...createUnifiedSlice(
+    set as Parameters<typeof createUnifiedSlice>[0],
+    get as Parameters<typeof createUnifiedSlice>[1],
+    store as Parameters<typeof createUnifiedSlice>[2],
+  ),
+
   emails: [],
   mailboxes: [],
   selectedEmail: null,
@@ -237,11 +240,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   searchAbortController: null,
   externalSearchResults: [],
 
-  // Unified mailbox state
-  isUnifiedView: false,
-  unifiedRole: null,
-  unifiedErrors: new Map(),
-  unifiedCounts: [],
+  // Unified mailbox state initial values are provided by the UnifiedSlice spread above.
 
   // Spam undo cache
   spamUndoCache: new Map(),
@@ -2104,83 +2103,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     }
   },
 
-  // Unified mailbox operations
-  fetchUnifiedEmails: async (accounts, role) => {
-    set({
-      isLoading: true,
-      error: null,
-      isUnifiedView: true,
-      unifiedRole: role,
-      selectedKeyword: null,
-    });
-    try {
-      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
-      const result = await fetchUnifiedEmails(accounts, role, emailsPerPage, 0);
-      set({
-        emails: result.emails,
-        hasMoreEmails: result.hasMore,
-        totalEmails: result.total,
-        isLoading: false,
-        unifiedErrors: result.errors,
-      });
-    } catch (error) {
-      console.error('Failed to fetch unified emails:', error);
-      set({
-        error: error instanceof Error ? error.message : "Failed to fetch unified emails",
-        isLoading: false,
-        emails: [],
-        hasMoreEmails: false,
-        totalEmails: 0,
-      });
-    }
-  },
-
-  loadMoreUnifiedEmails: async (accounts) => {
-    const { isLoadingMore, hasMoreEmails, emails, unifiedRole } = get();
-    if (isLoadingMore || !hasMoreEmails || !unifiedRole) return;
-
-    set({ isLoadingMore: true, error: null });
-    try {
-      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
-      const position = emails.length;
-      const result = await fetchUnifiedEmails(accounts, unifiedRole, emailsPerPage, position);
-
-      const currentEmails = get().emails;
-      const existingIds = new Set(currentEmails.map(e => e.id));
-      const newEmails = result.emails.filter(e => !existingIds.has(e.id));
-
-      set({
-        emails: [...currentEmails, ...newEmails],
-        hasMoreEmails: result.hasMore,
-        totalEmails: result.total,
-        isLoadingMore: false,
-        unifiedErrors: result.errors,
-      });
-    } catch (error) {
-      console.error('Failed to load more unified emails:', error);
-      set({
-        error: error instanceof Error ? error.message : "Failed to load more unified emails",
-        isLoadingMore: false,
-      });
-    }
-  },
-
-  refreshUnifiedCounts: async (accounts) => {
-    try {
-      const counts = fetchUnifiedMailboxCounts(accounts);
-      set({ unifiedCounts: counts });
-    } catch (error) {
-      console.error('Failed to refresh unified counts:', error);
-    }
-  },
-
-  exitUnifiedView: () => {
-    set({
-      isUnifiedView: false,
-      unifiedRole: null,
-      unifiedErrors: new Map(),
-    });
-  },
+  // Unified mailbox operations are provided by the UnifiedSlice spread above.
 
   loadMockData: () => {
     const mockEmails: Email[] = [
