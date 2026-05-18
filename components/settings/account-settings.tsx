@@ -9,6 +9,12 @@ import { formatFileSize } from '@/lib/utils';
 
 export function AccountSettings() {
   const t = useTranslations('settings.account');
+  // next-intl has no namespace traversal — `t('../../common.unknown')`
+  // (used by the previous code) just looks up the literal key
+  // `../../common.unknown` under `settings.account` and resolves to
+  // nothing, logging a missing-translation error and rendering the raw
+  // key. Pull `common` separately and use it for cross-namespace keys.
+  const tCommon = useTranslations('common');
   const { username, serverUrl, isDemoMode, primaryIdentity, authMode, activeAccountId } = useAuthStore();
   const { quota } = useEmailStore();
   const account = useAccountStore((s) => activeAccountId ? s.getAccountById(activeAccountId) : undefined);
@@ -21,12 +27,12 @@ export function AccountSettings() {
     <SettingsSection title={t('title')} description={t('description')}>
       {/* Display Name */}
       <SettingItem label={t('name_label')}>
-        <span className="text-sm text-foreground">{displayName || t('../../common.unknown')}</span>
+        <span className="text-sm text-foreground">{displayName || tCommon('unknown')}</span>
       </SettingItem>
 
       {/* Email Address */}
       <SettingItem label={t('email.label')}>
-        <span className="text-sm text-foreground">{email || t('../../common.unknown')}</span>
+        <span className="text-sm text-foreground">{email || tCommon('unknown')}</span>
       </SettingItem>
 
       {/* Username / Login (show when it differs from email) */}
@@ -46,7 +52,7 @@ export function AccountSettings() {
       {/* Server */}
       <SettingItem label={t('server.label')}>
         <span className="text-sm text-foreground truncate max-w-xs">
-          {serverUrl || t('../../common.unknown')}
+          {serverUrl || tCommon('unknown')}
         </span>
       </SettingItem>
 

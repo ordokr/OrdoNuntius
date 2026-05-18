@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { useEmailStore } from '@/stores/email-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -120,8 +120,11 @@ export function FolderSettings() {
   const [isLoading, setIsLoading] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
-  const ownMailboxes = mailboxes.filter(mb => !mb.isShared);
-  const folderTree = buildMailboxTree(ownMailboxes);
+  // Memoize — both run on every state change in this component (toggle
+  // a folder open, type in the rename input, etc.) even though their
+  // input only changes when mailboxes does.
+  const ownMailboxes = useMemo(() => mailboxes.filter(mb => !mb.isShared), [mailboxes]);
+  const folderTree = useMemo(() => buildMailboxTree(ownMailboxes), [ownMailboxes]);
 
   const getRoleMailboxId = (role: string): string => {
     const mb = ownMailboxes.find(m => m.role === role);

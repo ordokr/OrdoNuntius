@@ -86,6 +86,11 @@ export function EmailList({
   onEditDraft,
 }: EmailListProps) {
   const t = useTranslations('email_list');
+  // Cross-namespace lookups for spam toasts. next-intl has no `..`
+  // traversal — the previous `t('../email_viewer.spam.toast_batch')`
+  // calls were silently resolving to the literal key path. Scope a
+  // separate translator to `email_viewer.spam`.
+  const tSpam = useTranslations('email_viewer.spam');
   const { client } = useAuthStore();
   // Granular selectors instead of whole-store destructure. The destructure
   // form subscribes the component to *every* store mutation (zustand returns
@@ -554,11 +559,11 @@ export function EmailList({
                 await useEmailStore.getState().batchMarkAsSpam(client, emailIds);
                 const { toast } = await import('sonner');
                 toast.success(
-                  t('../email_viewer.spam.toast_batch', { count: emailIds.length })
+                  tSpam('toast_batch', { count: emailIds.length })
                 );
               } catch {
                 const { toast } = await import('sonner');
-                toast.error(t('../email_viewer.spam.error'));
+                toast.error(tSpam('error'));
               }
             }
           }}
@@ -569,11 +574,11 @@ export function EmailList({
                 await useEmailStore.getState().batchUndoSpam(client, emailIds);
                 const { toast } = await import('sonner');
                 toast.success(
-                  t('../email_viewer.spam.toast_not_spam_batch', { count: emailIds.length })
+                  tSpam('toast_not_spam_batch', { count: emailIds.length })
                 );
               } catch {
                 const { toast } = await import('sonner');
-                toast.error(t('../email_viewer.spam.error_not_spam'));
+                toast.error(tSpam('error_not_spam'));
               }
             }
           }}
