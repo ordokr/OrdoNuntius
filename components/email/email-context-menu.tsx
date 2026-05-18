@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { cn, buildMailboxTree, MailboxNode } from "@/lib/utils";
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
+import { useMemo } from "react";
 
 interface Position {
   x: number;
@@ -135,7 +136,6 @@ export function EmailContextMenu({
   onEditDraft,
 }: EmailContextMenuProps) {
   const t = useTranslations("context_menu");
-  const _tColor = useTranslations("email_viewer.color_tag");
   const emailKeywords = useSettingsStore((state) => state.emailKeywords);
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
@@ -144,38 +144,42 @@ export function EmailContextMenu({
   const showBatchActions = isMultiSelect && selectedCount > 1;
   const isInJunkFolder = currentMailboxRole === 'junk';
 
-  // Build color options from keyword definitions in settings
-  const colorOptions = emailKeywords.map((kw) => ({
-    name: kw.label,
-    value: kw.id,
-    color: KEYWORD_PALETTE[kw.color]?.dot || "bg-gray-500",
-  }));
-
-  // Build mailbox tree for move-to submenu with proper hierarchy
-  const moveTargetIds = new Set(
-    mailboxes
-      .filter(
-        (m) =>
-          m.id !== selectedMailbox &&
-          m.role !== "drafts" &&
-          !m.id.startsWith("shared-") &&
-          m.myRights?.mayAddItems
-      )
-      .map((m) => m.id)
+  // Memoize derived menu data — the context menu stays mounted (visibility
+  // is gated by `isOpen`) so every render of the parent re-ran the array
+  // and tree builds for nothing.
+  const colorOptions = useMemo(
+    () => emailKeywords.map((kw) => ({
+      name: kw.label,
+      value: kw.id,
+      color: KEYWORD_PALETTE[kw.color]?.dot || "bg-gray-500",
+    })),
+    [emailKeywords],
   );
-  const mailboxTree = buildMailboxTree(mailboxes);
 
-  // Filter tree to only include branches that contain valid move targets
-  const filterTree = (nodes: MailboxNode[]): MailboxNode[] => {
-    return nodes.reduce<MailboxNode[]>((acc, node) => {
-      const filteredChildren = filterTree(node.children);
-      if (moveTargetIds.has(node.id) || filteredChildren.length > 0) {
-        acc.push({ ...node, children: filteredChildren });
-      }
-      return acc;
-    }, []);
-  };
-  const moveTree = filterTree(mailboxTree);
+  const { moveTargetIds, moveTree } = useMemo(() => {
+    const targetIds = new Set(
+      mailboxes
+        .filter(
+          (m) =>
+            m.id !== selectedMailbox &&
+            m.role !== "drafts" &&
+            !m.id.startsWith("shared-") &&
+            m.myRights?.mayAddItems
+        )
+        .map((m) => m.id)
+    );
+    const tree = buildMailboxTree(mailboxes);
+    const filterTree = (nodes: MailboxNode[]): MailboxNode[] => {
+      return nodes.reduce<MailboxNode[]>((acc, node) => {
+        const filteredChildren = filterTree(node.children);
+        if (targetIds.has(node.id) || filteredChildren.length > 0) {
+          acc.push({ ...node, children: filteredChildren });
+        }
+        return acc;
+      }, []);
+    };
+    return { moveTargetIds: targetIds, moveTree: filterTree(tree) };
+  }, [mailboxes, selectedMailbox]);
 
   const handleAction = (action: () => void) => {
     action();

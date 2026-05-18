@@ -13,13 +13,11 @@ interface UnsubscribeBannerProps {
     mailto?: string;
     preferred?: 'http' | 'mailto';
   };
-  senderEmail: string;
   onDismiss: () => void;
 }
 
 export function UnsubscribeBanner({
   listUnsubscribe,
-  senderEmail: _senderEmail,
   onDismiss
 }: UnsubscribeBannerProps) {
   const t = useTranslations();
@@ -170,10 +168,14 @@ export function UnsubscribeBanner({
             handleUnsubscribe();
           }}
           title={t('email_viewer.unsubscribe_banner.confirm_title')}
-          message={t(unsubMethod === 'http'
-            ? 'email_viewer.unsubscribe_banner.success_http'
-            : 'email_viewer.unsubscribe_banner.success_mailto'
-          )}
+          // Was passing success_http/success_mailto here — those strings
+          // ("Unsubscribe page opened in new tab" / "Unsubscribe request
+          // sent to your email client") are post-action confirmations,
+          // not pre-action prompts, so the mobile dialog was telling the
+          // user the action had already happened while still asking them
+          // to confirm. Show the destination URL instead so the user can
+          // verify what they're about to open/send.
+          message={unsubUrl}
           confirmText={t('email_viewer.unsubscribe_banner.confirm_button')}
           cancelText={t('email_viewer.unsubscribe_banner.cancel')}
           variant="destructive"

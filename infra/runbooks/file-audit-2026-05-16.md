@@ -209,17 +209,17 @@ file in this index — visited when its turn arrives.)
 159. [ ] `components/contacts/contacts-sidebar.tsx`
 160. [ ] `components/email/calendar-invitation-banner.tsx`
 161. [ ] `components/email/email-composer.tsx`
-162. [ ] `components/email/email-context-menu.tsx`
-163. [ ] `components/email/email-hover-actions.tsx`
-164. [ ] `components/email/email-identity-badge.tsx`
-165. [ ] `components/email/email-list-item.tsx`
-166. [ ] `components/email/recipient-popover.tsx`
-167. [ ] `components/email/resizable-image.tsx`
+162. [x] `components/email/email-context-menu.tsx` — removed dead `_tColor` useTranslations call; memoized `colorOptions` and `(moveTargetIds, moveTree)` (context menu stays mounted, was rebuilding mailbox tree on every parent render).
+163. [s] `components/email/email-hover-actions.tsx` — clean. Trivial `hoverBackgroundClassName` alias of prop; not worth a commit.
+164. [s] `components/email/email-identity-badge.tsx` — clean.
+165. [s] `components/email/email-list-item.tsx` — clean. Hardcoded English "No preview available" at line 320 — i18n bug but cross-locale fix (logged).
+166. [s] `components/email/recipient-popover.tsx` — clean. Hardcoded English action labels ("Copy", "Email", "View contact", "Copied!") — i18n bug; cross-locale.
+167. [s] `components/email/resizable-image.tsx` — clean Tiptap node-view.
 168. [ ] `components/email/rich-text-editor.tsx`
-169. [ ] `components/email/smime-status-banner.tsx`
-170. [ ] `components/email/thread-email-item.tsx`
+169. [s] `components/email/smime-status-banner.tsx` — clean.
+170. [s] `components/email/thread-email-item.tsx` — clean. Same hardcoded "Unknown"/"No preview" English (cross-locale).
 171. [ ] `components/email/thread-list-item.tsx`
-172. [ ] `components/email/unsubscribe-banner.tsx`
+172. [x] `components/email/unsubscribe-banner.tsx` — **real UX bug fixed**: mobile `ConfirmDialog` was showing the `success_http`/`success_mailto` strings ("Unsubscribe page opened in new tab" / "Unsubscribe request sent to your email client") as the *pre-action* confirmation message — telling the user the action had completed while still asking them to confirm. Now shows the destination URL. Also dropped the unused `senderEmail` prop from the interface + both callsites in `email-viewer.tsx`.
 173. [ ] `components/error/error-boundary.tsx`
 174. [ ] `components/error/error-fallbacks.tsx`
 175. [ ] `components/error/index.ts`

@@ -4101,7 +4101,6 @@ export function EmailViewer({
                     {shouldShowUnsubBanner && listHeaders?.listUnsubscribe && (
                       <UnsubscribeBanner
                         listUnsubscribe={listHeaders.listUnsubscribe}
-                        senderEmail={email?.from?.[0]?.email || ''}
                         onDismiss={() => {
                           const messageId = email?.messageId || '';
                           const newSet = new Set(dismissedUnsubBanners).add(messageId);
@@ -4645,7 +4644,6 @@ export function EmailViewer({
                 {shouldShowUnsubBanner && listHeaders?.listUnsubscribe && (
                   <UnsubscribeBanner
                     listUnsubscribe={listHeaders.listUnsubscribe}
-                    senderEmail={email?.from?.[0]?.email || ''}
                     onDismiss={() => {
                       const messageId = email?.messageId || '';
                       const newSet = new Set(dismissedUnsubBanners).add(messageId);
