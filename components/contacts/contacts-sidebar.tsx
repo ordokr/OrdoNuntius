@@ -162,12 +162,19 @@ export function ContactsSidebar({
     return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
   }, [individuals]);
 
-  // Count of contacts without any keywords. Uses `.some` instead of
-  // building a filtered array via `.filter(...).length === 0` — short-
-  // circuits at the first active keyword per contact instead of walking
-  // every key.
+  // Count of contacts without any active keyword. Was: filter-then-length
+  // over individuals using `Object.keys(c.keywords).some(...)` — allocates
+  // a keys-array per contact (O(K_i) and a fresh array) AND a filtered
+  // intermediate array. Now: reduce, no intermediate arrays, and a `for...in`
+  // walk short-circuits on the first truthy keyword without allocating.
   const uncategorizedCount = useMemo(() => {
-    return individuals.filter(c => !c.keywords || !Object.keys(c.keywords).some(k => c.keywords![k])).length;
+    return individuals.reduce((n, c) => {
+      if (!c.keywords) return n + 1;
+      for (const k in c.keywords) {
+        if (c.keywords[k]) return n;
+      }
+      return n + 1;
+    }, 0);
   }, [individuals]);
 
   // Resolve actual group member counts against living contacts

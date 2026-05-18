@@ -691,8 +691,10 @@ export function Sidebar({
   const colorfulSidebarIcons = useSettingsStore(s => s.colorfulSidebarIcons);
   const tagCounts = useEmailStore(s => s.tagCounts);
   const accounts = useAccountStore(s => s.accounts);
-  const connectedAccounts = accounts.filter(a => a.isConnected);
-  const showUnified = enableUnifiedMailbox && connectedAccounts.length > 1;
+  // Need only the count, not the filtered list. `filter().length` allocates
+  // a throwaway intermediate array per render; the reduce avoids it.
+  const connectedCount = accounts.reduce((n, a) => a.isConnected ? n + 1 : n, 0);
+  const showUnified = enableUnifiedMailbox && connectedCount > 1;
   const unifiedCounts = useEmailStore(s => s.unifiedCounts);
   const t = useTranslations('sidebar');
 

@@ -91,21 +91,30 @@ export const createPushSlice: StateCreator<
       const accountChanges = change.changed[accountId];
       if (!accountChanges) return;
 
+      // Build the fan-out as a list of independent tasks, then run them in
+      // parallel. Email refresh writes emails/totalEmails; Mailbox refresh
+      // writes mailboxes; calendar/filter writes hit other stores entirely.
+      // No write contention between them, so a push frame reporting multiple
+      // change types completes in max(t) instead of sum(t).
+      const tasks: Promise<unknown>[] = [];
+
       if (accountChanges.Email) {
-        await get().refreshCurrentMailbox(client);
+        tasks.push(get().refreshCurrentMailbox(client));
+        // fetchTagCounts already runs as fire-and-forget; keep it that way.
         get().fetchTagCounts(client);
       }
 
       if (accountChanges.Mailbox) {
-        await get().fetchMailboxes(client);
+        tasks.push(get().fetchMailboxes(client));
       }
 
       // Calendar / CalendarEvent / SieveScript fan-out into other stores.
       // Dynamic imports avoid a circular-import chain at module-load time
       // (those stores can import from this one indirectly).
       if (accountChanges.Calendar || accountChanges.CalendarEvent) {
-        const calendarStore = useCalendarStore.getState();
-        if (calendarStore.supportsCalendar) {
+        tasks.push((async () => {
+          const calendarStore = useCalendarStore.getState();
+          if (!calendarStore.supportsCalendar) return;
           calendarStore.fetchCalendars(client);
           const { dateRange, selectedCalendarIds } = calendarStore;
           if (dateRange && selectedCalendarIds.length > 0) {
@@ -116,18 +125,25 @@ export const createPushSlice: StateCreator<
           if (taskStore.tasks.length > 0 || calendarStore.viewMode === 'tasks') {
             taskStore.fetchTasks(client);
           }
-        }
+        })());
       }
 
       if (accountChanges.SieveScript) {
-        const { useFilterStore } = await import('@/stores/filter-store');
-        const filterStore = useFilterStore.getState();
-        if (filterStore.isSupported) {
-          filterStore.fetchFilters(client).catch(err => {
-            console.error('Failed to refresh filters:', err);
-          });
-        }
+        tasks.push((async () => {
+          const { useFilterStore } = await import('@/stores/filter-store');
+          const filterStore = useFilterStore.getState();
+          if (filterStore.isSupported) {
+            filterStore.fetchFilters(client).catch(err => {
+              console.error('Failed to refresh filters:', err);
+            });
+          }
+        })());
       }
+
+      // allSettled: one fan-out task failing shouldn't strand the others.
+      // Each task already handles its own errors (refresh* swallows for
+      // background-refresh UX, fan-outs to other stores log+continue).
+      await Promise.allSettled(tasks);
     } catch (error) {
       console.error('Failed to handle state change:', error);
       set({

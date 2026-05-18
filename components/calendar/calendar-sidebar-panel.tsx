@@ -56,10 +56,19 @@ export function CalendarSidebarPanel({
   const tasks = useTaskStore((s) => s.tasks);
   const setViewMode = useCalendarStore((s) => s.setViewMode);
 
-  const pendingTaskCount = useMemo(() => tasks.filter(t => t.progress !== 'completed' && t.progress !== 'cancelled').length, [tasks]);
-  const overdueTaskCount = useMemo(() => {
-    const now = new Date();
-    return tasks.filter(t => t.progress !== 'completed' && t.progress !== 'cancelled' && t.due && new Date(t.due) < now).length;
+  // Single pass: overdue is a subset of pending, so walk `tasks` once
+  // and accumulate both counts. Was: two .filter(...).length over the
+  // same array — 2× O(tasks) plus throwaway intermediate arrays.
+  const { pendingTaskCount, overdueTaskCount } = useMemo(() => {
+    const now = Date.now();
+    let pending = 0;
+    let overdue = 0;
+    for (const t of tasks) {
+      if (t.progress === 'completed' || t.progress === 'cancelled') continue;
+      pending++;
+      if (t.due && new Date(t.due).getTime() < now) overdue++;
+    }
+    return { pendingTaskCount: pending, overdueTaskCount: overdue };
   }, [tasks]);
 
   const { contextMenu, openContextMenu, closeContextMenu, menuRef } = useContextMenu<Calendar>();
