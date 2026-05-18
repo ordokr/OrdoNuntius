@@ -463,6 +463,16 @@ export function FileBrowser({
     return sorted;
   }, [resources, searchQuery, sortKey, sortDir, folderLayout]);
 
+  // Selected names that are downloadable (files, not directories). Was
+  // computed twice per render inline as `[...selectedResources].filter(n =>
+  // !resources.find(r => r.name === n)?.isDirectory)` — O(|sel|·|resources|)
+  // each, plus the duplicate. Now O(|resources| + |sel|): build the name→
+  // isDirectory map once, lookup is O(1).
+  const selectedDownloadableNames = useMemo(() => {
+    const dirByName = new Map(resources.map(r => [r.name, r.isDirectory]));
+    return [...selectedResources].filter(n => !dirByName.get(n));
+  }, [resources, selectedResources]);
+
   // Build breadcrumb segments
   const breadcrumbs = currentPath === '/'
     ? [{ name: t("breadcrumb_root"), path: '/' }]
@@ -896,10 +906,10 @@ export function FileBrowser({
                 variant="ghost"
                 size="sm"
                 className="h-8"
-                onClick={() => onBatchDownload([...selectedResources].filter(n => !resources.find(r => r.name === n)?.isDirectory))}
+                onClick={() => onBatchDownload(selectedDownloadableNames)}
               >
                 <Download className="w-4 h-4 mr-1" />
-                {t("download")} ({[...selectedResources].filter(n => !resources.find(r => r.name === n)?.isDirectory).length})
+                {t("download")} ({selectedDownloadableNames.length})
               </Button>
               <Button
                 variant="ghost"

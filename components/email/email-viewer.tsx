@@ -901,6 +901,14 @@ export function EmailViewer({
   const isTrustedAddressBookSender = useContactStore((state) => state.isTrustedAddressBookSender);
   const addToTrustedSendersBook = useContactStore((state) => state.addToTrustedSendersBook);
   const emailKeywords = useSettingsStore((state) => state.emailKeywords);
+  // O(1) lookup index for `emailKeywords.find(k => k.id === tagId)` — was
+  // called three times per render in tag-pill rendering (header dots,
+  // toolbar dropdown, single-tag label), each O(emailKeywords). Now built
+  // once per emailKeywords change.
+  const emailKeywordsById = useMemo(
+    () => new Map(emailKeywords.map(k => [k.id, k])),
+    [emailKeywords],
+  );
   const toolbarPosition = useSettingsStore((state) => state.toolbarPosition);
   const showToolbarLabels = useSettingsStore((state) => state.showToolbarLabels);
   const mailLayout = useSettingsStore((state) => state.mailLayout);
@@ -3419,13 +3427,13 @@ export function EmailViewer({
               <>
                 <span className="flex items-center gap-0.5">
                   {currentColors.slice(0, 3).map((tagId) => {
-                    const kw = emailKeywords.find(k => k.id === tagId) ?? { id: tagId, label: tagId, color: 'gray' };
+                    const kw = emailKeywordsById.get(tagId) ?? { id: tagId, label: tagId, color: 'gray' };
                     return <span key={tagId} className={cn("w-3 h-3 rounded-full", KEYWORD_PALETTE[kw.color]?.dot || 'bg-gray-500')} />;
                   })}
                 </span>
                 {showToolbarLabels && currentColors.length === 1 && (
                   <span className="text-xs font-medium text-foreground">
-                    {emailKeywords.find(k => k.id === currentColors[0])?.label ?? currentColors[0]}
+                    {emailKeywordsById.get(currentColors[0])?.label ?? currentColors[0]}
                   </span>
                 )}
               </>
@@ -4024,7 +4032,7 @@ export function EmailViewer({
                 {currentColors.length > 0 && (
                   <span className="flex items-center gap-0.5">
                     {currentColors.map((tagId) => {
-                      const kw = emailKeywords.find(k => k.id === tagId) ?? { id: tagId, label: tagId, color: 'gray' };
+                      const kw = emailKeywordsById.get(tagId) ?? { id: tagId, label: tagId, color: 'gray' };
                       const dotClass = KEYWORD_PALETTE[kw.color]?.dot || 'bg-gray-500';
                       return (
                         <span key={tagId} className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotClass)} title={kw.label} />

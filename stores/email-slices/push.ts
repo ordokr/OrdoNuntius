@@ -30,6 +30,23 @@ import { SearchFilters, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search
 import { useSettingsStore } from "@/stores/settings-store";
 import { useCalendarStore } from "@/stores/calendar-store";
 
+// Fast equality for `keywords: Record<string, boolean>`. Avoids the
+// JSON.stringify pair previously used in refreshCurrentMailbox — that
+// allocated two strings per email per push and didn't short-circuit on
+// size mismatch. Email.keywords typically holds 0-6 entries so this is
+// dominated by the size check.
+function keywordsEqual(
+  a: Record<string, boolean> = {},
+  b: Record<string, boolean> = {},
+): boolean {
+  const aKeys = Object.keys(a);
+  if (aKeys.length !== Object.keys(b).length) return false;
+  for (const k of aKeys) {
+    if (a[k] !== b[k]) return false;
+  }
+  return true;
+}
+
 export interface PushSlice {
   isPushConnected: boolean;
   lastPushUpdate: number | null;
@@ -167,6 +184,10 @@ export const createPushSlice: StateCreator<
 
       // Skip the state update entirely when nothing changed — avoids a
       // wave of useless re-renders across every subscribed component.
+      // Was: `JSON.stringify(curr.keywords) !== JSON.stringify(email.keywords)`
+      // — O(K log K + serialize cost) per email × N emails on every push.
+      // Direct equality on the Record<string, boolean> is O(K) with an
+      // early-exit on size mismatch.
       const hasChanged =
         currentEmails.length !== merged.length ||
         merged.some((email, i) => {
@@ -175,7 +196,7 @@ export const createPushSlice: StateCreator<
           return (
             curr.id !== email.id ||
             curr.threadId !== email.threadId ||
-            JSON.stringify(curr.keywords) !== JSON.stringify(email.keywords)
+            !keywordsEqual(curr.keywords, email.keywords)
           );
         });
 
