@@ -1039,10 +1039,14 @@ export function EmailComposer({
     const used = new Map<string, typeof known[number]>();
 
     if (known.length > 0) {
+      // O(M+N) with a cid→entry index built once instead of O(M·N)
+      // doing `known.find()` per image. Most replies have a handful of
+      // both, but quoted-replies-with-many-inline-images can hit dozens.
+      const byCid = new Map(known.map(e => [e.cid, e]));
       doc.querySelectorAll('img[data-cid]').forEach((img) => {
         const cid = img.getAttribute('data-cid');
         if (!cid) return;
-        const entry = known.find((e) => e.cid === cid);
+        const entry = byCid.get(cid);
         if (!entry) return;
         img.setAttribute('src', `cid:${cid}`);
         img.removeAttribute('data-cid');

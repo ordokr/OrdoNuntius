@@ -71,6 +71,16 @@ function getContactSearchIndex(contact: ContactCard): ContactSearchIndex {
   return entry;
 }
 
+// Return the first value in a Record without allocating the values-array
+// that `Object.values(rec)[0]` builds. Used for "pick the primary X" on
+// RFC 9553 contact fields — they're keyed Records but the rendering
+// pipeline only ever wants the first entry.
+function firstValueOf<T>(rec: Record<string, T> | undefined): T | undefined {
+  if (!rec) return undefined;
+  for (const k in rec) return rec[k];
+  return undefined;
+}
+
 export function getContactDisplayName(contact: ContactCard): string {
   if (contact.name) {
     // Try given + surname from components first
@@ -83,24 +93,17 @@ export function getContactDisplayName(contact: ContactCard): string {
     // Fall back to name.full (RFC 9553 - used by Stalwart and other JMAP servers)
     if (contact.name.full) return contact.name.full;
   }
-  if (contact.nicknames) {
-    const nick = Object.values(contact.nicknames)[0];
-    if (nick?.name) return nick.name;
-  }
-  if (contact.organizations) {
-    const org = Object.values(contact.organizations)[0];
-    if (org?.name) return org.name;
-  }
-  if (contact.emails) {
-    const email = Object.values(contact.emails)[0];
-    if (email?.address) return email.address;
-  }
+  const nick = firstValueOf(contact.nicknames);
+  if (nick?.name) return nick.name;
+  const org = firstValueOf(contact.organizations);
+  if (org?.name) return org.name;
+  const email = firstValueOf(contact.emails);
+  if (email?.address) return email.address;
   return '';
 }
 
 export function getContactPrimaryEmail(contact: ContactCard): string {
-  if (!contact.emails) return '';
-  return Object.values(contact.emails)[0]?.address || '';
+  return firstValueOf(contact.emails)?.address || '';
 }
 
 export function getContactPhotoUri(contact: ContactCard): string | undefined {
