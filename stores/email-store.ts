@@ -138,6 +138,16 @@ interface EmailStore {
 
   // Mock data for demo
   loadMockData: () => void;
+
+  /**
+   * Reset every store field to its initial value. Used by
+   * `account-state-manager.clearAllStores()` when switching accounts.
+   * The shape lives here (single source of truth) instead of being
+   * duplicated in account-state-manager — that arrangement drifted
+   * whenever a new field was added to the store and the manager's
+   * reset didn't get updated to match.
+   */
+  clearState: () => void;
 }
 
 // Helper: compute the next email to select when removing one from the list
@@ -2347,6 +2357,49 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     set({
       emails: mockEmails,
       mailboxes: mockMailboxes,
+    });
+  },
+
+  clearState: () => {
+    // Reset every field to its initial value. Single source of truth
+    // for the email-store shape — account-state-manager used to
+    // hardcode this list and would drift whenever a new field was
+    // added (e.g. spamUndoCache, processingReadStatus, isLoadingMore,
+    // lastSelectedEmailId, searchAbortController, externalSearchResults
+    // were all missing from the manager's reset before this).
+    set({
+      emails: [],
+      mailboxes: [],
+      selectedEmail: null,
+      selectedEmailIds: new Set(),
+      lastSelectedEmailId: null,
+      selectedMailbox: "",
+      isLoading: false,
+      isLoadingEmail: false,
+      isLoadingMore: false,
+      error: null,
+      searchQuery: "",
+      quota: null,
+      processingReadStatus: new Set(),
+      hasMoreEmails: false,
+      totalEmails: 0,
+      isPushConnected: false,
+      lastPushUpdate: null,
+      newEmailNotification: null,
+      expandedThreadIds: new Set(),
+      threadEmailsCache: new Map(),
+      isLoadingThread: null,
+      selectedKeyword: null,
+      tagCounts: {},
+      searchFilters: { ...DEFAULT_SEARCH_FILTERS },
+      isAdvancedSearchOpen: false,
+      searchAbortController: null,
+      externalSearchResults: [],
+      isUnifiedView: false,
+      unifiedRole: null,
+      unifiedErrors: new Map(),
+      unifiedCounts: [],
+      spamUndoCache: new Map(),
     });
   },
 }));

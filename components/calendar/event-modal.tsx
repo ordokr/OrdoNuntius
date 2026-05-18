@@ -492,14 +492,18 @@ export function EventModal({
   useEffect(() => {
     const modal = modalRef.current;
     if (!modal) return;
-    const focusableEls = modal.querySelectorAll<HTMLElement>(
-      'input, select, textarea, button, [tabindex]:not([tabindex="-1"])'
-    );
-    const firstEl = focusableEls[0];
-    const lastEl = focusableEls[focusableEls.length - 1];
 
+    // Query focusables on every Tab press, not just on mount. The
+    // modal swaps between view ↔ edit modes (and the attendee panel
+    // shows/hides) — caching first/last on mount would tab-trap into
+    // a stale-buttons set after the user clicked Edit / RSVP'd.
     const handler = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
+      const focusableEls = modal.querySelectorAll<HTMLElement>(
+        'input, select, textarea, button, [tabindex]:not([tabindex="-1"])'
+      );
+      const firstEl = focusableEls[0];
+      const lastEl = focusableEls[focusableEls.length - 1];
       if (e.shiftKey && document.activeElement === firstEl) {
         e.preventDefault();
         lastEl?.focus();
@@ -509,7 +513,12 @@ export function EventModal({
       }
     };
     modal.addEventListener("keydown", handler);
-    firstEl?.focus();
+    // Initial focus still captures once at mount — that's the right
+    // behavior (don't yank focus mid-interaction on view↔edit toggle).
+    const initialFocusable = modal.querySelector<HTMLElement>(
+      'input, select, textarea, button, [tabindex]:not([tabindex="-1"])'
+    );
+    initialFocusable?.focus();
     return () => modal.removeEventListener("keydown", handler);
   }, []);
 

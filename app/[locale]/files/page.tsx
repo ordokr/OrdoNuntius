@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { ArrowLeft } from "lucide-react";
@@ -103,7 +103,14 @@ export default function FilesPage() {
   const [showDetails, setShowDetails] = useState(false);
   const [detailName, setDetailName] = useState<string | null>(null);
 
-  const detailResource = detailName ? resources.find(r => r.name === detailName) || null : null;
+  // Memoize: file-browser re-renders on every selection/scroll change
+  // and the detail panel is mounted in parallel; without memo each
+  // re-render walks the resources array (can be 1000+ entries in a
+  // large folder).
+  const detailResource = useMemo(
+    () => (detailName ? resources.find(r => r.name === detailName) || null : null),
+    [detailName, resources],
+  );
 
   // Check auth on mount – skip when already authenticated so that navigating
   // between routes doesn't retrigger checkAuth's transient `{ client: null,
@@ -176,7 +183,9 @@ export default function FilesPage() {
     }
   }, [createDirectory, t]);
 
-  const maxSizeUpload = client?.getMaxSizeUpload() || 0;
+  // client is a JMAPClient with a stable getMaxSizeUpload() that reads
+  // a session-cache field; only changes when client itself changes.
+  const maxSizeUpload = useMemo(() => client?.getMaxSizeUpload() || 0, [client]);
 
   const handleUploadFiles = useCallback(async (files: File[]) => {
     if (maxSizeUpload > 0) {

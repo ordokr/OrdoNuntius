@@ -552,16 +552,22 @@ export default function SettingsPage() {
     };
   }, [pendingHighlight, activeTab]);
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
+  // Cap-flag reads are cheap (in-memory session lookups) so we can do
+  // them unconditionally. Keeping them above the early-return is what
+  // lets the `useMemo` block below stay above the early-return — React
+  // hooks must run in the same order every render or the
+  // react-hooks/rules-of-hooks linter (rightly) errors.
   const supportsVacation = client?.supportsVacationResponse() ?? false;
   const supportsCalendar = client?.supportsCalendars() ?? false;
   const supportsSieve = client?.supportsSieve() ?? false;
   const supportsFiles = client?.supportsFiles() ?? false;
 
-  const tabs: TabDef[] = [
+  // Memoize both. The settings page re-renders on every keystroke in
+  // the search bar; without memo each keystroke rebuilds the ~25-entry
+  // tabs array (each running a `t()` lookup) AND the groupedTabs
+  // derivation (5 t() lookups + 5 filter scans). Inputs only change
+  // on capability flips (rare) or locale switch (rare).
+  const tabs: TabDef[] = useMemo(() => [
     // General
     { id: 'account', label: t('tabs.account'), icon: tabIcons.account, group: 'general' },
     { id: 'language', label: t('tabs.language'), icon: tabIcons.language, group: 'general' },
@@ -598,16 +604,27 @@ export default function SettingsPage() {
     ...(isFeatureEnabled('themesEnabled') ? [{ id: 'themes' as Tab, label: 'Themes', icon: tabIcons.themes, group: 'advanced' as TabGroup }] : []),
     ...(isFeatureEnabled('pluginsEnabled') ? [{ id: 'plugins' as Tab, label: 'Plugins', icon: tabIcons.plugins, group: 'advanced' as TabGroup }] : []),
     ...(isFeatureEnabled('debugModeEnabled') ? [{ id: 'debug' as Tab, label: t('tabs.debug'), icon: tabIcons.debug, group: 'advanced' as TabGroup }] : []),
-  ];
+  ], [t, supportsVacation, supportsSieve, supportsCalendar, supportsFiles, stalwartFeaturesEnabled, isFeatureEnabled]);
 
   // Group tabs by category
-  const groupedTabs = tabGroupOrder
+  const groupedTabs = useMemo(() => tabGroupOrder
     .map((group) => ({
       group,
       label: t(`tab_groups.${group}`),
       items: tabs.filter((tab) => tab.group === group),
     }))
-    .filter((g) => g.items.length > 0);
+    .filter((g) => g.items.length > 0),
+    [t, tabs],
+  );
+
+  // Early-return after all hooks have run, per rules-of-hooks. The
+  // memos above only depend on cheap synchronous values so paying for
+  // them on an unauthenticated render before bailing is essentially
+  // free (and the unauthenticated path immediately redirects via the
+  // useEffect above, so it's a transient frame).
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const trimmedQuery = searchQuery.trim().toLowerCase();
   const matchesQuery = (tab: TabDef) => {

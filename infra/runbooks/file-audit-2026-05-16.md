@@ -74,7 +74,7 @@ file in this index — visited when its turn arrives.)
  24. [s] `lib/auth/active-account-slot.ts` — 18 lines, clean.
  25. [x] `lib/auth/crypto.ts` — extracted `encryptJson`/`decryptJson` primitives (95→62 lines); 4 near-identical AES-GCM scaffolds collapsed to one.
  26. [x] `lib/account-utils.ts` — hoisted `AVATAR_COLORS` array out of `generateAvatarColor` (was re-allocated per call).
- 27. [s] `lib/account-state-manager.ts` — logged: `clearAllStores` hard-codes email-store's default shape (drift risk; email-store should expose `clearState()`); `restoreAccount` uses partial setState and silently depends on caller having cleared first.
+ 27. [x] `lib/account-state-manager.ts` — **drift risk resolved**: email-store now exposes `clearState()` as the single source of truth for its shape. `clearAllStores` delegates instead of hardcoding the field list (which had drifted — `processingReadStatus` / `spamUndoCache` / `isLoadingMore` / `lastSelectedEmailId` / `searchAbortController` / `externalSearchResults` all leaked across account switches before).
  28. [s] `stores/identity-store.ts` — clean. Correct partialize (only sub-addressing data + preferredPrimary persisted; identities are server-side).
  29. [s] `hooks/use-identity-sync.ts` — 31 lines, clean.
  30. [s] `components/layout/mobile-header.tsx` — clean. Logged: `MobileViewerHeader` is exported but unused anywhere; its `onDelete`/`onArchive` props are placeholders.
@@ -90,11 +90,11 @@ file in this index — visited when its turn arrives.)
  40. [s] `lib/smime/crypto-engine.ts` — skipped; webcrypto-liner engine setup, ditto.
  41. [s] `app/[locale]/auth/callback/page.tsx` — clean. Already guards `!serverUrl` at line 48, **resolves external finding #6**.
  42. [x] `app/[locale]/calendar/page.tsx` — **focused audit, 2 fixes**: (1) keydown handler early-returns when Ctrl/Meta/Alt held — was hijacking browser shortcuts (Cmd+T fired `goToToday` AND opened a new tab; Cmd+Left would have been `preventDefault`'d by `navigatePrev`); (2) `birthdayCalendarName` IIFE → `useMemo` so the `t()` lookup doesn't repeat per render and the downstream `allCalendars` memo's dep is stable. Structural split into sub-components logged for tier-2.
- 43. [s] `app/[locale]/contacts/page.tsx` — **focused audit done**, no in-file fix; clean. `selectedContact`/`selectedGroup` are `.find()` per render — minor; defer.
+ 43. [x] `app/[locale]/contacts/page.tsx` — memoized `selectedContact`/`selectedGroup` so they don't re-scan the contacts array on every search-bar keystroke.
  44. [s] `app/[locale]/error.tsx` — standard Next error boundary, clean.
- 45. [s] `app/[locale]/files/page.tsx` — **focused audit done**, no in-file fix; clean. `detailResource`/`maxSizeUpload` recomputed per render — minor; defer.
+ 45. [x] `app/[locale]/files/page.tsx` — memoized `detailResource` (was `.find()` walking up to 1000+ resources per render in large folders) and `maxSizeUpload` (was a per-render method call on the client).
  46. [s] `app/[locale]/layout.tsx` — 46 lines, clean nested-provider tree.
- 47. [s] `app/[locale]/settings/page.tsx` — **focused audit done**, no in-file fix. `tabs` (~25 entries, each with `t()` calls) and `groupedTabs` rebuilt every render; memoizing would be a minor win but settings is a tier-3 page (opened occasionally, not on hot path). Defer.
+ 47. [x] `app/[locale]/settings/page.tsx` — memoized `tabs` (~25 entries with `t()` lookups each) and `groupedTabs` (5 `t()` lookups + 5 filter scans). The settings page re-renders on every search-bar keystroke; without memo each keystroke was rebuilding the full structure.
  48. [s] `app/admin/_tabs/_jmap-servers-section.tsx` — admin-only, skipped.
  49. [s] `app/admin/_tabs/auth.tsx` — admin-only, skipped.
  50. [s] `app/admin/_tabs/branding.tsx` — admin-only, skipped.
@@ -184,7 +184,7 @@ file in this index — visited when its turn arrives.)
 134. [x] `components/calendar/event-card.tsx` — extracted `participantCount` const (was called 3× per `block` variant render).
 135. [s] `components/calendar/event-context-menu.tsx` — clean.
 136. [s] `components/calendar/event-detail-popover.tsx` — clean.
-137. [s] `components/calendar/event-modal.tsx` — clean. Focus-trap effect captures first/last focusable on mount only; acceptable pattern but stale if modal content changes between view/edit modes.
+137. [x] `components/calendar/event-modal.tsx` — **focus-trap staleness fixed**: focusables are now re-queried inside the Tab keydown handler (was cached at mount). Previous behavior would tab-trap into stale buttons after view↔edit toggle or attendee-panel mount.
 138. [s] `components/calendar/ical-import-modal.tsx` — clean.
 139. [s] `components/calendar/ical-subscription-modal.tsx` — clean.
 140. [x] `components/calendar/mini-calendar.tsx` — **i18n fixed**: replaced hardcoded `MONTH_LABELS` English array with `MONTH_KEYS` indexing into the existing `calendar.months` translation namespace.
@@ -230,7 +230,7 @@ file in this index — visited when its turn arrives.)
 180. [s] `components/files/folder-tree-sidebar.tsx` — clean; `loadChildren` has `childrenCache` dep but the closure consistency is maintained.
 181. [x] `components/files/image-preview-modal.tsx` — **real memory-leak fix**: the effect captured `revoke` in the outer scope and only assigned it inside `.then`, but cleanup ran with `revoke === null` whenever the user closed the modal (or changed `name`) before `getImageUrl` resolved. The pending `.then` then assigned the URL but cleanup had already run — orphaned blob URL. Race-guarded with `cancelled` + `acquiredUrl` so the late-resolve path revokes immediately when cancelled.
 182. [s] `components/files/new-folder-dialog.tsx` — clean (escape handler missing but click-outside via overlay works).
-183. [s] `components/files/rename-dialog.tsx` — clean. Near-duplicate of new-folder-dialog; tier-2 DRY opportunity.
+183. [x] `components/files/rename-dialog.tsx` — **DRY resolved**: extracted shared `TextInputDialog` primitive (`components/files/text-input-dialog.tsx`). `RenameDialog` and `NewFolderDialog` are now thin wrappers (~20 lines each, was ~60 each). The two dialogs preserve identical UX (autofocus, click-outside, submit-while-await).
 184. [s] `components/filters/filter-rule-modal.tsx` — clean.
 185. [s] `components/filters/sieve-editor-modal.tsx` — clean.
 186. [s] `components/identity/identity-form.tsx` — clean; proper validation with translated error messages.
@@ -306,7 +306,7 @@ file in this index — visited when its turn arrives.)
 256. [s] `components/ui/context-menu.tsx` — clean, properly uses useLayoutEffect for viewport clamping before paint. The `onClose` prop is destructured-and-renamed (`_onClose`) because closing is parent-controlled — confusing API but not a bug.
 257. [s] `components/ui/flag-icons.tsx` — flag SVG components, data file.
 258. [s] `components/ui/input.tsx` — 28 lines, clean.
-259. [s] `components/ui/language-switcher.tsx` — clean. Two `useEffect` blocks on `[open]` could be combined; minor.
+259. [x] `components/ui/language-switcher.tsx` — collapsed two `useEffect([open])` blocks into one; the close-on-outside-click + close-on-Escape listeners share the same lifecycle.
 260. [s] `components/ui/prompt-dialog.tsx` — clean, same async-rejection caveat as confirm-dialog.
 261. [s] `components/ui/toast.tsx` — clean, properly pauses progress on hover.
 262. [s] `components/ui/welcome-banner.tsx` — clean.
@@ -361,7 +361,7 @@ file in this index — visited when its turn arrives.)
 311. [s] `lib/email-composer-utils.ts` — clean.
 312. [s] `lib/error-reporting.ts` — clean.
 313. [s] `lib/file-preview.ts` — clean.
-314. [s] `lib/iframe-bridge.ts` — logged: `notifyParent` falls back to `targetOrigin = "*"` when PARENT_ORIGIN is unset — security risk if embedded in untrusted parent frame. External finding.
+314. [x] `lib/iframe-bridge.ts` — **fixed in c3fe170**: both `notifyParent` and `listenFromParent` now refuse to operate without a configured origin (fail-closed). No more `targetOrigin = "*"` broadcast, no more no-origin-check listener.
 315. [s] `lib/jmap/sieve-types.ts` — pure types.
 316. [s] `lib/logger.ts` — clean.
 317. [s] `lib/notification-sound.ts` — clean.
@@ -444,9 +444,9 @@ file in this index — visited when its turn arrives.)
 394. [s] `stores/policy-store.ts` — clean.
 395. [s] `stores/settings-store.ts` — clean.
 396. [s] `stores/smime-store.ts` — clean.
-397. [s] `stores/task-store.ts` — clean; pessimistic update pattern (await server before local state). Per RTT-min rule, optimistic-then-rollback would feel snappier; tier-2.
+397. [x] `stores/task-store.ts` — **fixed in 0d1695e**: updateTask/deleteTask/toggleTaskComplete switched to optimistic-then-rollback. Checkbox flips in ~0ms; on server failure the prior task row is restored from snapshot.
 398. [s] `stores/template-store.ts` — clean; `getRecent` already O(N+R) with byId Map.
-399. [s] `stores/theme-store.ts` — clean. `syncServerThemes` does serial per-theme `await downloadThemeCSS` + `await pluginStorage.saveThemeCSS` — Promise.all would parallelize. Per RTT-min rule, logged for tier-2.
+399. [x] `stores/theme-store.ts` — **fixed in c3fe170**: `syncServerThemes` fanned out via `Promise.all` so all themes download/save in parallel. The existing duplicate-check at the install branch handles the (rare) race where two concurrent installs would otherwise add the same theme twice.
 400. [s] `stores/toast-store.ts` — clean.
 401. [s] `stores/totp-reauth-store.ts` — clean.
 402. [x] `stores/ui-store.ts` — extracted `persistColumnsToStorage` helper, killing 4× repeated `try { localStorage.setItem("column-widths", JSON.stringify(...)) } catch { }` block.

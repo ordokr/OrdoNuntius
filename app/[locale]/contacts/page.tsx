@@ -148,8 +148,17 @@ export default function ContactsPage() {
 
   const groups = useMemo(() => contacts.filter(c => c.kind === 'group'), [contacts]);
   const individuals = useMemo(() => contacts.filter(c => c.kind !== 'group'), [contacts]);
-  const selectedContact = contacts.find((c) => c.id === selectedContactId) || null;
-  const selectedGroup = selectedGroupId ? contacts.find(c => c.id === selectedGroupId) || null : null;
+  // Memoize the find — the contacts page re-renders on every keystroke
+  // in the search bar; without memo each typed character re-scans the
+  // entire contact list twice.
+  const selectedContact = useMemo(
+    () => contacts.find((c) => c.id === selectedContactId) || null,
+    [contacts, selectedContactId],
+  );
+  const selectedGroup = useMemo(
+    () => (selectedGroupId ? contacts.find(c => c.id === selectedGroupId) || null : null),
+    [contacts, selectedGroupId],
+  );
   const selectedGroupMembers = useMemo(() => selectedGroupId ? getGroupMembers(selectedGroupId) : [], [selectedGroupId, getGroupMembers]);
 
   // Collect all unique keywords across contacts

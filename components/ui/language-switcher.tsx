@@ -41,7 +41,10 @@ export function LanguageSwitcher({ className }: { className?: string }) {
 
   const current = languages.find((l) => l.value === currentLocale) ?? languages[0];
 
-  // Close on outside click
+  // Single effect handles both close-on-outside-click and close-on-
+  // Escape. The two listeners share the same lifecycle (mount when
+  // open, unmount when closed) so splitting them was just two extra
+  // effect entries doing the same dependency check.
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
@@ -49,18 +52,15 @@ export function LanguageSwitcher({ className }: { className?: string }) {
         setOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
+    document.addEventListener("mousedown", handleClick);
     document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
   }, [open]);
 
   return (
