@@ -220,9 +220,9 @@ file in this index — visited when its turn arrives.)
 170. [s] `components/email/thread-email-item.tsx` — clean. Same hardcoded "Unknown"/"No preview" English (cross-locale).
 171. [s] `components/email/thread-list-item.tsx` — clean, already heavily optimized in earlier perf passes (granular selectors, hoisted prop pattern, memoized component). Same hardcoded "(no subject)" / "No preview available" i18n concern as siblings.
 172. [x] `components/email/unsubscribe-banner.tsx` — **real UX bug fixed**: mobile `ConfirmDialog` was showing the `success_http`/`success_mailto` strings ("Unsubscribe page opened in new tab" / "Unsubscribe request sent to your email client") as the *pre-action* confirmation message — telling the user the action had completed while still asking them to confirm. Now shows the destination URL. Also dropped the unused `senderEmail` prop from the interface + both callsites in `email-viewer.tsx`.
-173. [ ] `components/error/error-boundary.tsx`
-174. [ ] `components/error/error-fallbacks.tsx`
-175. [ ] `components/error/index.ts`
+173. [s] `components/error/error-boundary.tsx` — clean class + functional wrapper for translation injection.
+174. [s] `components/error/error-fallbacks.tsx` — clean.
+175. [s] `components/error/index.ts` — re-exports.
 176. [x] `components/files/file-browser.tsx` — **real memory-leak fix** in `Thumbnail` subcomponent: `getImageUrl` returns a `URL.createObjectURL` blob URL, but the effect's cleanup only flipped `cancelled` and never called `URL.revokeObjectURL`. Every thumbnail re-mount, `name` change, or modal close leaked a blob URL — a folder of N images leaked N URLs per re-render. Now revokes on cancel and on unmount. Same `acquired/cancelled` race-guard pattern as the image-preview-modal fix in this batch.
 177. [s] `components/files/file-preview-modal.tsx` — clean. Already does the correct race-guard pattern (cancelled flag + late assignment), so the analogous bug doesn't exist here.
 178. [s] `components/files/file-upload-area.tsx` — 88 lines, clean drop-zone.
@@ -231,34 +231,34 @@ file in this index — visited when its turn arrives.)
 181. [x] `components/files/image-preview-modal.tsx` — **real memory-leak fix**: the effect captured `revoke` in the outer scope and only assigned it inside `.then`, but cleanup ran with `revoke === null` whenever the user closed the modal (or changed `name`) before `getImageUrl` resolved. The pending `.then` then assigned the URL but cleanup had already run — orphaned blob URL. Race-guarded with `cancelled` + `acquiredUrl` so the late-resolve path revokes immediately when cancelled.
 182. [s] `components/files/new-folder-dialog.tsx` — clean (escape handler missing but click-outside via overlay works).
 183. [s] `components/files/rename-dialog.tsx` — clean. Near-duplicate of new-folder-dialog; tier-2 DRY opportunity.
-184. [ ] `components/filters/filter-rule-modal.tsx`
-185. [ ] `components/filters/sieve-editor-modal.tsx`
-186. [ ] `components/identity/identity-form.tsx`
-187. [ ] `components/identity/identity-manager-modal.tsx`
-188. [ ] `components/identity/sub-address-helper.tsx`
-189. [ ] `components/keyboard-shortcuts-modal.tsx`
-190. [ ] `components/layout/account-switcher.tsx`
-191. [ ] `components/layout/icon-picker.tsx`
-192. [ ] `components/layout/inline-app-view.tsx`
-193. [ ] `components/layout/mailbox-context-menu.tsx`
-194. [ ] `components/layout/resize-handle.tsx`
-195. [ ] `components/layout/sidebar-apps-modal.tsx`
-196. [ ] `components/plugins/plugin-error-boundary.tsx`
-197. [ ] `components/plugins/plugin-slot-renderer.tsx`
-198. [ ] `components/plugins/plugin-slot.tsx`
-199. [ ] `components/protocol/mailto-protocol-client.tsx`
-200. [ ] `components/protocol/protocol-account-picker.tsx`
-201. [ ] `components/protocol/protocol-launch-handler-provider.tsx`
-202. [ ] `components/protocol/webcal-protocol-client.tsx`
-203. [ ] `components/providers/calendar-alert-provider.tsx`
-204. [ ] `components/providers/embedded-bridge-provider.tsx`
-205. [ ] `components/providers/intl-provider.tsx`
-206. [ ] `components/providers/rate-limit-toast-provider.tsx`
-207. [ ] `components/providers/theme-provider.tsx`
-208. [ ] `components/pwa-install-prompt.tsx`
-209. [ ] `components/search/advanced-search-panel.tsx`
-210. [ ] `components/search/search-chips.tsx`
-211. [ ] `components/service-worker-registration.tsx`
+184. [s] `components/filters/filter-rule-modal.tsx` — clean.
+185. [s] `components/filters/sieve-editor-modal.tsx` — clean.
+186. [s] `components/identity/identity-form.tsx` — clean; proper validation with translated error messages.
+187. [s] `components/identity/identity-manager-modal.tsx` — clean.
+188. [s] `components/identity/sub-address-helper.tsx` — clean.
+189. [s] `components/keyboard-shortcuts-modal.tsx` — clean, uses focus trap.
+190. [s] `components/layout/account-switcher.tsx` — clean.
+191. [s] `components/layout/icon-picker.tsx` — clean; `allIconNames` properly memoized (Object.keys over Lucide's ~1000 icons runs once).
+192. [s] `components/layout/inline-app-view.tsx` — clean. Note: iframe sandbox is `allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox` for user-configured app URLs — intentional but worth noting (security trade-off lives with the user's choice of app URL).
+193. [s] `components/layout/mailbox-context-menu.tsx` — clean, well-structured path-shortening logic.
+194. [s] `components/layout/resize-handle.tsx` — clean, keyboard-accessible. Hardcoded `aria-label="Resize"` (i18n cross-locale).
+195. [s] `components/layout/sidebar-apps-modal.tsx` — clean, validates http/https protocol on user-entered URLs.
+196. [s] `components/plugins/plugin-error-boundary.tsx` — clean class error boundary, per-plugin isolation.
+197. [s] `components/plugins/plugin-slot-renderer.tsx` — clean.
+198. [s] `components/plugins/plugin-slot.tsx` — clean.
+199. [s] `components/protocol/mailto-protocol-client.tsx` — clean.
+200. [s] `components/protocol/protocol-account-picker.tsx` — clean modal; no escape handler (X button + backdrop click suffice).
+201. [s] `components/protocol/protocol-launch-handler-provider.tsx` — clean.
+202. [s] `components/protocol/webcal-protocol-client.tsx` — clean.
+203. [s] `components/providers/calendar-alert-provider.tsx` — clean.
+204. [s] `components/providers/embedded-bridge-provider.tsx` — clean iframe-bridge listener.
+205. [s] `components/providers/intl-provider.tsx` — excellent design: template-literal dynamic import + module-scope cache + SSR seed. Comments explain perf rationale.
+206. [s] `components/providers/rate-limit-toast-provider.tsx` — clean.
+207. [s] `components/providers/theme-provider.tsx` — 13 lines, clean.
+208. [s] `components/pwa-install-prompt.tsx` — **logged**: all-English-hardcoded strings ("Install {appName}", "Install our app...", "Not now", "Install", "Don't remind me again", etc.). No `useTranslations` call at all. Real i18n bug; cross-locale fix needed.
+209. [s] `components/search/advanced-search-panel.tsx` — clean.
+210. [s] `components/search/search-chips.tsx` — clean.
+211. [s] `components/service-worker-registration.tsx` — clean.
 212. [x] `components/settings/about-data-settings.tsx` — **next-intl namespace traversal bug fixed**: 3× `t('../../settings.X')` calls were silently resolving to the literal key path. Now uses a scoped `tSettings` translator.
 213. [s] `components/settings/account-security-settings.tsx` — clean; QR-code generation effect properly cancellation-guarded.
 214. [x] `components/settings/account-settings.tsx` — **next-intl namespace traversal bug fixed**: 3× `t('../../common.unknown')` fallbacks (rare-path) now use a scoped `tCommon` translator.
@@ -291,25 +291,25 @@ file in this index — visited when its turn arrives.)
 241. [s] `components/settings/template-settings.tsx` — clean.
 242. [s] `components/settings/themes-settings.tsx` — clean.
 243. [s] `components/settings/vacation-settings.tsx` — clean.
-244. [ ] `components/templates/placeholder-fill-modal.tsx`
-245. [ ] `components/templates/template-form.tsx`
-246. [ ] `components/templates/template-manager-modal.tsx`
-247. [ ] `components/templates/template-picker.tsx`
-248. [ ] `components/totp-reauth-dialog.tsx`
-249. [ ] `components/tour/tour-overlay.tsx`
-250. [ ] `components/tour/tour-provider.tsx`
-251. [ ] `components/tour/tour-steps.ts`
-252. [ ] `components/trusted-senders-modal.tsx`
-253. [ ] `components/ui/avatar.tsx`
-254. [ ] `components/ui/button.tsx`
-255. [ ] `components/ui/confirm-dialog.tsx`
-256. [ ] `components/ui/context-menu.tsx`
-257. [ ] `components/ui/flag-icons.tsx`
-258. [ ] `components/ui/input.tsx`
-259. [ ] `components/ui/language-switcher.tsx`
-260. [ ] `components/ui/prompt-dialog.tsx`
-261. [ ] `components/ui/toast.tsx`
-262. [ ] `components/ui/welcome-banner.tsx`
+244. [s] `components/templates/placeholder-fill-modal.tsx` — clean.
+245. [s] `components/templates/template-form.tsx` — clean.
+246. [s] `components/templates/template-manager-modal.tsx` — clean.
+247. [s] `components/templates/template-picker.tsx` — clean.
+248. [s] `components/totp-reauth-dialog.tsx` — **logged**: all-English-hardcoded strings ("Session Expired", "Your 2FA code has rotated", "Enter a fresh authentication code…", "Cancel", "Verify", etc.). No `useTranslations` call at all. Real i18n bug surfaces every time a TOTP session expires for non-English users.
+249. [s] `components/tour/tour-overlay.tsx` — clean.
+250. [s] `components/tour/tour-provider.tsx` — clean.
+251. [s] `components/tour/tour-steps.ts` — clean data file.
+252. [s] `components/trusted-senders-modal.tsx` — clean.
+253. [s] `components/ui/avatar.tsx` — clean. Module-scope memo caches for emailHash/initials/bgColor; contact-photo lookup is O(N×M) per render but memoized on `[contactPhotoUri, email, contacts]`. Tier-2: a contacts-by-email Map in the store would convert per-render lookup from O(N) to O(1).
+254. [s] `components/ui/button.tsx` — 42 lines, clean variant table.
+255. [s] `components/ui/confirm-dialog.tsx` — clean. Note: `onConfirm` is invoked synchronously inside a try/finally that always calls onClose — if onConfirm returns a rejected promise, the rejection is unhandled. Acceptable as a fire-and-forget contract.
+256. [s] `components/ui/context-menu.tsx` — clean, properly uses useLayoutEffect for viewport clamping before paint. The `onClose` prop is destructured-and-renamed (`_onClose`) because closing is parent-controlled — confusing API but not a bug.
+257. [s] `components/ui/flag-icons.tsx` — flag SVG components, data file.
+258. [s] `components/ui/input.tsx` — 28 lines, clean.
+259. [s] `components/ui/language-switcher.tsx` — clean. Two `useEffect` blocks on `[open]` could be combined; minor.
+260. [s] `components/ui/prompt-dialog.tsx` — clean, same async-rejection caveat as confirm-dialog.
+261. [s] `components/ui/toast.tsx` — clean, properly pauses progress on hover.
+262. [s] `components/ui/welcome-banner.tsx` — clean.
 263. [ ] `contexts/drag-drop-context.tsx`
 264. [ ] `hooks/use-attachment-drag.ts`
 265. [ ] `hooks/use-browser-navigation.ts`
