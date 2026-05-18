@@ -194,19 +194,19 @@ file in this index — visited when its turn arrives.)
 144. [s] `components/calendar/task-list-view.tsx` — clean.
 145. [s] `components/calendar/task-modal.tsx` — clean.
 146. [s] `components/calendar/task-toolbar.tsx` — clean.
-147. [ ] `components/contacts/contact-activity.tsx`
-148. [ ] `components/contacts/contact-context-menu.tsx`
-149. [ ] `components/contacts/contact-detail.tsx`
-150. [ ] `components/contacts/contact-export.tsx`
-151. [ ] `components/contacts/contact-form.tsx`
-152. [ ] `components/contacts/contact-group-detail.tsx`
-153. [ ] `components/contacts/contact-group-form.tsx`
-154. [ ] `components/contacts/contact-group-list.tsx`
-155. [ ] `components/contacts/contact-import-dialog.tsx`
-156. [ ] `components/contacts/contact-list-item.tsx`
-157. [ ] `components/contacts/contact-list.tsx`
-158. [ ] `components/contacts/contact-print.ts`
-159. [ ] `components/contacts/contacts-sidebar.tsx`
+147. [s] `components/contacts/contact-activity.tsx` — clean.
+148. [s] `components/contacts/contact-context-menu.tsx` — clean.
+149. [s] `components/contacts/contact-detail.tsx` — clean.
+150. [s] `components/contacts/contact-export.tsx` — 32 lines, clean vCard download helper.
+151. [s] `components/contacts/contact-form.tsx` — clean.
+152. [s] `components/contacts/contact-group-detail.tsx` — clean.
+153. [s] `components/contacts/contact-group-form.tsx` — clean.
+154. [s] `components/contacts/contact-group-list.tsx` — clean.
+155. [s] `components/contacts/contact-import-dialog.tsx` — clean. 5MB file-size guard + duplicate detection in place.
+156. [s] `components/contacts/contact-list-item.tsx` — clean.
+157. [s] `components/contacts/contact-list.tsx` — clean, heavy useMemo pipeline (filter → sort → groupedSections).
+158. [s] `components/contacts/contact-print.ts` — clean.
+159. [x] `components/contacts/contacts-sidebar.tsx` — `uncategorizedCount` switched from `.filter(...).length === 0` to `!.some(...)` so it short-circuits at the first active keyword per contact instead of walking every key.
 160. [s] `components/email/calendar-invitation-banner.tsx` — clean. 1118 lines but per-email lookups (`.find()`, `getInvitationMethod`, `findParticipantByEmail`) only run for the one currently-open invitation email at a time; not heavily rendered.
 161. [x] `components/email/email-composer.tsx` — **2 perf fixes**: (1) memoized `composerSignatureHtml` (was running DOMPurify via `sanitizeEmailHtml` on every keystroke); (2) memoized `canSmimeEncrypt` (was doing recipient-cert lookup on every keystroke). Composer re-renders on every recipient/subject/body keypress, so per-render work matters.
 162. [x] `components/email/email-context-menu.tsx` — removed dead `_tColor` useTranslations call; memoized `colorOptions` and `(moveTargetIds, moveTree)` (context menu stays mounted, was rebuilding mailbox tree on every parent render).

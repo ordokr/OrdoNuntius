@@ -162,9 +162,12 @@ export function ContactsSidebar({
     return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
   }, [individuals]);
 
-  // Count of contacts without any keywords
+  // Count of contacts without any keywords. Uses `.some` instead of
+  // building a filtered array via `.filter(...).length === 0` — short-
+  // circuits at the first active keyword per contact instead of walking
+  // every key.
   const uncategorizedCount = useMemo(() => {
-    return individuals.filter(c => !c.keywords || Object.keys(c.keywords).filter(k => c.keywords![k]).length === 0).length;
+    return individuals.filter(c => !c.keywords || !Object.keys(c.keywords).some(k => c.keywords![k])).length;
   }, [individuals]);
 
   // Resolve actual group member counts against living contacts
