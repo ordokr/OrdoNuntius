@@ -295,10 +295,13 @@ function getCalendarEventDebugSnapshot(event: Partial<CalendarEvent> | null | un
 }
 
 function namespaceMailboxIds(emails: Email[], accountId: string): void {
+  // `for...in` avoids the per-email `Object.keys` throwaway-array
+  // allocation. Bulk shared-folder fetches namespace hundreds of emails
+  // at once, so the alloc drop compounds.
   for (const email of emails) {
     if (!email.mailboxIds) continue;
     const namespaced: Record<string, boolean> = {};
-    for (const mbId of Object.keys(email.mailboxIds)) {
+    for (const mbId in email.mailboxIds) {
       namespaced[`${accountId}:${mbId}`] = email.mailboxIds[mbId];
     }
     email.mailboxIds = namespaced;

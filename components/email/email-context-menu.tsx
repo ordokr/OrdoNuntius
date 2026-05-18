@@ -32,6 +32,7 @@ import {
   EditIcon,
 } from "lucide-react";
 import { cn, buildMailboxTree, MailboxNode } from "@/lib/utils";
+import { getEmailColorTags } from "@/lib/thread-utils";
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 import { useMemo } from "react";
 
@@ -91,19 +92,9 @@ const getMailboxIcon = (role?: string) => {
   }
 };
 
-// Get all active label/color tag IDs from email keywords
-const getCurrentColors = (keywords: Record<string, boolean> | undefined): string[] => {
-  if (!keywords) return [];
-  const tags: string[] = [];
-  for (const key of Object.keys(keywords)) {
-    if ((key.startsWith("$label:") || key.startsWith("$color:")) && keywords[key] === true) {
-      tags.push(
-        key.startsWith("$label:") ? key.slice("$label:".length) : key.slice("$color:".length)
-      );
-    }
-  }
-  return tags;
-};
+// Was a third copy of `getEmailColorTags` from @/lib/thread-utils.
+// Consolidated — same logic, same prefixes.
+const getCurrentColors = getEmailColorTags;
 
 export function EmailContextMenu({
   email,

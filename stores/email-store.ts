@@ -1023,7 +1023,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
       const sourceMailboxIds = new Set<string>();
       for (const e of affected) {
         if (!e.keywords?.$seen) unreadDelta += 1;
-        if (e.mailboxIds) for (const mid of Object.keys(e.mailboxIds)) sourceMailboxIds.add(mid);
+        if (e.mailboxIds) for (const mid in e.mailboxIds) sourceMailboxIds.add(mid);
       }
       const movedCount = affected.length;
 
@@ -1203,7 +1203,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
         const wasRead = email.keywords?.$seen === true;
         if (wasRead === read) continue;
         const sign = read ? -1 : 1;
-        for (const mailboxId of Object.keys(email.mailboxIds)) {
+        for (const mailboxId in email.mailboxIds) {
           unreadDelta.set(mailboxId, (unreadDelta.get(mailboxId) ?? 0) + sign);
         }
       }
@@ -1309,7 +1309,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
             if (movedEmailIds.has(email.id)) {
               if (!email.mailboxIds) continue;
               const isUnread = !email.keywords?.$seen;
-              for (const mailboxId of Object.keys(email.mailboxIds)) {
+              for (const mailboxId in email.mailboxIds) {
                 totalDelta.set(mailboxId, (totalDelta.get(mailboxId) ?? 0) - 1);
                 if (isUnread) {
                   unreadDelta.set(mailboxId, (unreadDelta.get(mailboxId) ?? 0) - 1);
@@ -1352,7 +1352,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
         if (selectedEmailIds.has(email.id)) {
           if (!email.mailboxIds) continue;
           const isUnread = !email.keywords?.$seen;
-          for (const mailboxId of Object.keys(email.mailboxIds)) {
+          for (const mailboxId in email.mailboxIds) {
             totalDelta.set(mailboxId, (totalDelta.get(mailboxId) ?? 0) - 1);
             if (isUnread) {
               unreadDelta.set(mailboxId, (unreadDelta.get(mailboxId) ?? 0) - 1);

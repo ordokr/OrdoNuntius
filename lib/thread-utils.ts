@@ -142,11 +142,20 @@ export function mergeThreadEmails(
 
   const latestEmail = mergedEmails[0];
   const participantNames = getThreadParticipants(mergedEmails);
-  const hasUnread = mergedEmails.some(e => !e.keywords?.$seen);
-  const hasStarred = mergedEmails.some(e => e.keywords?.$flagged);
-  const hasAttachment = mergedEmails.some(e => e.hasAttachment);
-  const hasAnswered = mergedEmails.some(e => e.keywords?.$answered);
-  const hasForwarded = mergedEmails.some(e => e.keywords?.$forwarded);
+  // Was: five separate `.some()` calls. Each short-circuits, but in the
+  // common case (normal incoming thread with none of the flags set) each
+  // walks all N emails — 5N iterations total. Fuse into one walk with an
+  // all-found early-exit; allocates one iterator instead of five.
+  let hasUnread = false, hasStarred = false, hasAttachment = false, hasAnswered = false, hasForwarded = false;
+  for (const e of mergedEmails) {
+    const kw = e.keywords;
+    if (!hasUnread && !kw?.$seen) hasUnread = true;
+    if (!hasStarred && kw?.$flagged) hasStarred = true;
+    if (!hasAttachment && e.hasAttachment) hasAttachment = true;
+    if (!hasAnswered && kw?.$answered) hasAnswered = true;
+    if (!hasForwarded && kw?.$forwarded) hasForwarded = true;
+    if (hasUnread && hasStarred && hasAttachment && hasAnswered && hasForwarded) break;
+  }
 
   return {
     threadId: existingGroup.threadId,
@@ -174,13 +183,15 @@ export const KEYWORD_PREFIX_LEGACY = "$color:";
 export function getEmailColorTags(keywords: Record<string, boolean> | undefined): string[] {
   if (!keywords) return [];
   const tags: string[] = [];
-  for (const key of Object.keys(keywords)) {
-    if ((key.startsWith(KEYWORD_PREFIX) || key.startsWith(KEYWORD_PREFIX_LEGACY)) && keywords[key] === true) {
-      tags.push(
-        key.startsWith(KEYWORD_PREFIX)
-          ? key.slice(KEYWORD_PREFIX.length)
-          : key.slice(KEYWORD_PREFIX_LEGACY.length)
-      );
+  // `for...in` over the Record avoids the per-call `Object.keys` array
+  // allocation. This is called from EmailListItem render (~50× per
+  // virtualizer slice) and from the email-viewer toolbar — hot enough.
+  for (const key in keywords) {
+    if (keywords[key] !== true) continue;
+    if (key.startsWith(KEYWORD_PREFIX)) {
+      tags.push(key.slice(KEYWORD_PREFIX.length));
+    } else if (key.startsWith(KEYWORD_PREFIX_LEGACY)) {
+      tags.push(key.slice(KEYWORD_PREFIX_LEGACY.length));
     }
   }
   return tags;

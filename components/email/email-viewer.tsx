@@ -5,6 +5,7 @@ import DOMPurify from "dompurify";
 import { Email, ContactCard, Mailbox } from "@/lib/jmap/types";
 import { EMAIL_IFRAME_SANITIZE_CONFIG, collapseBlockedImageContainers, plainTextToSafeHtml } from "@/lib/email-sanitization";
 import { hasMeaningfulHtmlBody } from "@/lib/signature-utils";
+import { getEmailColorTags } from "@/lib/thread-utils";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { formatFileSize, cn, buildMailboxTree, MailboxNode, formatDateTime, generateUUID } from "@/lib/utils";
@@ -200,18 +201,11 @@ const getAttachmentDisplayName = (name: string | null | undefined, mimeType?: st
   return 'Attachment';
 };
 
-const getCurrentColors = (keywords: Record<string, boolean> | undefined): string[] => {
-  if (!keywords) return [];
-  const tags: string[] = [];
-  for (const key of Object.keys(keywords)) {
-    if ((key.startsWith("$label:") || key.startsWith("$color:")) && keywords[key] === true) {
-      tags.push(
-        key.startsWith("$label:") ? key.slice("$label:".length) : key.slice("$color:".length)
-      );
-    }
-  }
-  return tags;
-};
+// Was a local re-implementation of `getEmailColorTags` from
+// `@/lib/thread-utils` — same logic, same hardcoded "$label:" / "$color:"
+// prefixes that the lib version already exposes as `KEYWORD_PREFIX` /
+// `KEYWORD_PREFIX_LEGACY` constants. Consolidated.
+const getCurrentColors = getEmailColorTags;
 
 // Helper function to format recipients with contextual display
 const _formatRecipients = (
