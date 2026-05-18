@@ -77,9 +77,15 @@ export function TaskListView({
   const [quickAddTitle, setQuickAddTitle] = useState("");
 
   const filteredTasks = useMemo(() => {
+    // Build a Set for O(1) `selectedCalendarIds` lookup — was `.includes()`
+    // which is O(M) per check. Combined with `for...in` over task.calendarIds
+    // this drops the per-task `Object.keys` array allocation too.
+    const calendarSet = new Set(selectedCalendarIds);
     let result = tasks.filter(task => {
-      const calIds = Object.keys(task.calendarIds);
-      return calIds.some(id => selectedCalendarIds.includes(id));
+      for (const id in task.calendarIds) {
+        if (calendarSet.has(id)) return true;
+      }
+      return false;
     });
 
     if (!showCompleted) {
@@ -94,34 +100,40 @@ export function TaskListView({
         result = result.filter(task => task.progress === "completed");
         break;
       case "overdue":
+        // Was: `parseISO(task.due)` parsed twice per surviving task (once
+        // for isPast, once for isToday). Parse once.
         result = result.filter(task => {
           if (!task.due || task.progress === "completed" || task.progress === "cancelled") return false;
-          return isPast(parseISO(task.due)) && !isToday(parseISO(task.due));
+          const d = parseISO(task.due);
+          return isPast(d) && !isToday(d);
         });
         break;
     }
 
-    // Sort: overdue first, then by due date (no due date last), then by priority
-    result.sort((a, b) => {
-      // Completed tasks at the bottom
-      if (a.progress === "completed" && b.progress !== "completed") return 1;
-      if (a.progress !== "completed" && b.progress === "completed") return -1;
+    // Sort: overdue first, then by due date (no due date last), then by
+    // priority. Schwartzian transform — was parsing the same due-date string
+    // multiple times per item across the sort's O(N log N) comparisons. Now
+    // each due-date string is parsed exactly once, total O(N).
+    const decorated = result.map(task => ({
+      task,
+      dueMs: task.due ? new Date(task.due).getTime() : null,
+    }));
+    decorated.sort((a, b) => {
+      const ap = a.task.progress, bp = b.task.progress;
+      if (ap === "completed" && bp !== "completed") return 1;
+      if (ap !== "completed" && bp === "completed") return -1;
 
-      // Tasks with due dates before those without
-      if (a.due && !b.due) return -1;
-      if (!a.due && b.due) return 1;
-      if (a.due && b.due) {
-        const dateCompare = new Date(a.due).getTime() - new Date(b.due).getTime();
-        if (dateCompare !== 0) return dateCompare;
+      if (a.dueMs !== null && b.dueMs === null) return -1;
+      if (a.dueMs === null && b.dueMs !== null) return 1;
+      if (a.dueMs !== null && b.dueMs !== null && a.dueMs !== b.dueMs) {
+        return a.dueMs - b.dueMs;
       }
 
-      // Higher priority first (lower number = higher priority, but 0 = no priority goes last)
-      const aPri = a.priority || 10;
-      const bPri = b.priority || 10;
+      const aPri = a.task.priority || 10;
+      const bPri = b.task.priority || 10;
       return aPri - bPri;
     });
-
-    return result;
+    return decorated.map(d => d.task);
   }, [tasks, selectedCalendarIds, filter, showCompleted]);
 
   const handleToggle = useCallback((e: React.MouseEvent, task: CalendarTask) => {
