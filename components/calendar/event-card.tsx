@@ -80,6 +80,7 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
   const endTime = getEventEndDate(event);
   const timeString = `${format(startDate, timeFmt)} – ${format(endTime, timeFmt)}`;
   const ariaLabel = `${event.title || t("events.no_title")}, ${timeString}${calendarName ? `, ${calendarName}` : ""}`;
+  const participantCount = getParticipantCount(event);
 
   const handleDragStart = useCallback((e: DragEvent) => {
     e.stopPropagation();
@@ -195,13 +196,13 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
           {timeString}
         </div>
       )}
-      {getParticipantCount(event) > 0 && (
+      {participantCount > 0 && (
         <div
           className="flex items-center gap-0.5 opacity-70 text-[10px]"
-          title={t("participants.count", { count: getParticipantCount(event) })}
+          title={t("participants.count", { count: participantCount })}
         >
           <Users className="w-3 h-3" />
-          <span>{getParticipantCount(event)}</span>
+          <span>{participantCount}</span>
         </div>
       )}
     </button>

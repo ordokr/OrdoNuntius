@@ -173,27 +173,27 @@ file in this index — visited when its turn arrives.)
 123. [ ] `app/protocol/webcal/page.tsx`
 124. [ ] `app/setup/layout.tsx`
 125. [ ] `app/setup/page.tsx`
-126. [ ] `components/calendar/calendar-agenda-view.tsx`
-127. [ ] `components/calendar/calendar-day-view.tsx`
-128. [ ] `components/calendar/calendar-month-view.tsx`
-129. [ ] `components/calendar/calendar-sidebar-panel.tsx`
-130. [ ] `components/calendar/calendar-toolbar.tsx`
-131. [ ] `components/calendar/calendar-week-view.tsx`
-132. [ ] `components/calendar/create-calendar-modal.tsx`
-133. [ ] `components/calendar/empty-space-context-menu.tsx`
-134. [ ] `components/calendar/event-card.tsx`
-135. [ ] `components/calendar/event-context-menu.tsx`
-136. [ ] `components/calendar/event-detail-popover.tsx`
-137. [ ] `components/calendar/event-modal.tsx`
-138. [ ] `components/calendar/ical-import-modal.tsx`
-139. [ ] `components/calendar/ical-subscription-modal.tsx`
-140. [ ] `components/calendar/mini-calendar.tsx`
-141. [ ] `components/calendar/participant-input.tsx`
-142. [ ] `components/calendar/quick-event-input.tsx`
-143. [ ] `components/calendar/recurrence-scope-dialog.tsx`
-144. [ ] `components/calendar/task-list-view.tsx`
-145. [ ] `components/calendar/task-modal.tsx`
-146. [ ] `components/calendar/task-toolbar.tsx`
+126. [s] `components/calendar/calendar-agenda-view.tsx` — clean.
+127. [s] `components/calendar/calendar-day-view.tsx` — clean, hot path memoization in place.
+128. [s] `components/calendar/calendar-month-view.tsx` — clean, days/calendarMap/eventsByDate properly memoized.
+129. [s] `components/calendar/calendar-sidebar-panel.tsx` — clean.
+130. [s] `components/calendar/calendar-toolbar.tsx` — clean.
+131. [s] `components/calendar/calendar-week-view.tsx` — clean, well-memoized.
+132. [s] `components/calendar/create-calendar-modal.tsx` — clean.
+133. [s] `components/calendar/empty-space-context-menu.tsx` — clean.
+134. [x] `components/calendar/event-card.tsx` — extracted `participantCount` const (was called 3× per `block` variant render).
+135. [s] `components/calendar/event-context-menu.tsx` — clean.
+136. [s] `components/calendar/event-detail-popover.tsx` — clean.
+137. [s] `components/calendar/event-modal.tsx` — clean. Focus-trap effect captures first/last focusable on mount only; acceptable pattern but stale if modal content changes between view/edit modes.
+138. [s] `components/calendar/ical-import-modal.tsx` — clean.
+139. [s] `components/calendar/ical-subscription-modal.tsx` — clean.
+140. [s] `components/calendar/mini-calendar.tsx` — clean. Hardcoded English `MONTH_LABELS` in months picker (i18n bug; cross-locale).
+141. [s] `components/calendar/participant-input.tsx` — clean, debounced autocomplete + aria-combobox.
+142. [s] `components/calendar/quick-event-input.tsx` — clean.
+143. [s] `components/calendar/recurrence-scope-dialog.tsx` — clean, focus-trapped modal.
+144. [s] `components/calendar/task-list-view.tsx` — clean.
+145. [s] `components/calendar/task-modal.tsx` — clean.
+146. [s] `components/calendar/task-toolbar.tsx` — clean.
 147. [ ] `components/contacts/contact-activity.tsx`
 148. [ ] `components/contacts/contact-context-menu.tsx`
 149. [ ] `components/contacts/contact-detail.tsx`
