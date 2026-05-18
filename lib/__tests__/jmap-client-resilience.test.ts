@@ -165,10 +165,12 @@ describe('JMAPClient resilience', () => {
       expect(tokenRefresh).toHaveBeenCalledOnce();
       expect(fetchSpy).toHaveBeenCalledTimes(2);
 
-      // Verify retry used the new token
+      // Verify retry used the new token. authenticatedFetch now passes
+      // a `Headers` instance (see withAuthHeaders helper) instead of a
+      // plain object, so read via `.get()` not bracket-indexing.
       const retryCall = fetchSpy.mock.calls[1];
-      const retryHeaders = retryCall[1]?.headers as Record<string, string>;
-      expect(retryHeaders['Authorization']).toBe('Bearer new-token-456');
+      const retryHeaders = retryCall[1]?.headers as Headers;
+      expect(retryHeaders.get('Authorization')).toBe('Bearer new-token-456');
     });
   });
 
@@ -358,9 +360,10 @@ describe('JMAPClient resilience', () => {
 
       expect(objectUrl).toMatch(/^blob:/);
       expect(fetchSpy).toHaveBeenCalledTimes(1);
-      // Verify auth header was sent
-      const callHeaders = fetchSpy.mock.calls[0][1]?.headers as Record<string, string>;
-      expect(callHeaders['Authorization']).toContain('Basic');
+      // Verify auth header was sent. authenticatedFetch now passes a
+      // `Headers` instance (see withAuthHeaders helper).
+      const callHeaders = fetchSpy.mock.calls[0][1]?.headers as Headers;
+      expect(callHeaders.get('Authorization')).toContain('Basic');
 
       URL.revokeObjectURL(objectUrl);
     });
