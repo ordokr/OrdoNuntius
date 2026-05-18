@@ -154,13 +154,14 @@ export function deactivatePlugin(pluginId: string): void {
 // --- Activate all enabled plugins ----------------------------
 
 export async function activateAllPlugins(plugins: InstalledPlugin[]): Promise<void> {
-  // Ensure externals are exposed
   exposePluginExternals();
 
+  // Each loadPlugin is independent (its own IndexedDB read, blob URL,
+  // dynamic import, activate() call). Parallel; allSettled so one bad
+  // plugin doesn't block the rest — loadPlugin catches internally and
+  // flags status=error.
   const enabledPlugins = plugins.filter(p => p.enabled && p.status !== 'error');
-  for (const plugin of enabledPlugins) {
-    await loadPlugin(plugin);
-  }
+  await Promise.allSettled(enabledPlugins.map(p => loadPlugin(p)));
 }
 
 // --- Deactivate all plugins ---------------------------------

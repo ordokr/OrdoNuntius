@@ -252,11 +252,14 @@ export const usePluginStore = create<PluginStoreState>()(
           // Sync server-managed plugins before loading
           await syncServerPlugins(get, set);
 
-          // Load all enabled plugins
+          // Load all enabled plugins. Each loadPlugin reads its bundle from
+          // IndexedDB and runs the plugin's activate() — independent per
+          // plugin, so parallelize. allSettled so one plugin's activate-time
+          // throw doesn't strand the others (loadPlugin catches internally
+          // and flips status to 'error', but a synchronous throw before that
+          // try/catch would still bubble — defensive).
           const enabledPlugins = get().plugins.filter(p => p.enabled && p.status !== 'error');
-          for (const plugin of enabledPlugins) {
-            await loadPlugin(plugin);
-          }
+          await Promise.allSettled(enabledPlugins.map(p => loadPlugin(p)));
 
           set({ initialized: true });
         })();

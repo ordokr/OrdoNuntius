@@ -530,17 +530,29 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
         const position = emails.length;
         const authAccounts = useAccountStore.getState().accounts.filter(a => a.isConnected);
         const allClients = useAuthStore.getState().getAllConnectedClients();
-        const built: UnifiedAccountClient[] = [];
-        for (const a of authAccounts) {
-          const c = allClients.get(a.id);
-          if (!c) continue;
-          try {
-            const mailboxes = await c.getMailboxes();
-            built.push({ accountId: a.id, accountLabel: a.label || a.email, client: c, mailboxes });
-          } catch {
-            /* skip account on mailbox fetch failure */
-          }
-        }
+        // Was: sequential `for (...) { await c.getMailboxes() }` — N RTT for N
+        // accounts. Parallelized: 1 RTT (the longest mailbox fetch). Per-
+        // account failures still drop quietly so a single slow/dead account
+        // doesn't block the rest. Matches the pattern in app/[locale]/page.tsx's
+        // `populateUnifiedAccountMailboxes` (logged: candidate for a shared
+        // helper, but lib/unified-mailbox.ts must stay store-agnostic so a
+        // shared helper would need an injected accounts/clients pair).
+        const eligible = authAccounts
+          .map(a => ({ a, c: allClients.get(a.id) }))
+          .filter((p): p is { a: typeof p.a; c: NonNullable<typeof p.c> } => Boolean(p.c));
+        const settled = await Promise.allSettled(
+          eligible.map(({ a, c }) =>
+            c.getMailboxes().then(mailboxes => ({
+              accountId: a.id,
+              accountLabel: a.label || a.email,
+              client: c,
+              mailboxes,
+            })),
+          ),
+        );
+        const built: UnifiedAccountClient[] = settled.flatMap(r =>
+          r.status === 'fulfilled' ? [r.value] : [],
+        );
         const result = await fetchUnifiedEmails(built, unifiedRole, emailsPerPage, position);
         const currentEmails = get().emails;
         const existingIds = new Set(currentEmails.map(e => e.id));

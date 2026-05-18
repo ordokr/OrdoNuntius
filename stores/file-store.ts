@@ -380,17 +380,20 @@ export const useFileStore = create<FileState>((set, get) => ({
       }
     }
 
-    // Create directories as flat entries with prefixed names (no parentId nesting)
-    // Convert "/" separators from webkitRelativePath to PATH_SEP (∕) for server names
-    const sortedDirs = [...dirs].sort((a, b) => a.split('/').length - b.split('/').length);
-    for (const dir of sortedDirs) {
-      if (abortController.signal.aborted) break;
-      const fullDirName = prefix + dir.replace(/\//g, PATH_SEP);
-      try {
-        await client.createFileDirectory(fullDirName, null);
-      } catch {
-        // Directory may already exist - ignore
-      }
+    // Create directories as flat entries with prefixed names (no parentId
+    // nesting — confirmed by the `null` parent below). Since the server
+    // treats them as flat, there's no parent-then-child ordering constraint
+    // and we can fire all N creates in parallel. Cancellation can't unwind
+    // in-flight requests but the user's cancel intent only matters for the
+    // *upload* loop below; a handful of empty server-side dirs from a
+    // cancelled upload is acceptable. Was: N sequential RTT.
+    if (!abortController.signal.aborted) {
+      await Promise.allSettled(
+        [...dirs].map(dir => {
+          const fullDirName = prefix + dir.replace(/\//g, PATH_SEP);
+          return client.createFileDirectory(fullDirName, null);
+        }),
+      );
     }
 
     // Upload files with full prefixed paths
