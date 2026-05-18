@@ -456,3 +456,108 @@ file in this index — visited when its turn arrives.)
 406. [s] `tailwind.config.ts` — config file.
 407. [s] `vitest.config.ts` — config file.
 408. [s] `vitest.setup.ts` — test setup.
+
+## Post-audit perf sweep (2026-05-18)
+
+After the file-by-file audit was complete, a focused perf sweep ran
+across hot paths. Each commit is small and self-contained; verified
+with tsc + Next build between batches; deployed in five batches.
+
+### RTT minimization (sequential `await` loops → parallel)
+
+  - `email-store.ts` loadMoreEmails (unified view): per-account
+    `c.getMailboxes()` was sequential. N accounts × RTT → 1 RTT.
+  - `plugin-store.ts` initializePlugins + `lib/plugin-loader.ts`
+    activateAllPlugins: per-plugin `loadPlugin` was sequential. Each
+    plugin's IndexedDB read + activate() is independent — parallel
+    with allSettled.
+  - `file-store.ts` upload-folder directory create: N sequential
+    `client.createFileDirectory` → parallel (server treats them as
+    flat — `null` parentId — so no parent-then-child ordering).
+  - `app/admin/_tabs/themes.tsx` forceEnableAll / forceDisableAll:
+    sequential PATCH per theme → batched via shared helper.
+  - `email-slices/push.ts` handleStateChange: the Email / Mailbox /
+    Calendar / SieveScript fan-outs were awaited in series. They
+    write to disjoint stores — collected into a tasks array and
+    Promise.allSettled. max(t) instead of sum(t).
+  - `email-slices/spam.ts` batchMarkAsSpam + batchUndoSpam: N
+    sequential `client.markAsSpam(emailId)` / `undoSpam` → single
+    `client.batchMoveEmails(...)` call. 50 RTT → 1 RTT.
+
+### O(N²) → O(N+M) Map / Set lookups
+
+  - `file-browser.tsx` selectedDownloadableNames: was `[...sel]
+    .filter(n => !resources.find(r => r.name === n)?.isDirectory)`
+    computed twice per render. Memoized with a name→isDirectory Map.
+  - `email-viewer.tsx`: three sites called `emailKeywords.find(k =>
+    k.id === tagId)` per render. Hoisted `emailKeywordsById:
+    Map<string, KeywordDefinition>`.
+  - `email-composer.tsx` rewriteInlineImages: `known.find(e => e.cid
+    === cid)` per inline image → cid→entry Map built once.
+  - `contacts-sidebar.tsx` memberCountByGroup: was O(G·C·M·2) with
+    `.filter(c => keys.includes(c.id) || ...).length`. Per-group
+    Set lookup makes it O(G·(C+M)) and reduce-to-counter drops the
+    intermediate filtered array.
+  - `task-list-view.tsx`: `selectedCalendarIds.includes()` was O(M)
+    per task; now Set + `for...in` over task.calendarIds.
+  - `lib/calendar-store.ts` mapServerEventToStoreEvent /
+    mapCalendarIdsToStoreIds: shared `calendarByOriginal` Map
+    threaded through both paths — O(K·C) → O(K+C).
+
+### Per-iteration allocation drops (`Object.keys/values/entries` → `for...in`)
+
+  - `email-store.ts`: four batch-op loops (moveEmailsToMailbox /
+    batchMarkAsRead / moveThreadToMailbox / batchDelete) walked
+    `email.mailboxIds` via `Object.keys` per email in a batch.
+  - `lib/jmap/client.ts` namespaceMailboxIds: bulk shared-folder
+    fetches namespace hundreds of emails at once.
+  - `lib/thread-utils.ts` getEmailColorTags: called from
+    EmailListItem render (~50× per virtualizer slice).
+  - `lib/calendar-participants.ts`: five hot helpers
+    (participantMatchesEmail / isOrganizer / getUserParticipantId /
+    getUserStatus / getStatusCounts) walked event.participants via
+    Object.values per call.
+  - `contacts-sidebar.tsx` contactCountByBook + allKeywords,
+    `app/[locale]/contacts/page.tsx` allKeywords + uncategorized
+    filter, `address-book-management-settings.tsx` sortedKeywords
+    (also wrapped in useMemo — was unmemoized): per-contact
+    Object.entries / Object.keys dropped.
+
+### Schwartzian transforms on date comparators
+
+  - `task-list-view.tsx`: `new Date(a.due).getTime() - new Date(b.due)
+    .getTime()` per comparison → pre-compute dueMs once per item.
+  - `file-browser.tsx` displayResources, "modified" sort.
+  - `calendar-agenda-view.tsx` grouped: `getEventStartDate(...)` does
+    `parseISO` per call.
+  - `lib/calendar-utils.ts` packWeekSegments: tie-breaker
+    `getEventStartDate(s.event).getTime()` cached.
+  - `lib/thread-utils.ts` recomputeThreadGroupAttrs: five separate
+    `.some()` calls fused into one walk with all-found early-exit.
+
+### DRY consolidations
+
+  - `lib/account-keyed-cache.ts` (new): generic factory for
+    accountId→T localStorage caches. `lib/last-inbox.ts` and
+    `lib/cached-inbox-emails.ts` migrated.
+  - `getEmailColorTags`: was duplicated as `getCurrentColors` in
+    BOTH `email-viewer.tsx` AND `email-context-menu.tsx`. Both
+    consumers now import the lib version (which already existed).
+  - `countActiveGroupMembers` extracted to `stores/contact-store.ts`
+    — was inlined in `contact-group-list.tsx` and
+    `app/[locale]/contacts/page.tsx`.
+
+### Other perf wins
+
+  - `email-slices/push.ts` refreshCurrentMailbox: per-email keyword
+    equality was `JSON.stringify(a) !== JSON.stringify(b)` (allocated
+    2 strings per email per push, no size-mismatch short-circuit) →
+    `keywordsEqual` helper, O(K) with early exit.
+  - `sidebar.tsx`: `accounts.filter(a => a.isConnected).length` →
+    `reduce` to count without an intermediate array.
+  - `calendar-sidebar-panel.tsx`: pendingTaskCount + overdueTaskCount
+    each did `tasks.filter(...).length`. Overdue ⊆ pending, so fused
+    into one walk that accumulates both counts.
+  - `contact-store.ts` `firstValueOf` helper: replaces
+    `Object.values(rec)[0]` in `getContactDisplayName` (three sites)
+    and `getContactPrimaryEmail` — zero-allocation first-entry pick.
