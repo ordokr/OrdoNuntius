@@ -363,9 +363,84 @@ function performFullLogout(set: (state: Partial<AuthState>) => void): void {
   try { localStorage.removeItem('account-storage'); } catch { /* noop */ }
 }
 
+interface BearerLoginFinalization {
+  /** The connected JMAPClient (already registered in `clients` map). */
+  client: JMAPClient;
+  /** Account ID — already added to accountStore by the caller. */
+  accountId: string;
+  username: string;
+  serverUrl: string;
+  identities: Identity[];
+  primaryIdentity: Identity | null;
+  accessToken: string;
+  expiresIn: number;
+  /**
+   * Cookie slot the server wrote the refresh-token cookie to. Authoritative
+   * over whatever accountStore.addAccount picked, since concurrent tabs can
+   * race for slot indices.
+   */
+  cookieSlot: number;
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      /**
+       * Shared tail for bearer-token logins (OAuth + server-SSO). Both flows
+       * differ in how they obtain the access token but converge on the same
+       * post-token bookkeeping: pin the cookie slot, set active, sync
+       * Stalwart-context, flip auth state, schedule refresh, notify the
+       * embedding parent, kick off settings sync. Was ~60 lines duplicated
+       * verbatim in loginWithOAuth and loginWithServerSso.
+       */
+      const finalizeBearerLogin = async (ctx: BearerLoginFinalization): Promise<void> => {
+        const accountStore = useAccountStore.getState();
+
+        // The refresh-token cookie was written to `ctx.cookieSlot`. Force the
+        // stored cookieSlot to match: addAccount preserves the prior slot when
+        // re-adding an existing account, and recomputes via getNextCookieSlot
+        // for new accounts (which may disagree if another tab claimed a slot
+        // mid-flow). The cookie's slot is the source of truth.
+        accountStore.updateAccount(ctx.accountId, { cookieSlot: ctx.cookieSlot });
+        accountStore.setActiveAccount(ctx.accountId);
+
+        await syncStalwartAuthContext(
+          ctx.serverUrl,
+          ctx.username,
+          ctx.client.getAuthHeader(),
+          ctx.cookieSlot,
+        );
+
+        set({
+          isAuthenticated: true,
+          isLoading: false,
+          serverUrl: ctx.serverUrl,
+          username: ctx.username,
+          client: ctx.client,
+          ...getClientRateLimitState(ctx.client),
+          identities: ctx.identities,
+          primaryIdentity: ctx.primaryIdentity,
+          authMode: 'oauth',
+          accessToken: ctx.accessToken,
+          tokenExpiresAt: Date.now() + ctx.expiresIn * 1000,
+          connectionLost: false,
+          error: null,
+          activeAccountId: ctx.accountId,
+        });
+
+        scheduleRefresh(ctx.expiresIn, get().refreshAccessToken, ctx.accountId);
+
+        notifyParent('sso:auth-success', { username: ctx.username });
+
+        fetchConfig().then((cfg) => {
+          if (!cfg.settingsSyncEnabled) return;
+          useSettingsStore.getState().loadFromServer(ctx.username, ctx.serverUrl).finally(() => {
+            useSettingsStore.getState().enableSync(ctx.username, ctx.serverUrl);
+          });
+        }).catch(() => {});
+      };
+
+      return {
       isAuthenticated: false,
       isLoading: false,
       error: null,
@@ -746,48 +821,22 @@ export const useAuthStore = create<AuthState>()(
             hasError: false,
             isDefault: accountStore.accounts.length === 0,
           });
-          // The refresh-token cookie was written to `slot`. Force the stored
-          // cookieSlot to match: addAccount preserves the prior slot when
-          // re-adding an existing account, and recomputes via getNextCookieSlot
-          // for new accounts (which may disagree if another tab claimed a slot
-          // mid-flow). Either way, the cookie's slot is the source of truth.
-          accountStore.updateAccount(accountId, { cookieSlot: slot });
-          accountStore.setActiveAccount(accountId);
 
-          await syncStalwartAuthContext(serverUrl, username, client.getAuthHeader(), slot);
-
-          set({
-            isAuthenticated: true,
-            isLoading: false,
-            serverUrl,
-            username,
+          await finalizeBearerLogin({
             client,
-            ...getClientRateLimitState(client),
+            accountId,
+            username,
+            serverUrl,
             identities,
             primaryIdentity,
-            authMode: 'oauth',
             accessToken: access_token,
-            tokenExpiresAt: Date.now() + expires_in * 1000,
-            connectionLost: false,
-            error: null,
-            activeAccountId: accountId,
+            expiresIn: expires_in,
+            cookieSlot: slot,
           });
 
           // Prefetch was kicked off earlier (see earlyPrefetch above); this
           // attach exists only so debug.error in the same scope is consistent.
           void earlyPrefetch;
-
-          scheduleRefresh(expires_in, get().refreshAccessToken, accountId);
-
-          notifyParent('sso:auth-success', { username });
-
-          // Sync settings from server (only if enabled)
-          fetchConfig().then(config => {
-            if (!config.settingsSyncEnabled) return;
-            useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
-              useSettingsStore.getState().enableSync(username, serverUrl);
-            });
-          }).catch(() => {});
 
           // Clean up sessionStorage
           if (typeof window !== 'undefined') {
@@ -895,44 +944,21 @@ export const useAuthStore = create<AuthState>()(
             hasError: false,
             isDefault: accountStore.accounts.length === 0,
           });
-          // The refresh-token cookie was written to `slot` by /api/auth/sso/complete.
-          // Force the stored cookieSlot to match - see loginWithOAuth above for the
-          // re-add and concurrent-tab cases this guards against.
-          accountStore.updateAccount(accountId, { cookieSlot: slot });
-          accountStore.setActiveAccount(accountId);
 
-          await syncStalwartAuthContext(ssoServerUrl, username, client.getAuthHeader(), slot);
-
-          set({
-            isAuthenticated: true,
-            isLoading: false,
-            serverUrl: ssoServerUrl,
-            username,
+          await finalizeBearerLogin({
             client,
-            ...getClientRateLimitState(client),
+            accountId,
+            username,
+            serverUrl: ssoServerUrl,
             identities,
             primaryIdentity,
-            authMode: 'oauth',
             accessToken: access_token,
-            tokenExpiresAt: Date.now() + expires_in * 1000,
-            connectionLost: false,
-            error: null,
-            activeAccountId: accountId,
+            expiresIn: expires_in,
+            cookieSlot: slot,
           });
 
           // Prefetch was kicked off earlier (see earlyPrefetch above).
           void earlyPrefetch;
-
-          scheduleRefresh(expires_in, get().refreshAccessToken, accountId);
-
-          notifyParent('sso:auth-success', { username });
-
-          fetchConfig().then(cfg => {
-            if (!cfg.settingsSyncEnabled) return;
-            useSettingsStore.getState().loadFromServer(username, ssoServerUrl).finally(() => {
-              useSettingsStore.getState().enableSync(username, ssoServerUrl);
-            });
-          }).catch(() => {});
 
           return true;
         } catch (error) {
@@ -1722,7 +1748,8 @@ export const useAuthStore = create<AuthState>()(
       getAllConnectedClients: () => {
         return new Map(clients);
       },
-    }),
+    };
+    },
     {
       name: 'auth-storage',
       partialize: (state) => {
