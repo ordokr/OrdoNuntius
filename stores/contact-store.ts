@@ -13,7 +13,8 @@ import { debug } from '@/lib/debug';
 // list), so no eviction is needed.
 interface ContactSearchIndex {
   lowerName: string;
-  lowerEmails: readonly string[];
+  /** address + pre-lowercased copy, paired so consumers iterate once. */
+  emails: ReadonlyArray<{ address: string; lower: string }>;
 }
 const _contactSearchIndex = new WeakMap<ContactCard, ContactSearchIndex>();
 
@@ -27,11 +28,15 @@ function getContactByEmailIndex(contacts: readonly ContactCard[]): Map<string, C
   const cached = _contactByEmailIndex.get(contacts);
   if (cached) return cached;
   const index = new Map<string, ContactCard>();
+  // `for...in` over contact.emails avoids the per-contact `Object.values`
+  // throwaway array. With a 10k-contact address book that's 10k allocs
+  // dropped from the cold-index build.
   for (const contact of contacts) {
     if (!contact.emails) continue;
-    for (const e of Object.values(contact.emails)) {
-      if (!e.address) continue;
-      const key = e.address.toLowerCase();
+    for (const k in contact.emails) {
+      const addr = contact.emails[k]?.address;
+      if (!addr) continue;
+      const key = addr.toLowerCase();
       // First-wins: if two contacts share an email, the earlier-listed
       // one wins. Matches the order-dependent behavior of the prior
       // for-of-Object.values lookup loop in Avatar.
@@ -60,13 +65,20 @@ function getContactSearchIndex(contact: ContactCard): ContactSearchIndex {
   const cached = _contactSearchIndex.get(contact);
   if (cached) return cached;
   const lowerName = getContactDisplayName(contact).toLowerCase();
-  // Index-aligned with Object.values(contact.emails). Entries without an
-  // address get an empty string so callers can index directly without
-  // having to filter twice.
-  const lowerEmails: string[] = contact.emails
-    ? Object.values(contact.emails).map(e => e.address ? e.address.toLowerCase() : '')
-    : [];
-  const entry: ContactSearchIndex = { lowerName, lowerEmails };
+  // Pre-compute address + lowercased address pairs in one pass. Previous
+  // shape built `lowerEmails` index-aligned with `Object.values(contact.
+  // emails)` and forced consumers to call `Object.values` *again* to walk
+  // the pairs — duplicate allocation. The new shape carries the address
+  // with its lowercase so consumers iterate one array, no second alloc.
+  const emails: Array<{ address: string; lower: string }> = [];
+  if (contact.emails) {
+    for (const k in contact.emails) {
+      const addr = contact.emails[k]?.address;
+      if (!addr) continue;
+      emails.push({ address: addr, lower: addr.toLowerCase() });
+    }
+  }
+  const entry: ContactSearchIndex = { lowerName, emails };
   _contactSearchIndex.set(contact, entry);
   return entry;
 }
@@ -441,18 +453,18 @@ export const useContactStore = create<ContactStore>()(
           }
 
           // Pre-lowercased name + emails (cached in WeakMap per contact).
+          // Walk the paired array directly — was re-deriving the same list
+          // via `Object.values(contact.emails)` per iteration, doubling
+          // allocation cost.
           const idx = getContactSearchIndex(contact);
           const nameMatches = idx.lowerName.includes(lower);
-          const emails = contact.emails ? Object.values(contact.emails) : [];
-          for (let i = 0; i < emails.length; i++) {
+          for (const e of idx.emails) {
             if (results.length >= MAX_RESULTS) break;
-            const emailEntry = emails[i];
-            if (!emailEntry.address) continue;
-            if (nameMatches || idx.lowerEmails[i]?.includes(lower)) {
+            if (nameMatches || e.lower.includes(lower)) {
               // Compute the display name lazily — only when we have a hit,
               // not for every contact we scan past.
               const name = getContactDisplayName(contact);
-              results.push({ name, email: emailEntry.address });
+              results.push({ name, email: e.address });
             }
           }
         }

@@ -103,10 +103,8 @@ const SingleEmailItemImpl = React.forwardRef<HTMLDivElement, SingleEmailItemProp
         ?? { id, label: id, color: 'gray' }
     );
     const resolvedKeywordDef = resolvedKeywordDefs[0] ?? null;
-    const resolvedColorTag = (() => {
-      if (colorTag) return colorTag;
-      return resolvedKeywordDef ? KEYWORD_PALETTE[resolvedKeywordDef.color]?.bg ?? null : null;
-    })();
+    const resolvedColorTag = colorTag
+      ?? (resolvedKeywordDef ? KEYWORD_PALETTE[resolvedKeywordDef.color]?.bg ?? null : null);
 
     const { dragHandlers, isDragging } = useEmailDrag({
       email,

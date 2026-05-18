@@ -1467,9 +1467,14 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
       const remaining = emails.filter(e => !selectedEmailIds.has(e.id));
       set({ emails: remaining, selectedEmailIds: new Set(), isLoading: false });
 
-      await fetchMailboxes(client);
-      // Refresh the current mailbox view (honors active search/filters)
-      await get().refreshCurrentMailbox(client);
+      // Mailbox list + current-view refresh hit disjoint store fields and
+      // don't depend on each other — parallelize. With archive mode = year
+      // or month the server creates new dated folders, so fetchMailboxes is
+      // necessary; refreshCurrentMailbox repaints the active list.
+      await Promise.all([
+        fetchMailboxes(client),
+        get().refreshCurrentMailbox(client),
+      ]);
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to archive emails',
