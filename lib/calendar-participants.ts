@@ -27,8 +27,11 @@ function participantMatchesEmail(p: CalendarParticipant, lowerEmails: string[]):
     if (addr && lowerEmails.includes(addr)) return true;
   }
   if (p.sendTo) {
-    for (const addr of Object.values(p.sendTo)) {
-      const normalized = addr.replace(/^mailto:/i, '').toLowerCase();
+    // `for...in` avoids the per-call `Object.values` array allocation —
+    // this function is called per participant per event in calendar
+    // rendering, so the alloc compounds.
+    for (const k in p.sendTo) {
+      const normalized = p.sendTo[k].replace(/^mailto:/i, '').toLowerCase();
       if (normalized && lowerEmails.includes(normalized)) return true;
     }
   }
@@ -38,16 +41,18 @@ function participantMatchesEmail(p: CalendarParticipant, lowerEmails: string[]):
 export function isOrganizer(event: CalendarEvent, userEmails: string[]): boolean {
   if (!event.participants) return false;
   const lower = userEmails.map(e => e.toLowerCase());
-  return Object.values(event.participants).some(p =>
-    p.roles?.owner && participantMatchesEmail(p, lower)
-  );
+  for (const k in event.participants) {
+    const p = event.participants[k];
+    if (p.roles?.owner && participantMatchesEmail(p, lower)) return true;
+  }
+  return false;
 }
 
 export function getUserParticipantId(event: CalendarEvent, userEmails: string[]): string | null {
   if (!event.participants) return null;
   const lower = userEmails.map(e => e.toLowerCase());
-  for (const [id, p] of Object.entries(event.participants)) {
-    if (participantMatchesEmail(p, lower)) return id;
+  for (const id in event.participants) {
+    if (participantMatchesEmail(event.participants[id], lower)) return id;
   }
   return null;
 }
@@ -58,7 +63,8 @@ export function getUserStatus(
 ): CalendarParticipant['participationStatus'] | null {
   if (!event.participants) return null;
   const lower = userEmails.map(e => e.toLowerCase());
-  for (const p of Object.values(event.participants)) {
+  for (const k in event.participants) {
+    const p = event.participants[k];
     if (participantMatchesEmail(p, lower)) return p.participationStatus;
   }
   return null;
@@ -87,8 +93,8 @@ export function getParticipantList(event: CalendarEvent): ParticipantInfo[] {
 export function getStatusCounts(event: CalendarEvent): StatusCounts {
   const counts: StatusCounts = { accepted: 0, declined: 0, tentative: 0, 'needs-action': 0 };
   if (!event.participants) return counts;
-  for (const p of Object.values(event.participants)) {
-    const s = p.participationStatus || 'needs-action';
+  for (const k in event.participants) {
+    const s = event.participants[k].participationStatus || 'needs-action';
     if (s in counts) counts[s as keyof StatusCounts]++;
   }
   return counts;
