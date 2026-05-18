@@ -254,6 +254,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     selectedEmailIds: new Set(),
     expandedThreadIds: new Set(),
     threadEmailsCache: new Map(),
+    // Same rationale as selectMailbox: stale undo entries refer to
+    // the previous selection's mailbox context.
+    spamUndoCache: new Map(),
   }),
   fetchTagCounts: async (client) => {
     try {
@@ -277,6 +280,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     expandedThreadIds: new Set(),
     threadEmailsCache: new Map(),
     isLoadingThread: null,
+    // Drop stale undo entries when switching mailboxes — the cached
+    // originalMailboxId would refer to the previous mailbox and a
+    // late toast-undo would put the email back in the wrong place.
+    spamUndoCache: new Map(),
   }),
   setLoading: (loading) => set({ isLoading: loading }),
   setLoadingEmail: (loading) => set({ isLoadingEmail: loading }),
@@ -837,85 +844,101 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   },
 
   markAsRead: async (client, emailId, read) => {
+    // Coalesce concurrent calls for the same (id, target-state) pair.
+    const processingKey = `${emailId}-${read}`;
+    if (get().processingReadStatus.has(processingKey)) {
+      return;
+    }
+
+    const email = get().emails.find(e => e.id === emailId);
+    if (!email) return;
+
+    // No-op if already in desired state.
+    const isCurrentlyRead = email.keywords?.$seen === true;
+    if (isCurrentlyRead === read) {
+      return;
+    }
+
+    // OPTIMISTIC UPDATE: flip local state + counters first so the UI
+    // responds in ~0ms (used to await JMAP RTT before any visible
+    // change). Snapshot prior emails / selectedEmail / mailboxes so
+    // we can roll back on server failure. Applies the RTT-min rule.
+    const prevState = get();
+    const prevEmail = prevState.emails.find(e => e.id === emailId);
+    const prevSelectedEmail = prevState.selectedEmail;
+    const prevMailboxes = prevState.mailboxes;
+
+    set((state) => {
+      const updatedMailboxes = state.mailboxes.map(mailbox => {
+        if (email.mailboxIds && email.mailboxIds[mailbox.id]) {
+          const delta = read ? -1 : 1;
+          return {
+            ...mailbox,
+            unreadEmails: Math.max(0, mailbox.unreadEmails + delta),
+            unreadThreads: Math.max(0, mailbox.unreadThreads + delta),
+          };
+        }
+        return mailbox;
+      });
+      return {
+        emails: state.emails.map(e =>
+          e.id === emailId ? { ...e, keywords: { ...e.keywords, $seen: read } } : e
+        ),
+        selectedEmail: state.selectedEmail?.id === emailId
+          ? { ...state.selectedEmail, keywords: { ...state.selectedEmail.keywords, $seen: read } }
+          : state.selectedEmail,
+        mailboxes: updatedMailboxes,
+        processingReadStatus: new Set([...state.processingReadStatus, processingKey]),
+      };
+    });
+
     try {
-      // Check if this email is already being processed
-      const processingKey = `${emailId}-${read}`;
-      const currentProcessing = get().processingReadStatus;
-      if (currentProcessing.has(processingKey)) {
-        return; // Already being processed
-      }
-
-      // Get the email to check its current state and mailboxes
-      const email = get().emails.find(e => e.id === emailId);
-      if (!email) return;
-
-      // Check if already in the desired state
-      const isCurrentlyRead = email.keywords?.$seen === true;
-      if (isCurrentlyRead === read) {
-        return; // Already in desired state
-      }
-
-      // Add to processing set
-      set((state) => ({
-        processingReadStatus: new Set([...state.processingReadStatus, processingKey])
-      }));
-
-      // Determine accountId for shared folders
       const selectedMailboxId = get().selectedMailbox;
-      const mailboxes = get().mailboxes;
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailboxId);
-      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
+      const currentMailbox = get().mailboxes.find(mb => mb.id === selectedMailboxId);
+      const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
 
       await client.markAsRead(emailId, read, accountId);
 
-      // Update local state including mailbox counters
+      // Success — just clear the processing key. Local state is
+      // already correct from the optimistic flip above.
       set((state) => {
-        // Remove from processing set
-        const newProcessingSet = new Set(state.processingReadStatus);
-        newProcessingSet.delete(processingKey);
-
-        // Only update counters if the state is actually changing
-        const emailInState = state.emails.find(e => e.id === emailId);
-        if (!emailInState) return { processingReadStatus: newProcessingSet };
-
-        const wasRead = emailInState.keywords?.$seen === true;
-        if (wasRead === read) {
-          return { processingReadStatus: newProcessingSet }; // State unchanged, skip counter update
-        }
-
-        const updatedMailboxes = state.mailboxes.map(mailbox => {
-          // Check if this email belongs to this mailbox
-          if (emailInState.mailboxIds && emailInState.mailboxIds[mailbox.id]) {
-            // Adjust unread counter: -1 if marking as read, +1 if marking as unread
-            const delta = read ? -1 : 1;
+        const next = new Set(state.processingReadStatus);
+        next.delete(processingKey);
+        return { processingReadStatus: next };
+      });
+    } catch (error) {
+      // Roll back optimistic update. Restore the specific email's
+      // prior keywords + selectedEmail + mailbox counters. Don't
+      // blanket-replace `emails` array because other in-flight ops
+      // may have changed unrelated rows during our await.
+      set((state) => {
+        const next = new Set(state.processingReadStatus);
+        next.delete(processingKey);
+        return {
+          processingReadStatus: next,
+          emails: state.emails.map(e =>
+            e.id === emailId && prevEmail
+              ? { ...e, keywords: prevEmail.keywords }
+              : e
+          ),
+          selectedEmail: state.selectedEmail?.id === emailId && prevSelectedEmail
+            ? { ...state.selectedEmail, keywords: prevSelectedEmail.keywords }
+            : state.selectedEmail,
+          // Counters: revert just the touched mailboxes. Other
+          // mailboxes may have had unrelated mutations meanwhile, so
+          // pull from `state.mailboxes` not the snapshot.
+          mailboxes: state.mailboxes.map(mailbox => {
+            const prevMb = prevMailboxes.find(pm => pm.id === mailbox.id);
+            if (!prevMb) return mailbox;
+            if (!email.mailboxIds || !email.mailboxIds[mailbox.id]) return mailbox;
+            const delta = read ? 1 : -1; // reverse of optimistic delta
             return {
               ...mailbox,
               unreadEmails: Math.max(0, mailbox.unreadEmails + delta),
-              unreadThreads: Math.max(0, mailbox.unreadThreads + delta)
+              unreadThreads: Math.max(0, mailbox.unreadThreads + delta),
             };
-          }
-          return mailbox;
-        });
-
-        return {
-          emails: state.emails.map(e =>
-            e.id === emailId ? { ...e, keywords: { ...e.keywords, $seen: read } } : e
-          ),
-          selectedEmail: state.selectedEmail?.id === emailId
-            ? { ...state.selectedEmail, keywords: { ...state.selectedEmail.keywords, $seen: read } }
-            : state.selectedEmail,
-          mailboxes: updatedMailboxes,
-          processingReadStatus: newProcessingSet
-        };
-      });
-    } catch (error) {
-      // Remove from processing set on error
-      set((state) => {
-        const newProcessingSet = new Set(state.processingReadStatus);
-        newProcessingSet.delete(`${emailId}-${read}`);
-        return {
-          processingReadStatus: newProcessingSet,
-          error: error instanceof Error ? error.message : "Failed to update email"
+          }),
+          error: error instanceof Error ? error.message : "Failed to update email",
         };
       });
       throw error;
@@ -1578,10 +1601,19 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
     if (!currentMailbox) return;
 
-    get().spamUndoCache.set(emailId, {
-      emailId,
-      originalMailboxId: currentMailbox.originalId || currentMailbox.id,
-      accountId: currentMailbox.accountId,
+    // Was: get().spamUndoCache.set(...) — in-place mutation bypassing
+    // the zustand setter. Works at runtime but breaks immutability so
+    // dev tools / subscribers don't see the change, and the previous
+    // Map reference leaks into any component that subscribed to
+    // spamUndoCache. Replace with a proper immutable update.
+    set(state => {
+      const nextCache = new Map(state.spamUndoCache);
+      nextCache.set(emailId, {
+        emailId,
+        originalMailboxId: currentMailbox.originalId || currentMailbox.id,
+        accountId: currentMailbox.accountId,
+      });
+      return { spamUndoCache: nextCache };
     });
 
     try {
@@ -1610,7 +1642,13 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // Use cached original mailbox (more accurate for immediate undo)
       targetMailboxId = cachedData.originalMailboxId;
       accountId = cachedData.accountId;
-      get().spamUndoCache.delete(emailId);
+      // Was: get().spamUndoCache.delete(emailId) — in-place mutation
+      // bypassing zustand. Now uses an immutable copy via the setter.
+      set(state => {
+        const nextCache = new Map(state.spamUndoCache);
+        nextCache.delete(emailId);
+        return { spamUndoCache: nextCache };
+      });
     } else {
       // Fall back to finding Inbox (generic "not spam" button/menu)
       const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
@@ -1890,9 +1928,21 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // Fetch all emails in the thread
       const emails = await client.getThreadEmails(threadId, accountId);
 
-      // Update cache
+      // Bounded LRU. Without the cap, a user expanding many threads
+      // during one mailbox session keeps growing this Map until the
+      // mailbox switches (which resets it). 64 threads × ~50 emails
+      // × ~2KB each ≈ 6 MB ceiling — generous but bounded.
+      const MAX_THREAD_CACHE = 64;
       const newCache = new Map(get().threadEmailsCache);
+      // Map iteration order is insertion order, so delete-then-set
+      // moves the entry to the end. When over capacity, drop oldest.
+      newCache.delete(threadId);
       newCache.set(threadId, emails);
+      while (newCache.size > MAX_THREAD_CACHE) {
+        const oldestKey = newCache.keys().next().value;
+        if (oldestKey === undefined) break;
+        newCache.delete(oldestKey);
+      }
 
       set({
         threadEmailsCache: newCache,
