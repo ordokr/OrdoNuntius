@@ -21,6 +21,25 @@ export function generateUUID(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+// Cached RelativeTimeFormat — constructing it is non-trivial (locale
+// data table lookup) and formatDate is called once per visible email
+// row, so a fresh instance per call would burn measurable CPU on a
+// virtualizer scroll. `short` style produces "5 min. ago" in English,
+// "il y a 5 min" in French, "5분 전" in Korean — the locale-aware
+// replacement for the previous hardcoded "5m ago".
+//
+// The cache key is the current document language (set by next-intl
+// after a language switch). When the user changes locale, the next
+// formatDate call rebuilds the formatter for the new locale.
+let _cachedRtf: { rtf: Intl.RelativeTimeFormat; lang: string } | null = null;
+function getRtf(): Intl.RelativeTimeFormat {
+  const lang = typeof document !== "undefined" ? document.documentElement.lang || "" : "";
+  if (_cachedRtf && _cachedRtf.lang === lang) return _cachedRtf.rtf;
+  const rtf = new Intl.RelativeTimeFormat(lang || undefined, { numeric: "auto", style: "short" });
+  _cachedRtf = { rtf, lang };
+  return rtf;
+}
+
 export function formatDate(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   const now = new Date();
@@ -30,14 +49,18 @@ export function formatDate(date: Date | string): string {
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
 
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
+  // `numeric: 'auto'` lets the platform render "now" / "yesterday" /
+  // "今" / "ahora" idiomatically when the value lands on a boundary.
+  // Was hardcoded English ("Just now", "5m ago", "3h ago", "2d ago").
+  const rtf = getRtf();
+  if (minutes < 1) return rtf.format(0, "minute");
+  if (minutes < 60) return rtf.format(-minutes, "minute");
+  if (hours < 24) return rtf.format(-hours, "hour");
+  if (days < 7) return rtf.format(-days, "day");
 
-  // Was hardcoded `"en-US"` — every email in the inbox list older than 7
-  // days rendered with US month names regardless of the user's locale.
-  // Passing `undefined` lets Intl pick up the document/browser locale.
+  // Was hardcoded `"en-US"` — every email older than 7 days rendered
+  // with US month names regardless of the user's locale. `undefined`
+  // lets Intl pick up the document/browser locale.
   return d.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",

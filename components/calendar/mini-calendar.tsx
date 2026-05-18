@@ -15,10 +15,13 @@ import type { CalendarEvent } from "@/lib/jmap/types";
 
 type PickerView = "days" | "months" | "years";
 
-const MONTH_LABELS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
+// Maps a 0-based month index to the translation key under `calendar.months`
+// in locale JSON. Was a hardcoded English array — the months-picker view
+// rendered "Jan", "Feb", … regardless of the user's locale.
+const MONTH_KEYS = [
+  "jan", "feb", "mar", "apr", "may", "jun",
+  "jul", "aug", "sep", "oct", "nov", "dec",
+] as const;
 
 interface MiniCalendarProps {
   selectedDate: Date;
@@ -206,12 +209,12 @@ export function MiniCalendar({
 
       {pickerView === "months" && (
         <div className="grid grid-cols-3 gap-1 py-1">
-          {MONTH_LABELS.map((label, i) => {
+          {MONTH_KEYS.map((key, i) => {
             const isCurrentMonth = i === currentMonth && currentYear === getYear(new Date());
             const isSelected = i === getMonth(selectedDate) && currentYear === getYear(selectedDate);
             return (
               <button
-                key={i}
+                key={key}
                 onClick={() => handlePickMonth(i)}
                 className={cn(
                   "py-2 text-xs rounded-md transition-colors",
@@ -220,7 +223,7 @@ export function MiniCalendar({
                   !isSelected && !isCurrentMonth && "hover:bg-muted"
                 )}
               >
-                {label}
+                {t(`months.${key}`)}
               </button>
             );
           })}

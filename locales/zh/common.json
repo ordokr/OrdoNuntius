@@ -2933,5 +2933,35 @@
     "email_too_long": "Email address is too long (max 254 characters)",
     "email_invalid_chars": "Email address contains invalid characters",
     "email_invalid": "Please enter a valid email address"
+  },
+  "recipient_popover": {
+    "copy": "Copy",
+    "copy_email_title": "Copy email",
+    "email": "Email",
+    "send_email_title": "Send email",
+    "view_contact": "View contact",
+    "view_details": "View details",
+    "copied": "Copied!",
+    "copy_failed": "Failed to copy"
+  },
+  "rich_text_editor": {
+    "bold": "Bold",
+    "italic": "Italic",
+    "underline": "Underline",
+    "strikethrough": "Strikethrough",
+    "heading_1": "Heading 1",
+    "heading_2": "Heading 2",
+    "bullet_list": "Bullet List",
+    "ordered_list": "Ordered List",
+    "quote": "Quote",
+    "code_block": "Code Block",
+    "align_left": "Align Left",
+    "align_center": "Align Center",
+    "align_right": "Align Right",
+    "link": "Link",
+    "table": "Table",
+    "clear_formatting": "Clear Formatting",
+    "undo": "Undo",
+    "redo": "Redo"
   }
 }

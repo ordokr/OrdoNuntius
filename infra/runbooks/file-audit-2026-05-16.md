@@ -187,7 +187,7 @@ file in this index — visited when its turn arrives.)
 137. [s] `components/calendar/event-modal.tsx` — clean. Focus-trap effect captures first/last focusable on mount only; acceptable pattern but stale if modal content changes between view/edit modes.
 138. [s] `components/calendar/ical-import-modal.tsx` — clean.
 139. [s] `components/calendar/ical-subscription-modal.tsx` — clean.
-140. [s] `components/calendar/mini-calendar.tsx` — clean. Hardcoded English `MONTH_LABELS` in months picker (i18n bug; cross-locale).
+140. [x] `components/calendar/mini-calendar.tsx` — **i18n fixed**: replaced hardcoded `MONTH_LABELS` English array with `MONTH_KEYS` indexing into the existing `calendar.months` translation namespace.
 141. [s] `components/calendar/participant-input.tsx` — clean, debounced autocomplete + aria-combobox.
 142. [s] `components/calendar/quick-event-input.tsx` — clean.
 143. [s] `components/calendar/recurrence-scope-dialog.tsx` — clean, focus-trapped modal.
@@ -213,9 +213,9 @@ file in this index — visited when its turn arrives.)
 163. [s] `components/email/email-hover-actions.tsx` — clean. Trivial `hoverBackgroundClassName` alias of prop; not worth a commit.
 164. [s] `components/email/email-identity-badge.tsx` — clean.
 165. [s] `components/email/email-list-item.tsx` — clean. Hardcoded English "No preview available" at line 320 — i18n bug but cross-locale fix (logged).
-166. [s] `components/email/recipient-popover.tsx` — clean. Hardcoded English action labels ("Copy", "Email", "View contact", "Copied!") — i18n bug; cross-locale.
+166. [x] `components/email/recipient-popover.tsx` — **i18n fixed**: action labels + tooltips + toast strings wired to a new `recipient_popover` namespace added to all 16 locales (copy, copy_email_title, email, send_email_title, view_contact, view_details, copied, copy_failed).
 167. [s] `components/email/resizable-image.tsx` — clean Tiptap node-view.
-168. [s] `components/email/rich-text-editor.tsx` — clean Tiptap setup. Hardcoded English toolbar `title` attrs ("Bold", "Italic", etc.) — i18n bug, cross-locale.
+168. [x] `components/email/rich-text-editor.tsx` — **i18n fixed**: all 18 toolbar tooltip `title=` attrs wired to a new `rich_text_editor` namespace (bold/italic/underline/strikethrough/heading_1/heading_2/bullet_list/ordered_list/quote/code_block/align_left/align_center/align_right/link/table/clear_formatting/undo/redo).
 169. [s] `components/email/smime-status-banner.tsx` — clean.
 170. [s] `components/email/thread-email-item.tsx` — clean. Same hardcoded "Unknown"/"No preview" English (cross-locale).
 171. [s] `components/email/thread-list-item.tsx` — clean, already heavily optimized in earlier perf passes (granular selectors, hoisted prop pattern, memoized component). Same hardcoded "(no subject)" / "No preview available" i18n concern as siblings.
@@ -418,7 +418,7 @@ file in this index — visited when its turn arrives.)
 368. [s] `lib/thread-utils.ts` — clean; excellently optimized (Schwartzian transform on Date parses, fused loops with early exit).
 369. [s] `lib/tnef.ts` — TNEF parser; clean.
 370. [s] `lib/unified-mailbox.ts` — clean.
-371. [x] `lib/utils.ts` — `formatDate` was hardcoded to `"en-US"` locale, rendering US month names regardless of user locale. Now uses browser default. Logged: relative-time strings ("Just now", "5m ago") still English; cross-locale.
+371. [x] `lib/utils.ts` — **i18n fully fixed**: relative-time strings ("Just now", "5m ago", etc.) now use `Intl.RelativeTimeFormat` with `numeric: "auto"` style, locale-aware via `document.documentElement.lang`. Long-form dates already locale-aware after the earlier `"en-US"` → `undefined` fix. RTF instance cached per-lang to avoid construction cost per row (formatDate called once per visible email).
 372. [x] `lib/validation.ts` — **i18n bug fixed**: added `getEmailValidationErrorCode` returning typed codes (`EMAIL_REQUIRED`/`EMAIL_TOO_LONG`/`EMAIL_INVALID_CHARS`/`EMAIL_INVALID`); callers translate via the new `validation_errors` namespace. Legacy `getEmailValidationError` kept as `@deprecated` for back-compat. `identity-form.tsx` migrated to the code-based API.
 373. [s] `lib/vcard.ts` — vCard parser/serializer; clean.
 374. [s] `lib/version-check/fetcher.ts` — clean.

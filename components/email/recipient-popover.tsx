@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "next-intl";
 import { Mail, Phone, Building, ExternalLink, Copy, Send, UserPlus } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ interface RecipientPopoverProps {
 }
 
 export function RecipientPopover({ name, email, displayLabel, onViewContact, className }: RecipientPopoverProps) {
+  const t = useTranslations("recipient_popover");
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -115,9 +117,9 @@ export function RecipientPopover({ name, email, displayLabel, onViewContact, cla
   const handleCopyEmail = async (addr: string) => {
     try {
       await navigator.clipboard.writeText(addr);
-      toast.success("Copied!");
+      toast.success(t("copied"));
     } catch {
-      toast.error("Failed to copy");
+      toast.error(t("copy_failed"));
     }
   };
 
@@ -201,27 +203,27 @@ export function RecipientPopover({ name, email, displayLabel, onViewContact, cla
               <button
                 onClick={() => handleCopyEmail(email)}
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted transition-colors"
-                title="Copy email"
+                title={t("copy_email_title")}
               >
                 <Copy className="w-3.5 h-3.5" />
-                Copy
+                {t("copy")}
               </button>
               <a
                 href={`mailto:${email}`}
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted transition-colors"
-                title="Send email"
+                title={t("send_email_title")}
               >
                 <Send className="w-3.5 h-3.5" />
-                Email
+                {t("email")}
               </a>
               {onViewContact && (
                 <button
                   onClick={handleViewContact}
                   className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted transition-colors ml-auto"
-                  title={contact ? "View contact" : "View details"}
+                  title={contact ? t("view_contact") : t("view_details")}
                 >
                   {contact ? <ExternalLink className="w-3.5 h-3.5" /> : <UserPlus className="w-3.5 h-3.5" />}
-                  {contact ? "View contact" : "View details"}
+                  {contact ? t("view_contact") : t("view_details")}
                 </button>
               )}
             </div>
