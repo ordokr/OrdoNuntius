@@ -15,7 +15,7 @@ import { ContactsSidebar, type ContactCategory } from "@/components/contacts/con
 import { ContactImportDialog } from "@/components/contacts/contact-import-dialog";
 import { RenameDialog } from "@/components/files/rename-dialog";
 import { exportContacts } from "@/components/contacts/contact-export";
-import { useContactStore, getContactDisplayName } from "@/stores/contact-store";
+import { useContactStore, getContactDisplayName, countActiveGroupMembers } from "@/stores/contact-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
@@ -597,9 +597,7 @@ export default function ContactsPage() {
             <div className="flex-1 overflow-y-auto divide-y divide-border">
               {groups.map((group) => {
                 const gName = getContactDisplayName(group);
-                const memberCount = group.members
-                  ? Object.values(group.members).filter(Boolean).length
-                  : 0;
+                const memberCount = countActiveGroupMembers(group.members);
                 return (
                   <button
                     key={group.id}

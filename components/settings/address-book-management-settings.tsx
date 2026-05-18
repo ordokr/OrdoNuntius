@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Book, Pencil, Share2, Tag, Users } from "lucide-react";
 import { useContactStore } from "@/stores/contact-store";
@@ -178,15 +178,22 @@ export function AddressBookManagementSettings() {
     );
   };
 
-  // Collect keywords with counts
-  const keywordCounts: Record<string, number> = {};
-  for (const c of contacts) {
-    if (c.kind === "group" || !c.keywords) continue;
-    for (const [kw, active] of Object.entries(c.keywords)) {
-      if (active) keywordCounts[kw] = (keywordCounts[kw] || 0) + 1;
+  // Collect keywords with counts. Was unmemoized — ran on every parent
+  // re-render (settings page has many setState triggers), walked all
+  // contacts × keywords with `Object.entries` allocating per contact,
+  // then `Object.entries` + sort on the counts. Now memoized on
+  // `contacts` only; `for...in` over c.keywords drops the per-contact
+  // entries-array allocation.
+  const sortedKeywords = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const c of contacts) {
+      if (c.kind === "group" || !c.keywords) continue;
+      for (const kw in c.keywords) {
+        if (c.keywords[kw]) counts[kw] = (counts[kw] || 0) + 1;
+      }
     }
-  }
-  const sortedKeywords = Object.entries(keywordCounts).sort(([a], [b]) => a.localeCompare(b));
+    return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
+  }, [contacts]);
 
   const handleRenameKeyword = async (oldKw: string, newKw: string) => {
     setIsLoading(true);

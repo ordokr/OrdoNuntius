@@ -111,6 +111,23 @@ export function getContactPhotoUri(contact: ContactCard): string | undefined {
   return undefined;
 }
 
+/**
+ * Count active members of a group's `members` map. The shape is
+ * `Record<string, boolean>` — `true` means active, `false` (or missing)
+ * means inactive. Was previously inlined in two list renders as
+ * `Object.values(group.members).filter(Boolean).length` which allocates a
+ * values-array AND a filtered-array per group per render. The direct
+ * `for...in` walk avoids both.
+ */
+export function countActiveGroupMembers(members: Record<string, boolean> | undefined): number {
+  if (!members) return 0;
+  let n = 0;
+  for (const k in members) {
+    if (members[k]) n++;
+  }
+  return n;
+}
+
 export const TRUSTED_SENDERS_BOOK_NAME = 'Trusted Senders';
 
 interface ContactStore {

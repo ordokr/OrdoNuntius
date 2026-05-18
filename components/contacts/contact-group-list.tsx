@@ -6,7 +6,7 @@ import { Users, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ContactCard } from "@/lib/jmap/types";
-import { getContactDisplayName } from "@/stores/contact-store";
+import { getContactDisplayName, countActiveGroupMembers } from "@/stores/contact-store";
 
 interface ContactGroupListProps {
   groups: ContactCard[];
@@ -61,9 +61,7 @@ export function ContactGroupList({
         ) : (
           <div className="divide-y divide-border">
             {sorted.map((group) => {
-              const memberCount = group.members
-                ? Object.values(group.members).filter(Boolean).length
-                : 0;
+              const memberCount = countActiveGroupMembers(group.members);
               return (
                 <button
                   key={group.id}

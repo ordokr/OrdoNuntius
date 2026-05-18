@@ -136,27 +136,29 @@ export function ContactsSidebar({
     return Array.from(map.values());
   }, [addressBooks]);
 
-  // Count contacts per address book
+  // Count contacts per address book. Same allocation note as allKeywords
+  // below — `for...in` drops the per-contact `Object.keys` array.
   const contactCountByBook = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const contact of individuals) {
       if (!contact.addressBookIds) continue;
-      for (const bookId of Object.keys(contact.addressBookIds)) {
-        if (!contact.addressBookIds[bookId]) continue;
-        counts[bookId] = (counts[bookId] || 0) + 1;
+      for (const bookId in contact.addressBookIds) {
+        if (contact.addressBookIds[bookId]) counts[bookId] = (counts[bookId] || 0) + 1;
       }
     }
     return counts;
   }, [individuals]);
 
-  // Auto-collect keywords from all contacts
+  // Auto-collect keywords from all contacts. `for...in` over keywords
+  // drops the per-contact `Object.entries` allocation — for an address
+  // book with thousands of contacts the entries-array allocation
+  // dominates this walk.
   const allKeywords = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const contact of individuals) {
       if (!contact.keywords) continue;
-      for (const [kw, active] of Object.entries(contact.keywords)) {
-        if (!active) continue;
-        counts[kw] = (counts[kw] || 0) + 1;
+      for (const kw in contact.keywords) {
+        if (contact.keywords[kw]) counts[kw] = (counts[kw] || 0) + 1;
       }
     }
     return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
