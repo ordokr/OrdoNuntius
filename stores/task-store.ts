@@ -65,18 +65,48 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   updateTask: async (client, id, updates) => {
-    await client.updateCalendarTask(id, updates);
+    // Optimistic update: flip local state before the server round-trip
+    // so the UI feels instant. Snapshot the prior row so we can roll
+    // back if the server rejects. Applies the RTT-min rule — the
+    // perceived latency goes from "JMAP RTT" to ~0ms.
+    const prev = get().tasks.find(t => t.id === id);
+    if (!prev) {
+      await client.updateCalendarTask(id, updates);
+      return;
+    }
     set({
       tasks: get().tasks.map(t => t.id === id ? { ...t, ...updates, updated: new Date().toISOString() } : t),
     });
+    try {
+      await client.updateCalendarTask(id, updates);
+    } catch (error) {
+      // Roll back to the snapshot
+      set({ tasks: get().tasks.map(t => t.id === id ? prev : t) });
+      throw error;
+    }
   },
 
   deleteTask: async (client, id) => {
-    await client.deleteCalendarTask(id);
+    const prev = get().tasks.find(t => t.id === id);
+    const prevSelectedTaskId = get().selectedTaskId;
+    if (!prev) {
+      await client.deleteCalendarTask(id);
+      return;
+    }
+    // Optimistic remove + selection clear; restore on server failure.
     set({
       tasks: get().tasks.filter(t => t.id !== id),
-      selectedTaskId: get().selectedTaskId === id ? null : get().selectedTaskId,
+      selectedTaskId: prevSelectedTaskId === id ? null : prevSelectedTaskId,
     });
+    try {
+      await client.deleteCalendarTask(id);
+    } catch (error) {
+      set({
+        tasks: [...get().tasks, prev],
+        selectedTaskId: prevSelectedTaskId,
+      });
+      throw error;
+    }
   },
 
   toggleTaskComplete: async (client, task) => {
@@ -85,10 +115,18 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       progress: newProgress,
       progressUpdated: new Date().toISOString(),
     };
-    await client.updateCalendarTask(task.id, updates);
+    // Optimistic checkbox flip — the most user-visible UX of the lot.
     set({
       tasks: get().tasks.map(t => t.id === task.id ? { ...t, ...updates, updated: new Date().toISOString() } : t),
     });
+    try {
+      await client.updateCalendarTask(task.id, updates);
+    } catch (error) {
+      set({
+        tasks: get().tasks.map(t => t.id === task.id ? task : t),
+      });
+      throw error;
+    }
   },
 
   clearTasks: () => set({ tasks: [], selectedTaskId: null, error: null }),

@@ -843,23 +843,15 @@ export class JMAPClient implements IJMAPClient {
 
       throw new Error('Unexpected response format');
     } catch (error) {
+      // Previously this caught and returned a synthetic single-entry
+      // INBOX. That masked real backend failures behind a permanently-
+      // empty-looking inbox UX — users couldn't tell "no mail" apart
+      // from "Mailbox/get failed". Re-throw so callers can surface
+      // the real cause (their existing try/catch already handles it:
+      // email-store.fetchMailboxes sets `error`, the unified-mailbox
+      // builder skips the failed account, sendRawEmail propagates).
       console.error('Failed to get mailboxes:', error);
-      return [{
-        id: 'INBOX',
-        originalId: undefined,
-        name: 'Inbox',
-        role: 'inbox',
-        sortOrder: 0,
-        totalEmails: 0,
-        unreadEmails: 0,
-        totalThreads: 0,
-        unreadThreads: 0,
-        myRights: DEFAULT_MAILBOX_RIGHTS,
-        isSubscribed: true,
-        accountId: this.accountId,
-        accountName: this.username,
-        isShared: false,
-      }] as Mailbox[];
+      throw error;
     }
   }
 

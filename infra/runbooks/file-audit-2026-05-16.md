@@ -42,9 +42,9 @@ file in this index — visited when its turn arrives.)
 | 6 | `app/[locale]/login/page.tsx` | `app/[locale]/auth/callback/page.tsx` | ~~Verify it handles empty `oauth_server_url` from sessionStorage~~ — **RESOLVED**: callback already guards at line 48. | ~~low~~ resolved |
 | 7 | `app/[locale]/login/page.tsx` | Same file (defer for tier-2 pass) | Consider consolidating ~15 useState into useReducer groups (form / UI / OAuth / theme / suggestions). Large refactor, low ROI today. | low |
 | 8 | `app/[locale]/login/page.tsx` | Same file | `handleSubmit`/`handleDevLogin`/`handleDemoLogin` each `router.push('/')` after success — redundant with the `useEffect` on `isAuthenticated`, causing two navigations. Trim later. | trivial |
-| 9 | `stores/auth-store.ts` | Same file (tier-2) | Multi-account refresh race: singleton `refreshPromise` short-circuits before per-account map; `scheduleRefresh` callback reads `activeAccountId` at fire-time not schedule-time. Fix together with test coverage. | **high** (multi-account correctness) |
+| 9 | `stores/auth-store.ts` | Same file (tier-2) | ~~Multi-account refresh race~~ — **RESOLVED** in fc7070c: `refreshAccessToken(forAccountId?)` accepts an explicit account, `scheduleRefresh` passes it through, `JMAPClient.setOnTokenRefresh` lets the bearer client's 401-retry callback re-bind once accountId is known. Non-active-account refresh failures no longer tear down the whole session. | ~~**high**~~ resolved |
 | 10 | `stores/auth-store.ts` | Same file (tier-2) | Three login methods (password/OAuth/server-SSO) share ~80 lines of post-connect boilerplate (cookieSlot, snapshot/clear, accountStore.addAccount, set, scheduleRefresh, notifyParent, fetchConfig→settingsSync). Extract a shared `finalizeLogin()` helper. | medium |
-| 11 | `lib/jmap/client.ts` | Same file (tier-2) | `getMailboxes` returns synthetic INBOX on error — masks real server-side failures behind an empty-inbox UX. Caller should distinguish. | medium |
+| 11 | `lib/jmap/client.ts` | Same file (tier-2) | ~~`getMailboxes` returns synthetic INBOX on error~~ — **RESOLVED**: now re-throws so callers can surface the real cause. Their try/catch already handled it. | ~~medium~~ resolved |
 
 ## Files (hot-path-first, then alphabetical)
 
