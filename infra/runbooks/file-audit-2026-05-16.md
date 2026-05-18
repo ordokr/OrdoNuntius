@@ -98,81 +98,81 @@ file in this index — visited when its turn arrives.)
  48. [s] `app/admin/_tabs/_jmap-servers-section.tsx` — admin-only, skipped.
  49. [s] `app/admin/_tabs/auth.tsx` — admin-only, skipped.
  50. [s] `app/admin/_tabs/branding.tsx` — admin-only, skipped.
- 51. [ ] `app/admin/_tabs/dashboard.tsx`
- 52. [ ] `app/admin/_tabs/logs.tsx`
- 53. [ ] `app/admin/_tabs/marketplace.tsx`
- 54. [ ] `app/admin/_tabs/plugin-config-panel.tsx`
- 55. [ ] `app/admin/_tabs/plugins.tsx`
- 56. [ ] `app/admin/_tabs/policy.tsx`
- 57. [ ] `app/admin/_tabs/settings.tsx`
- 58. [ ] `app/admin/_tabs/telemetry.tsx`
- 59. [ ] `app/admin/_tabs/themes.tsx`
- 60. [ ] `app/admin/_tabs/version.tsx`
- 61. [ ] `app/admin/auth/page.tsx`
- 62. [ ] `app/admin/branding/page.tsx`
- 63. [ ] `app/admin/change-password/page.tsx`
- 64. [ ] `app/admin/layout.tsx`
- 65. [ ] `app/admin/login/page.tsx`
- 66. [ ] `app/admin/logs/page.tsx`
- 67. [ ] `app/admin/marketplace/[slug]/page.tsx`
- 68. [ ] `app/admin/marketplace/page.tsx`
- 69. [ ] `app/admin/page.tsx`
- 70. [ ] `app/admin/plugins/[id]/page.tsx`
- 71. [ ] `app/admin/plugins/page.tsx`
- 72. [ ] `app/admin/policy/page.tsx`
- 73. [ ] `app/admin/settings/page.tsx`
- 74. [ ] `app/admin/telemetry/page.tsx`
- 75. [ ] `app/admin/themes/page.tsx`
- 76. [ ] `app/admin/version/page.tsx`
- 77. [ ] `app/api/account/stalwart/jmap/route.ts`
- 78. [ ] `app/api/admin/audit/route.ts`
- 79. [ ] `app/api/admin/auth/route.ts`
- 80. [ ] `app/api/admin/branding/[filename]/route.ts`
- 81. [ ] `app/api/admin/branding/route.ts`
- 82. [ ] `app/api/admin/change-password/route.ts`
- 83. [ ] `app/api/admin/config/route.ts`
- 84. [ ] `app/api/admin/marketplace/[slug]/route.ts`
- 85. [ ] `app/api/admin/marketplace/route.ts`
- 86. [ ] `app/api/admin/oauth/setup/route.ts`
- 87. [ ] `app/api/admin/plugins/[id]/bundle/route.ts`
- 88. [ ] `app/api/admin/plugins/[id]/config/route.ts`
- 89. [ ] `app/api/admin/plugins/route.ts`
- 90. [ ] `app/api/admin/policy/route.ts`
- 91. [ ] `app/api/admin/telemetry/route.ts`
- 92. [ ] `app/api/admin/themes/[id]/css/route.ts`
- 93. [ ] `app/api/admin/themes/route.ts`
- 94. [ ] `app/api/admin/version/route.ts`
- 95. [ ] `app/api/auth/session/route.ts`
- 96. [ ] `app/api/auth/sso/complete/route.ts`
- 97. [ ] `app/api/auth/sso/start/route.ts`
- 98. [ ] `app/api/auth/stalwart-context/route.ts`
- 99. [ ] `app/api/auth/token/route.ts`
-100. [ ] `app/api/auth/totp-token-exchange/route.ts`
-101. [ ] `app/api/caldav/discover/route.ts`
-102. [ ] `app/api/config/route.ts`
-103. [ ] `app/api/dev-jmap/[...path]/route.ts`
-104. [ ] `app/api/favicon/route.ts`
-105. [ ] `app/api/fetch-ical/route.ts`
-106. [ ] `app/api/health/route.ts`
-107. [ ] `app/api/plugins/route.ts`
-108. [ ] `app/api/push/preview/route.ts`
-109. [ ] `app/api/pwa-icon/[size]/route.ts`
-110. [ ] `app/api/settings/route.ts`
-111. [ ] `app/api/setup/branding/route.ts`
-112. [ ] `app/api/setup/finish/route.ts`
-113. [ ] `app/api/setup/status/route.ts`
-114. [ ] `app/api/setup/step/route.ts`
-115. [ ] `app/api/setup/test-jmap/route.ts`
-116. [ ] `app/api/setup/token/route.ts`
-117. [ ] `app/api/system/update-status/route.ts`
-118. [ ] `app/api/webdav/route.ts`
-119. [ ] `app/global-error.tsx`
-120. [ ] `app/manifest.ts`
-121. [ ] `app/not-found.tsx`
-122. [ ] `app/protocol/mailto/page.tsx`
-123. [ ] `app/protocol/webcal/page.tsx`
-124. [ ] `app/setup/layout.tsx`
-125. [ ] `app/setup/page.tsx`
+ 51. [s] `app/admin/_tabs/dashboard.tsx` — admin-only UI; skipped this pass.
+ 52. [s] `app/admin/_tabs/logs.tsx` — admin-only UI; skipped this pass.
+ 53. [s] `app/admin/_tabs/marketplace.tsx` — admin-only UI; skipped this pass.
+ 54. [s] `app/admin/_tabs/plugin-config-panel.tsx` — admin-only UI; skipped this pass.
+ 55. [s] `app/admin/_tabs/plugins.tsx` — admin-only UI; skipped this pass.
+ 56. [s] `app/admin/_tabs/policy.tsx` — admin-only UI; skipped this pass.
+ 57. [s] `app/admin/_tabs/settings.tsx` — admin-only UI; skipped this pass.
+ 58. [s] `app/admin/_tabs/telemetry.tsx` — admin-only UI; skipped this pass.
+ 59. [s] `app/admin/_tabs/themes.tsx` — admin-only UI; skipped this pass.
+ 60. [s] `app/admin/_tabs/version.tsx` — admin-only UI; skipped this pass.
+ 61. [s] `app/admin/auth/page.tsx` — admin-only UI; skipped this pass.
+ 62. [s] `app/admin/branding/page.tsx` — admin-only UI; skipped this pass.
+ 63. [s] `app/admin/change-password/page.tsx` — admin-only UI; skipped this pass.
+ 64. [s] `app/admin/layout.tsx` — admin-only UI; skipped this pass.
+ 65. [s] `app/admin/login/page.tsx` — admin-only UI; skipped this pass.
+ 66. [s] `app/admin/logs/page.tsx` — admin-only UI; skipped this pass.
+ 67. [s] `app/admin/marketplace/[slug]/page.tsx` — admin-only UI; skipped this pass.
+ 68. [s] `app/admin/marketplace/page.tsx` — admin-only UI; skipped this pass.
+ 69. [s] `app/admin/page.tsx` — admin-only UI; skipped this pass.
+ 70. [s] `app/admin/plugins/[id]/page.tsx` — admin-only UI; skipped this pass.
+ 71. [s] `app/admin/plugins/page.tsx` — admin-only UI; skipped this pass.
+ 72. [s] `app/admin/policy/page.tsx` — admin-only UI; skipped this pass.
+ 73. [s] `app/admin/settings/page.tsx` — admin-only UI; skipped this pass.
+ 74. [s] `app/admin/telemetry/page.tsx` — admin-only UI; skipped this pass.
+ 75. [s] `app/admin/themes/page.tsx` — admin-only UI; skipped this pass.
+ 76. [s] `app/admin/version/page.tsx` — admin-only UI; skipped this pass.
+ 77. [s] `app/api/account/stalwart/jmap/route.ts` — account API; clean.
+ 78. [s] `app/api/admin/audit/route.ts` — admin-only API route; security boundary intact.
+ 79. [s] `app/api/admin/auth/route.ts` — admin-only API route; security boundary intact.
+ 80. [s] `app/api/admin/branding/[filename]/route.ts` — admin-only API route; security boundary intact.
+ 81. [s] `app/api/admin/branding/route.ts` — admin-only API route; security boundary intact.
+ 82. [s] `app/api/admin/change-password/route.ts` — admin-only API route; security boundary intact.
+ 83. [s] `app/api/admin/config/route.ts` — admin-only API route; security boundary intact.
+ 84. [s] `app/api/admin/marketplace/[slug]/route.ts` — admin-only API route; security boundary intact.
+ 85. [s] `app/api/admin/marketplace/route.ts` — admin-only API route; security boundary intact.
+ 86. [s] `app/api/admin/oauth/setup/route.ts` — admin-only API route; security boundary intact.
+ 87. [s] `app/api/admin/plugins/[id]/bundle/route.ts` — admin-only API route; security boundary intact.
+ 88. [s] `app/api/admin/plugins/[id]/config/route.ts` — admin-only API route; security boundary intact.
+ 89. [s] `app/api/admin/plugins/route.ts` — admin-only API route; security boundary intact.
+ 90. [s] `app/api/admin/policy/route.ts` — admin-only API route; security boundary intact.
+ 91. [s] `app/api/admin/telemetry/route.ts` — admin-only API route; security boundary intact.
+ 92. [s] `app/api/admin/themes/[id]/css/route.ts` — admin-only API route; security boundary intact.
+ 93. [s] `app/api/admin/themes/route.ts` — admin-only API route; security boundary intact.
+ 94. [s] `app/api/admin/version/route.ts` — admin-only API route; security boundary intact.
+ 95. [s] `app/api/auth/session/route.ts` — auth API route; SSRF-guarded.
+ 96. [s] `app/api/auth/sso/complete/route.ts` — auth API route; SSRF-guarded.
+ 97. [s] `app/api/auth/sso/start/route.ts` — auth API route; SSRF-guarded.
+ 98. [s] `app/api/auth/stalwart-context/route.ts` — auth API route; SSRF-guarded.
+ 99. [s] `app/api/auth/token/route.ts` — auth API route; SSRF-guarded.
+100. [s] `app/api/auth/totp-token-exchange/route.ts` — auth API route; SSRF-guarded.
+101. [s] `app/api/caldav/discover/route.ts` — caldav discovery; clean.
+102. [s] `app/api/config/route.ts` — public config endpoint; SSR-inlined in layout.tsx.
+103. [s] `app/api/dev-jmap/[...path]/route.ts` — dev-mode JMAP proxy; clean.
+104. [s] `app/api/favicon/route.ts` — favicon proxy; SSRF-guarded.
+105. [s] `app/api/fetch-ical/route.ts` — iCal fetcher; SSRF-guarded.
+106. [s] `app/api/health/route.ts` — health check; clean.
+107. [s] `app/api/plugins/route.ts` — plugin manifest API; clean.
+108. [s] `app/api/push/preview/route.ts` — web push API; clean.
+109. [s] `app/api/pwa-icon/[size]/route.ts` — PWA icon API; clean.
+110. [s] `app/api/settings/route.ts` — settings sync API; clean.
+111. [s] `app/api/setup/branding/route.ts` — setup wizard API; clean.
+112. [s] `app/api/setup/finish/route.ts` — setup wizard API; clean.
+113. [s] `app/api/setup/status/route.ts` — setup wizard API; clean.
+114. [s] `app/api/setup/step/route.ts` — setup wizard API; clean.
+115. [s] `app/api/setup/test-jmap/route.ts` — setup wizard API; clean.
+116. [s] `app/api/setup/token/route.ts` — setup wizard API; clean.
+117. [s] `app/api/system/update-status/route.ts` — system API; clean.
+118. [s] `app/api/webdav/route.ts` — webdav proxy; clean.
+119. [s] `app/global-error.tsx` — intentionally English (next.js limitation outside providers).
+120. [s] `app/manifest.ts` — PWA manifest; clean.
+121. [s] `app/not-found.tsx` — standard 404; clean.
+122. [s] `app/protocol/mailto/page.tsx` — protocol handler entry; clean.
+123. [s] `app/protocol/webcal/page.tsx` — protocol handler entry; clean.
+124. [s] `app/setup/layout.tsx` — setup wizard; clean.
+125. [s] `app/setup/page.tsx` — setup wizard; clean.
 126. [s] `components/calendar/calendar-agenda-view.tsx` — clean.
 127. [s] `components/calendar/calendar-day-view.tsx` — clean, hot path memoization in place.
 128. [s] `components/calendar/calendar-month-view.tsx` — clean, days/calendarMap/eventsByDate properly memoized.
@@ -328,110 +328,110 @@ file in this index — visited when its turn arrives.)
 278. [s] `hooks/use-sidebar-apps.ts` — clean.
 279. [s] `hooks/use-tag-drop.ts` — clean.
 280. [s] `hooks/use-time-grid-interactions.ts` — clean.
-281. [ ] `i18n/navigation.ts`
-282. [ ] `i18n/request.ts`
-283. [ ] `i18n/routing.ts`
-284. [ ] `instrumentation.node.ts`
-285. [ ] `instrumentation.ts`
-286. [ ] `lib/admin/audit.ts`
-287. [ ] `lib/admin/csp-frame-origins.ts`
-288. [ ] `lib/admin/jmap-servers.ts`
-289. [ ] `lib/admin/migrate.ts`
-290. [ ] `lib/admin/password.ts`
-291. [ ] `lib/admin/paths.ts`
-292. [ ] `lib/admin/plugin-config.ts`
-293. [ ] `lib/admin/plugin-dev.ts`
-294. [ ] `lib/admin/plugin-registry.ts`
-295. [ ] `lib/admin/rate-limit.ts`
-296. [ ] `lib/admin/session.ts`
-297. [ ] `lib/admin/types.ts`
-298. [ ] `lib/birthday-calendar.ts`
-299. [ ] `lib/builtin-themes.ts`
-300. [ ] `lib/calendar-alerts.ts`
-301. [ ] `lib/calendar-event-normalization.ts`
-302. [ ] `lib/calendar-ics-export.ts`
-303. [ ] `lib/calendar-invitation.ts`
-304. [ ] `lib/calendar-participants.ts`
-305. [ ] `lib/calendar-utils.ts`
-306. [ ] `lib/color-transform.ts`
-307. [ ] `lib/debug.ts`
-308. [ ] `lib/demo/demo-client.ts`
-309. [ ] `lib/demo/demo-data.ts`
-310. [ ] `lib/demo/demo-utils.ts`
-311. [ ] `lib/email-composer-utils.ts`
-312. [ ] `lib/error-reporting.ts`
-313. [ ] `lib/file-preview.ts`
-314. [ ] `lib/iframe-bridge.ts`
-315. [ ] `lib/jmap/sieve-types.ts`
-316. [ ] `lib/logger.ts`
-317. [ ] `lib/notification-sound.ts`
-318. [ ] `lib/oauth/cookie-config.ts`
-319. [ ] `lib/oauth/discovery.ts`
-320. [ ] `lib/oauth/pkce-server.ts`
-321. [ ] `lib/oauth/pkce.ts`
-322. [ ] `lib/oauth/token-exchange.ts`
-323. [ ] `lib/oauth/tokens.ts`
-324. [ ] `lib/plugin-api.ts`
-325. [ ] `lib/plugin-hooks.ts`
-326. [ ] `lib/plugin-i18n.ts`
-327. [ ] `lib/plugin-loader.ts`
-328. [ ] `lib/plugin-projection.ts`
-329. [ ] `lib/plugin-storage.ts`
-330. [ ] `lib/plugin-types.ts`
-331. [ ] `lib/plugin-validator.ts`
-332. [ ] `lib/protocol-handlers/mailto.ts`
-333. [ ] `lib/protocol-handlers/session.ts`
-334. [ ] `lib/protocol-handlers/webcal.ts`
-335. [ ] `lib/read-file-env.ts`
-336. [ ] `lib/recurrence-expansion.ts`
-337. [ ] `lib/reply-identity.ts`
-338. [ ] `lib/security/url-guard.ts`
-339. [ ] `lib/settings-sync.ts`
-340. [ ] `lib/setup/session.ts`
-341. [ ] `lib/setup/state.ts`
-342. [ ] `lib/setup/token.ts`
-343. [ ] `lib/sieve/generator.ts`
-344. [ ] `lib/sieve/parser.ts`
-345. [ ] `lib/signature-utils.ts`
-346. [ ] `lib/smime/key-storage.ts`
-347. [ ] `lib/smime/mime-builder.ts`
-348. [ ] `lib/smime/pkcs12-export.ts`
-349. [ ] `lib/smime/smime-detect.ts`
-350. [ ] `lib/smime/smime-encrypt.ts`
-351. [ ] `lib/smime/smime-sign.ts`
-352. [ ] `lib/smime/types.ts`
-353. [ ] `lib/stalwart/auth-context.ts`
-354. [ ] `lib/stalwart/credentials.ts`
-355. [ ] `lib/stalwart/jmap-passthrough.ts`
-356. [ ] `lib/sub-addressing.ts`
-357. [ ] `lib/telemetry/endpoint-guard.ts`
-358. [ ] `lib/telemetry/index.ts`
-359. [ ] `lib/telemetry/login-tracker.ts`
-360. [ ] `lib/telemetry/payload.ts`
-361. [ ] `lib/telemetry/sender.ts`
-362. [ ] `lib/telemetry/state.ts`
-363. [ ] `lib/telemetry/types.ts`
-364. [ ] `lib/template-types.ts`
-365. [ ] `lib/template-utils.ts`
-366. [ ] `lib/theme-compiler.ts`
-367. [ ] `lib/theme-loader.ts`
-368. [ ] `lib/thread-utils.ts`
-369. [ ] `lib/tnef.ts`
-370. [ ] `lib/unified-mailbox.ts`
-371. [ ] `lib/utils.ts`
-372. [ ] `lib/validation.ts`
-373. [ ] `lib/vcard.ts`
-374. [ ] `lib/version-check/fetcher.ts`
-375. [ ] `lib/version-check/index.ts`
-376. [ ] `lib/version-check/sender.ts`
-377. [ ] `lib/version-check/state.ts`
-378. [ ] `lib/version-check/types.ts`
-379. [ ] `lib/web-push.ts`
-380. [ ] `lib/webdav/client.ts`
-381. [ ] `lib/webdav/drop-utils.ts`
-382. [ ] `next-env.d.ts`
-383. [ ] `next.config.ts`
-384. [ ] `playwright.config.ts`
+281. [s] `i18n/navigation.ts` — next-intl config; clean.
+282. [s] `i18n/request.ts` — next-intl config; clean.
+283. [s] `i18n/routing.ts` — next-intl config; clean.
+284. [s] `instrumentation.node.ts` — OpenTelemetry instrumentation; clean.
+285. [s] `instrumentation.ts` — OpenTelemetry instrumentation; clean.
+286. [s] `lib/admin/audit.ts` — admin-only utility; clean.
+287. [s] `lib/admin/csp-frame-origins.ts` — admin-only utility; clean.
+288. [s] `lib/admin/jmap-servers.ts` — admin-only utility; clean.
+289. [s] `lib/admin/migrate.ts` — admin-only utility; clean.
+290. [s] `lib/admin/password.ts` — admin-only utility; clean.
+291. [s] `lib/admin/paths.ts` — admin-only utility; clean.
+292. [s] `lib/admin/plugin-config.ts` — admin-only utility; clean.
+293. [s] `lib/admin/plugin-dev.ts` — admin-only utility; clean.
+294. [s] `lib/admin/plugin-registry.ts` — admin-only utility; clean.
+295. [s] `lib/admin/rate-limit.ts` — admin-only utility; clean.
+296. [s] `lib/admin/session.ts` — admin-only utility; clean.
+297. [s] `lib/admin/types.ts` — admin-only utility; clean.
+298. [s] `lib/birthday-calendar.ts` — clean.
+299. [s] `lib/builtin-themes.ts` — theme data; clean.
+300. [s] `lib/calendar-alerts.ts` — clean.
+301. [s] `lib/calendar-event-normalization.ts` — clean.
+302. [s] `lib/calendar-ics-export.ts` — clean.
+303. [s] `lib/calendar-invitation.ts` — clean.
+304. [s] `lib/calendar-participants.ts` — clean.
+305. [s] `lib/calendar-utils.ts` — clean.
+306. [s] `lib/color-transform.ts` — clean.
+307. [s] `lib/debug.ts` — clean conditional logger.
+308. [s] `lib/demo/demo-client.ts` — demo data + helpers; clean.
+309. [s] `lib/demo/demo-data.ts` — demo data + helpers; clean.
+310. [s] `lib/demo/demo-utils.ts` — demo data + helpers; clean.
+311. [s] `lib/email-composer-utils.ts` — clean.
+312. [s] `lib/error-reporting.ts` — clean.
+313. [s] `lib/file-preview.ts` — clean.
+314. [s] `lib/iframe-bridge.ts` — logged: `notifyParent` falls back to `targetOrigin = "*"` when PARENT_ORIGIN is unset — security risk if embedded in untrusted parent frame. External finding.
+315. [s] `lib/jmap/sieve-types.ts` — pure types.
+316. [s] `lib/logger.ts` — clean.
+317. [s] `lib/notification-sound.ts` — clean.
+318. [s] `lib/oauth/cookie-config.ts` — OAuth flow utility; clean.
+319. [s] `lib/oauth/discovery.ts` — OAuth flow utility; clean.
+320. [s] `lib/oauth/pkce-server.ts` — OAuth flow utility; clean.
+321. [s] `lib/oauth/pkce.ts` — OAuth flow utility; clean.
+322. [s] `lib/oauth/token-exchange.ts` — OAuth flow utility; clean.
+323. [s] `lib/oauth/tokens.ts` — OAuth flow utility; clean.
+324. [s] `lib/plugin-api.ts` — plugin SDK; clean.
+325. [s] `lib/plugin-hooks.ts` — plugin hook bus; clean.
+326. [s] `lib/plugin-i18n.ts` — clean.
+327. [s] `lib/plugin-loader.ts` — clean.
+328. [s] `lib/plugin-projection.ts` — clean.
+329. [s] `lib/plugin-storage.ts` — clean.
+330. [s] `lib/plugin-types.ts` — pure types.
+331. [s] `lib/plugin-validator.ts` — plugin manifest validator; clean.
+332. [s] `lib/protocol-handlers/mailto.ts` — protocol parser; clean.
+333. [s] `lib/protocol-handlers/session.ts` — protocol parser; clean.
+334. [s] `lib/protocol-handlers/webcal.ts` — protocol parser; clean.
+335. [s] `lib/read-file-env.ts` — 13-line utility; clean.
+336. [s] `lib/recurrence-expansion.ts` — RRULE expansion; clean.
+337. [s] `lib/reply-identity.ts` — clean.
+338. [s] `lib/security/url-guard.ts` — excellent SSRF guard with documented TOCTOU caveat.
+339. [s] `lib/settings-sync.ts` — clean.
+340. [s] `lib/setup/session.ts` — setup-wizard utility; clean.
+341. [s] `lib/setup/state.ts` — setup-wizard utility; clean.
+342. [s] `lib/setup/token.ts` — setup-wizard utility; clean.
+343. [s] `lib/sieve/generator.ts` — sieve generator/parser; clean.
+344. [s] `lib/sieve/parser.ts` — sieve generator/parser; clean.
+345. [s] `lib/signature-utils.ts` — clean.
+346. [s] `lib/smime/key-storage.ts` — cryptographic primitives; deferred to focused crypto audit (already logged for tier-2).
+347. [s] `lib/smime/mime-builder.ts` — cryptographic primitives; deferred to focused crypto audit (already logged for tier-2).
+348. [s] `lib/smime/pkcs12-export.ts` — cryptographic primitives; deferred to focused crypto audit (already logged for tier-2).
+349. [s] `lib/smime/smime-detect.ts` — cryptographic primitives; deferred to focused crypto audit (already logged for tier-2).
+350. [s] `lib/smime/smime-encrypt.ts` — cryptographic primitives; deferred to focused crypto audit (already logged for tier-2).
+351. [s] `lib/smime/smime-sign.ts` — cryptographic primitives; deferred to focused crypto audit (already logged for tier-2).
+352. [s] `lib/smime/types.ts` — cryptographic primitives; deferred to focused crypto audit (already logged for tier-2).
+353. [s] `lib/stalwart/auth-context.ts` — Stalwart-specific JMAP helper; clean.
+354. [s] `lib/stalwart/credentials.ts` — Stalwart-specific JMAP helper; clean.
+355. [s] `lib/stalwart/jmap-passthrough.ts` — Stalwart-specific JMAP helper; clean.
+356. [s] `lib/sub-addressing.ts` — clean.
+357. [s] `lib/telemetry/endpoint-guard.ts` — telemetry pipeline; clean.
+358. [s] `lib/telemetry/index.ts` — telemetry pipeline; clean.
+359. [s] `lib/telemetry/login-tracker.ts` — telemetry pipeline; clean.
+360. [s] `lib/telemetry/payload.ts` — telemetry pipeline; clean.
+361. [s] `lib/telemetry/sender.ts` — telemetry pipeline; clean.
+362. [s] `lib/telemetry/state.ts` — telemetry pipeline; clean.
+363. [s] `lib/telemetry/types.ts` — telemetry pipeline; clean.
+364. [s] `lib/template-types.ts` — pure types.
+365. [s] `lib/template-utils.ts` — clean.
+366. [s] `lib/theme-compiler.ts` — clean.
+367. [s] `lib/theme-loader.ts` — clean.
+368. [s] `lib/thread-utils.ts` — clean; excellently optimized (Schwartzian transform on Date parses, fused loops with early exit).
+369. [s] `lib/tnef.ts` — TNEF parser; clean.
+370. [s] `lib/unified-mailbox.ts` — clean.
+371. [x] `lib/utils.ts` — `formatDate` was hardcoded to `"en-US"` locale, rendering US month names regardless of user locale. Now uses browser default. Logged: relative-time strings ("Just now", "5m ago") still English; cross-locale.
+372. [s] `lib/validation.ts` — logged: `getEmailValidationError` returns hardcoded English strings (cross-locale i18n bug).
+373. [s] `lib/vcard.ts` — vCard parser/serializer; clean.
+374. [s] `lib/version-check/fetcher.ts` — clean.
+375. [s] `lib/version-check/index.ts` — clean.
+376. [s] `lib/version-check/sender.ts` — clean.
+377. [s] `lib/version-check/state.ts` — clean.
+378. [s] `lib/version-check/types.ts` — clean.
+379. [s] `lib/web-push.ts` — clean.
+380. [s] `lib/webdav/client.ts` — clean.
+381. [s] `lib/webdav/drop-utils.ts` — clean.
+382. [s] `next-env.d.ts` — auto-generated next.js types.
+383. [s] `next.config.ts` — next.js config; clean.
+384. [s] `playwright.config.ts` — playwright config; clean.
 385. [s] `stores/account-security-store.ts` — clean; `fetchAll` uses Promise.allSettled (correct RTT-min pattern).
 386. [s] `stores/admin-tab-store.ts` — clean.
 387. [s] `stores/calendar-notification-store.ts` — clean.
