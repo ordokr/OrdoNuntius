@@ -130,13 +130,28 @@ export const createSpamSlice: StateCreator<
     const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
     if (!currentMailbox) return;
 
+    // Was N sequential `client.markAsSpam(emailId)` calls — each one
+    // re-fetched mailboxes (cached) AND sent its own Email/set request.
+    // With 50 selected emails that's 50 sequential RTTs. The junk
+    // mailbox is the same for all of them, so resolve it once and
+    // pass the whole batch through the JMAP-native `batchMoveEmails`
+    // (single Email/set update with all IDs). 50 RTT → 1 RTT.
+    const accountId = currentMailbox.accountId;
+    const junkMailbox = mailboxes.find(m =>
+      m.role === 'junk' && (accountId ? m.accountId === accountId : !m.isShared)
+    );
+    if (!junkMailbox) {
+      console.error('Junk mailbox not found');
+      return;
+    }
+    const junkMailboxId = accountId && junkMailbox.originalId ? junkMailbox.originalId : junkMailbox.id;
+
     try {
-      for (const emailId of emailIds) {
-        await client.markAsSpam(emailId, currentMailbox.accountId);
-      }
+      await client.batchMoveEmails(emailIds, junkMailboxId, accountId);
+      const idSet = new Set(emailIds);
       set(state => ({
-        emails: state.emails.filter(e => !emailIds.includes(e.id)),
-        selectedEmail: emailIds.includes(state.selectedEmail?.id || '') ? null : state.selectedEmail,
+        emails: state.emails.filter(e => !idSet.has(e.id)),
+        selectedEmail: state.selectedEmail && idSet.has(state.selectedEmail.id) ? null : state.selectedEmail,
         selectedEmailIds: new Set(),
       }));
     } catch (error) {
@@ -155,14 +170,15 @@ export const createSpamSlice: StateCreator<
       (accountId ? m.accountId === accountId : !m.accountId)
     );
     if (!inboxMailbox) throw new Error('Inbox not found');
+    const inboxMailboxId = inboxMailbox.originalId || inboxMailbox.id;
 
+    // Same N-RTT → 1-RTT batching pattern as batchMarkAsSpam above.
     try {
-      for (const emailId of emailIds) {
-        await client.undoSpam(emailId, inboxMailbox.originalId || inboxMailbox.id, accountId);
-      }
+      await client.batchMoveEmails(emailIds, inboxMailboxId, accountId);
+      const idSet = new Set(emailIds);
       set(state => ({
-        emails: state.emails.filter(e => !emailIds.includes(e.id)),
-        selectedEmail: emailIds.includes(state.selectedEmail?.id || '') ? null : state.selectedEmail,
+        emails: state.emails.filter(e => !idSet.has(e.id)),
+        selectedEmail: state.selectedEmail && idSet.has(state.selectedEmail.id) ? null : state.selectedEmail,
         selectedEmailIds: new Set(),
       }));
     } catch (error) {

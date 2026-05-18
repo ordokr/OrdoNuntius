@@ -181,22 +181,35 @@ export function ContactsSidebar({
 
   // Resolve actual group member counts against living contacts
   const memberCountByGroup = useMemo(() => {
+    // Was O(G × C × M × 2): per group, `.filter(c => keys.includes(c.id)
+    // || normalized.includes(c.id) || ...)` did 2 `.includes()` per
+    // individual per group — each O(M). With 100 groups × 1000 contacts
+    // × 50-member arrays that's ~10M ops per render whenever contacts
+    // change. A Set built once per group reduces each lookup to O(1).
+    // Plus: reduce to a counter instead of building a throwaway filtered
+    // array just to read `.length`.
     const counts: Record<string, number> = {};
     for (const group of groups) {
       if (!group.members) {
         counts[group.id] = 0;
         continue;
       }
-      const memberKeys = Object.keys(group.members).filter(k => group.members![k]);
-      const normalizedKeys = memberKeys.map(k => k.startsWith('urn:uuid:') ? k.slice(9) : k);
-      counts[group.id] = individuals.filter(c => {
-        if (memberKeys.includes(c.id) || normalizedKeys.includes(c.id)) return true;
+      const keys = new Set<string>();
+      for (const k in group.members) {
+        if (!group.members[k]) continue;
+        keys.add(k);
+        if (k.startsWith('urn:uuid:')) keys.add(k.slice(9));
+      }
+      let n = 0;
+      for (const c of individuals) {
+        if (keys.has(c.id)) { n++; continue; }
         if (c.uid) {
+          if (keys.has(c.uid)) { n++; continue; }
           const bareUid = c.uid.startsWith('urn:uuid:') ? c.uid.slice(9) : c.uid;
-          return memberKeys.includes(c.uid) || normalizedKeys.includes(bareUid);
+          if (keys.has(bareUid)) { n++; }
         }
-        return false;
-      }).length;
+      }
+      counts[group.id] = n;
     }
     return counts;
   }, [groups, individuals]);
