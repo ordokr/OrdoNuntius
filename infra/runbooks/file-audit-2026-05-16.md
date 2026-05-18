@@ -259,38 +259,38 @@ file in this index — visited when its turn arrives.)
 209. [ ] `components/search/advanced-search-panel.tsx`
 210. [ ] `components/search/search-chips.tsx`
 211. [ ] `components/service-worker-registration.tsx`
-212. [ ] `components/settings/about-data-settings.tsx`
-213. [ ] `components/settings/account-security-settings.tsx`
-214. [ ] `components/settings/account-settings.tsx`
-215. [ ] `components/settings/address-book-management-settings.tsx`
-216. [ ] `components/settings/appearance-settings.tsx`
-217. [ ] `components/settings/calendar-management-settings.tsx`
-218. [ ] `components/settings/calendar-settings.tsx`
-219. [ ] `components/settings/composing-settings.tsx`
-220. [ ] `components/settings/contacts-settings.tsx`
-221. [ ] `components/settings/content-senders-settings.tsx`
-222. [ ] `components/settings/debug-settings.tsx`
-223. [ ] `components/settings/files-settings.tsx`
-224. [ ] `components/settings/filter-settings.tsx`
-225. [ ] `components/settings/folder-settings.tsx`
-226. [ ] `components/settings/identity-settings.tsx`
-227. [ ] `components/settings/keyword-settings.tsx`
-228. [ ] `components/settings/language-settings.tsx`
-229. [ ] `components/settings/layout-settings.tsx`
-230. [ ] `components/settings/notification-settings.tsx`
-231. [ ] `components/settings/plugins-settings.tsx`
-232. [ ] `components/settings/protocol-handler-settings.tsx`
-233. [ ] `components/settings/reading-settings.tsx`
-234. [ ] `components/settings/settings-section.tsx`
-235. [ ] `components/settings/share-collection-dialog.tsx`
-236. [ ] `components/settings/sidebar-apps-settings.tsx`
-237. [ ] `components/settings/smime-certificate-modal.tsx`
-238. [ ] `components/settings/smime-passphrase-dialog.tsx`
-239. [ ] `components/settings/smime-settings.tsx`
-240. [ ] `components/settings/spam-siege-game.tsx`
-241. [ ] `components/settings/template-settings.tsx`
-242. [ ] `components/settings/themes-settings.tsx`
-243. [ ] `components/settings/vacation-settings.tsx`
+212. [x] `components/settings/about-data-settings.tsx` — **next-intl namespace traversal bug fixed**: 3× `t('../../settings.X')` calls were silently resolving to the literal key path. Now uses a scoped `tSettings` translator.
+213. [s] `components/settings/account-security-settings.tsx` — clean; QR-code generation effect properly cancellation-guarded.
+214. [x] `components/settings/account-settings.tsx` — **next-intl namespace traversal bug fixed**: 3× `t('../../common.unknown')` fallbacks (rare-path) now use a scoped `tCommon` translator.
+215. [s] `components/settings/address-book-management-settings.tsx` — clean.
+216. [s] `components/settings/appearance-settings.tsx` — clean, module-scoped DENSITY_PREVIEW config.
+217. [s] `components/settings/calendar-management-settings.tsx` — clean; CalDAV discovery effect uses AbortController on cleanup.
+218. [s] `components/settings/calendar-settings.tsx` — clean.
+219. [s] `components/settings/composing-settings.tsx` — clean.
+220. [s] `components/settings/contacts-settings.tsx` — clean.
+221. [s] `components/settings/content-senders-settings.tsx` — clean.
+222. [s] `components/settings/debug-settings.tsx` — clean.
+223. [s] `components/settings/files-settings.tsx` — clean.
+224. [s] `components/settings/filter-settings.tsx` — clean; optimistic update + rollback on save failure.
+225. [x] `components/settings/folder-settings.tsx` — memoized `ownMailboxes`/`folderTree` (were rebuilt on every local state change like rename-input typing).
+226. [s] `components/settings/identity-settings.tsx` — clean, 55 lines.
+227. [s] `components/settings/keyword-settings.tsx` — clean.
+228. [s] `components/settings/language-settings.tsx` — clean, 17 lines.
+229. [s] `components/settings/layout-settings.tsx` — clean.
+230. [s] `components/settings/notification-settings.tsx` — clean; hardcoded English error messages (cross-locale).
+231. [s] `components/settings/plugins-settings.tsx` — clean; hardcoded English toast strings (cross-locale).
+232. [s] `components/settings/protocol-handler-settings.tsx` — clean.
+233. [s] `components/settings/reading-settings.tsx` — clean.
+234. [s] `components/settings/settings-section.tsx` — clean shared building-block; `aria-label="Managed by administrator"` hardcoded English.
+235. [s] `components/settings/share-collection-dialog.tsx` — clean; preset detection helpers + cancellation-guarded principal fetch.
+236. [s] `components/settings/sidebar-apps-settings.tsx` — clean.
+237. [s] `components/settings/smime-certificate-modal.tsx` — clean.
+238. [s] `components/settings/smime-passphrase-dialog.tsx` — clean.
+239. [s] `components/settings/smime-settings.tsx` — clean; lazy-imports pkcs12-import on export. Hardcoded English error fallbacks (cross-locale).
+240. [s] `components/settings/spam-siege-game.tsx` — clean (game/easter-egg).
+241. [s] `components/settings/template-settings.tsx` — clean.
+242. [s] `components/settings/themes-settings.tsx` — clean.
+243. [s] `components/settings/vacation-settings.tsx` — clean.
 244. [ ] `components/templates/placeholder-fill-modal.tsx`
 245. [ ] `components/templates/template-form.tsx`
 246. [ ] `components/templates/template-manager-modal.tsx`
