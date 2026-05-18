@@ -310,24 +310,24 @@ file in this index — visited when its turn arrives.)
 260. [s] `components/ui/prompt-dialog.tsx` — clean, same async-rejection caveat as confirm-dialog.
 261. [s] `components/ui/toast.tsx` — clean, properly pauses progress on hover.
 262. [s] `components/ui/welcome-banner.tsx` — clean.
-263. [ ] `contexts/drag-drop-context.tsx`
-264. [ ] `hooks/use-attachment-drag.ts`
-265. [ ] `hooks/use-browser-navigation.ts`
-266. [ ] `hooks/use-calendar-alerts.ts`
-267. [ ] `hooks/use-confirm-dialog.ts`
-268. [ ] `hooks/use-context-menu.ts`
-269. [ ] `hooks/use-email-drag.ts`
-270. [ ] `hooks/use-focus-trap.ts`
-271. [ ] `hooks/use-format-event-date.ts`
-272. [ ] `hooks/use-keyboard-shortcuts.ts`
-273. [ ] `hooks/use-long-press.ts`
-274. [ ] `hooks/use-mailbox-drop.ts`
-275. [ ] `hooks/use-media-query.ts`
-276. [ ] `hooks/use-prompt-dialog.ts`
-277. [ ] `hooks/use-refresh-gesture.ts`
-278. [ ] `hooks/use-sidebar-apps.ts`
-279. [ ] `hooks/use-tag-drop.ts`
-280. [ ] `hooks/use-time-grid-interactions.ts`
+263. [s] `contexts/drag-drop-context.tsx` — clean.
+264. [s] `hooks/use-attachment-drag.ts` — clean.
+265. [s] `hooks/use-browser-navigation.ts` — clean.
+266. [s] `hooks/use-calendar-alerts.ts` — clean.
+267. [s] `hooks/use-confirm-dialog.ts` — clean; promise-based dialog with unmount cleanup that resolves(false) if still pending.
+268. [s] `hooks/use-context-menu.ts` — clean.
+269. [s] `hooks/use-email-drag.ts` — clean.
+270. [s] `hooks/use-focus-trap.ts` — clean a11y pattern: stores previous focus, queries fresh focusables on each Tab.
+271. [s] `hooks/use-format-event-date.ts` — clean; localized day/month names via t() lookup.
+272. [s] `hooks/use-keyboard-shortcuts.ts` — clean; ref pattern keeps handlers fresh, modifier guard prevents browser-shortcut hijack.
+273. [s] `hooks/use-long-press.ts` — clean.
+274. [s] `hooks/use-mailbox-drop.ts` — clean.
+275. [s] `hooks/use-media-query.ts` — clean.
+276. [s] `hooks/use-prompt-dialog.ts` — clean.
+277. [s] `hooks/use-refresh-gesture.ts` — clean; F5/Cmd+R + pull-to-refresh, gates pull-to-refresh on scrollTop===0.
+278. [s] `hooks/use-sidebar-apps.ts` — clean.
+279. [s] `hooks/use-tag-drop.ts` — clean.
+280. [s] `hooks/use-time-grid-interactions.ts` — clean.
 281. [ ] `i18n/navigation.ts`
 282. [ ] `i18n/request.ts`
 283. [ ] `i18n/routing.ts`
