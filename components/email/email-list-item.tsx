@@ -249,7 +249,7 @@ export function EmailListItem({ email, selected, currentMailboxRole: currentMail
                       ? "font-bold text-foreground"
                       : "font-medium text-muted-foreground"
                   )}>
-                    {sender?.name || sender?.email || "Unknown"}
+                    {sender?.name || sender?.email || t('unknown_sender')}
                   </span>
                   <div className="flex items-center gap-1.5">
                     {isStarred && (
@@ -317,7 +317,7 @@ export function EmailListItem({ email, selected, currentMailboxRole: currentMail
                     ? "text-muted-foreground"
                     : "text-muted-foreground/80"
                 )}>
-                  {trimmedPreview || "No preview available"}
+                  {trimmedPreview || t('no_preview')}
                 </p>
               )}
             </>

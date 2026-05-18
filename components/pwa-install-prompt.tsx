@@ -1,9 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
 import { X, Download } from "lucide-react";
 import { useConfig } from "@/hooks/use-config";
+
+// IMPORTANT: Strings in this file CANNOT be translated.
+// PWAInstallPrompt is mounted in app/layout.tsx (the ROOT layout), which
+// sits OUTSIDE the [locale] segment that provides the NextIntlClient
+// context. Calling useTranslations() here throws on SSR with no usable
+// provider in scope — same fundamental constraint as app/global-error.tsx.
+// To localize this prompt, it would need to be moved inside
+// app/[locale]/layout.tsx (and admin paths would lose the prompt — see
+// the layout split). For now strings stay English; the user only sees
+// this once anyway (install/dismiss is one-time per browser).
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -13,7 +22,6 @@ interface BeforeInstallPromptEvent extends Event {
 const DISMISSED_KEY = "pwa-install-dismissed";
 
 export function PWAInstallPrompt() {
-  const t = useTranslations("pwa_install");
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -84,17 +92,17 @@ export function PWAInstallPrompt() {
           )}
           <div>
             <h3 className="font-semibold text-sm text-neutral-900 dark:text-white">
-              {t("title", { appName })}
+              Install {appName}
             </h3>
             <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
-              {t("description")}
+              Install our app for quick access and offline support.
             </p>
           </div>
         </div>
         <button
           onClick={handleDismiss}
           className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
-          aria-label={t("dismiss_aria_label")}
+          aria-label="Dismiss install prompt"
         >
           <X className="w-4 h-4" />
         </button>
@@ -105,20 +113,20 @@ export function PWAInstallPrompt() {
             onClick={handleDismiss}
             className="flex-1 px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
           >
-            {t("not_now")}
+            Not now
           </button>
           <button
             onClick={handleInstall}
             className="flex-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors"
           >
-            {t("install")}
+            Install
           </button>
         </div>
         <button
           onClick={handleDismissForever}
           className="w-full text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors text-center"
         >
-          {t("remind_never")}
+          Don&apos;t remind me again
         </button>
       </div>
     </div>
