@@ -89,12 +89,12 @@ file in this index — visited when its turn arrives.)
  39. [s] `lib/smime/certificate-utils.ts` — skipped; ditto.
  40. [s] `lib/smime/crypto-engine.ts` — skipped; webcrypto-liner engine setup, ditto.
  41. [s] `app/[locale]/auth/callback/page.tsx` — clean. Already guards `!serverUrl` at line 48, **resolves external finding #6**.
- 42. [s] `app/[locale]/calendar/page.tsx` — 1584 lines, 46 hook calls; skipped for dedicated pass.
- 43. [s] `app/[locale]/contacts/page.tsx` — 886 lines, large feature page; skipped.
+ 42. [x] `app/[locale]/calendar/page.tsx` — **focused audit, 2 fixes**: (1) keydown handler early-returns when Ctrl/Meta/Alt held — was hijacking browser shortcuts (Cmd+T fired `goToToday` AND opened a new tab; Cmd+Left would have been `preventDefault`'d by `navigatePrev`); (2) `birthdayCalendarName` IIFE → `useMemo` so the `t()` lookup doesn't repeat per render and the downstream `allCalendars` memo's dep is stable. Structural split into sub-components logged for tier-2.
+ 43. [s] `app/[locale]/contacts/page.tsx` — **focused audit done**, no in-file fix; clean. `selectedContact`/`selectedGroup` are `.find()` per render — minor; defer.
  44. [s] `app/[locale]/error.tsx` — standard Next error boundary, clean.
- 45. [s] `app/[locale]/files/page.tsx` — 518 lines, large feature page; skipped.
+ 45. [s] `app/[locale]/files/page.tsx` — **focused audit done**, no in-file fix; clean. `detailResource`/`maxSizeUpload` recomputed per render — minor; defer.
  46. [s] `app/[locale]/layout.tsx` — 46 lines, clean nested-provider tree.
- 47. [s] `app/[locale]/settings/page.tsx` — 962 lines, large feature page; skipped.
+ 47. [s] `app/[locale]/settings/page.tsx` — **focused audit done**, no in-file fix. `tabs` (~25 entries, each with `t()` calls) and `groupedTabs` rebuilt every render; memoizing would be a minor win but settings is a tier-3 page (opened occasionally, not on hot path). Defer.
  48. [s] `app/admin/_tabs/_jmap-servers-section.tsx` — admin-only, skipped.
  49. [s] `app/admin/_tabs/auth.tsx` — admin-only, skipped.
  50. [s] `app/admin/_tabs/branding.tsx` — admin-only, skipped.

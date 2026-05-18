@@ -970,6 +970,10 @@ export default function CalendarPage() {
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
       if (target.getAttribute("contenteditable") === "true") return;
       if (showEventModal || detailEvent) return;
+      // Skip when a modifier is held so we don't hijack browser shortcuts:
+      // Cmd+T (new tab) would otherwise fire goToToday, Cmd+Left (back)
+      // would be preventDefault'd and consumed by navigatePrev, etc.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       switch (e.key) {
         case "ArrowLeft": e.preventDefault(); navigatePrev(); break;
@@ -992,9 +996,9 @@ export default function CalendarPage() {
     return generateBirthdayEvents(contacts, dateRange.start, dateRange.end);
   }, [showBirthdayCalendar, contacts, dateRange]);
 
-  const birthdayCalendarName = (() => {
+  const birthdayCalendarName = useMemo(() => {
     try { return t('birthday_calendar'); } catch { return 'Birthdays'; }
-  })();
+  }, [t]);
 
   const allCalendars = useMemo(() => {
     if (!showBirthdayCalendar) return calendars;
