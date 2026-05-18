@@ -341,13 +341,21 @@ export const useThemeStore = create<ThemeState>()(
 
             const serverThemes = data.themes;
 
-            for (const st of serverThemes) {
-              const local = get().installedThemes.find(t => t.id === st.id);
+            // Fan out the per-theme network + IndexedDB work in parallel.
+            // Was a serial for-loop paying (downloadThemeCSS RTT +
+            // pluginStorage.saveThemeCSS) sequentially per theme — for N
+            // themes that's N× the latency on every cold init. Each branch
+            // ends in a `set(state => ...)` functional update; zustand's
+            // set is synchronous and atomic so concurrent set calls don't
+            // race (the duplicate check at the install branch handles the
+            // (rare) case where the same theme would be added twice).
+            const snapshot = get().installedThemes;
+            await Promise.all(serverThemes.map(async (st) => {
+              const local = snapshot.find(t => t.id === st.id);
 
               if (!local) {
-                // Download and install new server theme
                 const css = await downloadThemeCSS(st.id);
-                if (!css) continue;
+                if (!css) return;
 
                 const sanitized = sanitizeThemeCSS(css);
                 const theme: InstalledTheme = {
@@ -373,43 +381,43 @@ export const useThemeStore = create<ThemeState>()(
                     installedThemes: [...state.installedThemes, theme],
                   };
                 });
-
-              } else if (!local.builtIn) {
-                let css = local.css;
-
-                if (local.version !== st.version || !css) {
-                  const downloadedCss = await downloadThemeCSS(st.id);
-                  if (!downloadedCss) continue;
-
-                  const sanitized = sanitizeThemeCSS(downloadedCss);
-                  css = sanitized.css;
-                  await pluginStorage.saveThemeCSS(st.id, sanitized.css);
-                }
-
-                const updatedTheme = {
-                  ...local,
-                  name: st.name,
-                  version: st.version,
-                  author: st.author,
-                  description: st.description || '',
-                  css,
-                  variants: st.variants as ThemeVariant[],
-                  managed: true,
-                  forceEnabled: st.forceEnabled,
-                };
-
-                set(state => ({
-                  installedThemes: state.installedThemes.map(t =>
-                    t.id === st.id ? updatedTheme : t
-                  ),
-                }));
-
-                // Re-apply if active
-                if (get().activeThemeId === st.id) {
-                  applyCustomThemeCSS(updatedTheme, get().resolvedTheme);
-                }
+                return;
               }
-            }
+
+              if (local.builtIn) return;
+
+              let css = local.css;
+              if (local.version !== st.version || !css) {
+                const downloadedCss = await downloadThemeCSS(st.id);
+                if (!downloadedCss) return;
+
+                const sanitized = sanitizeThemeCSS(downloadedCss);
+                css = sanitized.css;
+                await pluginStorage.saveThemeCSS(st.id, sanitized.css);
+              }
+
+              const updatedTheme = {
+                ...local,
+                name: st.name,
+                version: st.version,
+                author: st.author,
+                description: st.description || '',
+                css,
+                variants: st.variants as ThemeVariant[],
+                managed: true,
+                forceEnabled: st.forceEnabled,
+              };
+
+              set(state => ({
+                installedThemes: state.installedThemes.map(t =>
+                  t.id === st.id ? updatedTheme : t
+                ),
+              }));
+
+              if (get().activeThemeId === st.id) {
+                applyCustomThemeCSS(updatedTheme, get().resolvedTheme);
+              }
+            }));
 
             set(state => ({
               installedThemes: dedupeInstalledThemes(state.installedThemes),
