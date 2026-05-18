@@ -3,9 +3,8 @@ import { Email, Mailbox, StateChange } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useCalendarStore } from "@/stores/calendar-store";
-import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
+import { DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { emailHooks } from "@/lib/plugin-hooks";
-import type { ExternalSearchResult } from "@/lib/plugin-types";
 import { fetchUnifiedEmails, type UnifiedAccountClient } from "@/lib/unified-mailbox";
 import { useAuthStore } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
@@ -14,9 +13,10 @@ import { getCachedInbox, setCachedInbox } from "@/lib/cached-inbox-emails";
 import { createUnifiedSlice, type UnifiedSlice } from "@/stores/email-slices/unified";
 import { createThreadSlice, type ThreadSlice } from "@/stores/email-slices/thread";
 import { createSpamSlice, type SpamSlice } from "@/stores/email-slices/spam";
+import { createSearchSlice, type SearchSlice } from "@/stores/email-slices/search";
 import { getNextSelectedEmail, getNextSelectedEmailAfterRemoval } from "@/stores/email-slices/_helpers";
 
-interface EmailStore extends UnifiedSlice, ThreadSlice, SpamSlice {
+interface EmailStore extends UnifiedSlice, ThreadSlice, SpamSlice, SearchSlice {
   emails: Email[];
   mailboxes: Mailbox[];
   selectedEmail: Email | null;
@@ -42,12 +42,8 @@ interface EmailStore extends UnifiedSlice, ThreadSlice, SpamSlice {
   selectedKeyword: string | null;
   tagCounts: Record<string, { total: number; unread: number }>;
 
-  // Advanced search state
-  searchFilters: SearchFilters;
-  isAdvancedSearchOpen: boolean;
-  searchAbortController: AbortController | null;
-  /** Plugin-contributed search results (CRM hits, Slack messages, etc.) populated by emailHooks.onProvideSearchResults. */
-  externalSearchResults: ExternalSearchResult[];
+  // Advanced search state + actions live in the `SearchSlice` mixed in above
+  // (see stores/email-slices/search.ts).
 
   // Unified mailbox state + actions live in the `UnifiedSlice` mixed in above
   // (see stores/email-slices/unified.ts).
@@ -86,11 +82,8 @@ interface EmailStore extends UnifiedSlice, ThreadSlice, SpamSlice {
   moveToMailbox: (client: IJMAPClient, emailId: string, mailboxId: string) => Promise<void>;
   moveEmailsToMailbox: (client: IJMAPClient, emailIds: string[], mailboxId: string) => Promise<void>;
   moveThreadToMailbox: (client: IJMAPClient, emailId: string, mailboxId: string) => Promise<void>;
-  searchEmails: (client: IJMAPClient, query: string) => Promise<void>;
-  advancedSearch: (client: IJMAPClient) => Promise<void>;
-  setSearchFilters: (filters: Partial<SearchFilters>) => void;
-  clearSearchFilters: () => void;
-  toggleAdvancedSearch: () => void;
+  // Search actions (searchEmails / advancedSearch / setSearchFilters /
+  // clearSearchFilters / toggleAdvancedSearch) are provided by SearchSlice.
   toggleStar: (client: IJMAPClient, emailId: string) => Promise<void>;
   setEmailKeywordsLocal: (emailId: string, keywords: Record<string, boolean>) => void;
 
@@ -181,6 +174,11 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
     get as Parameters<typeof createSpamSlice>[1],
     store as Parameters<typeof createSpamSlice>[2],
   ),
+  ...createSearchSlice(
+    set as Parameters<typeof createSearchSlice>[0],
+    get as Parameters<typeof createSearchSlice>[1],
+    store as Parameters<typeof createSearchSlice>[2],
+  ),
 
   emails: [],
   mailboxes: [],
@@ -207,12 +205,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
   selectedKeyword: null,
   tagCounts: {},
 
-  // Advanced search state
-  searchFilters: { ...DEFAULT_SEARCH_FILTERS },
-  isAdvancedSearchOpen: false,
-  searchAbortController: null,
-  externalSearchResults: [],
-
+  // Advanced search state initial values are provided by the SearchSlice spread above.
   // Unified mailbox state initial values are provided by the UnifiedSlice spread above.
   // Spam undo cache initial value is provided by the SpamSlice spread above.
 
@@ -1106,106 +1099,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
     }
   },
 
-  searchEmails: async (client, query) => {
-    set({ isLoading: true, error: null, searchQuery: query, emails: [], hasMoreEmails: false, totalEmails: 0 }); // Clear emails for loading state
-    try {
-      // Get the current mailbox to scope the search
-      const selectedMailbox = get().selectedMailbox;
-      const mailboxes = get().mailboxes;
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
-      // Use originalId for shared mailboxes
-      const jmapMailboxId = mailbox?.originalId || selectedMailbox;
-      // Only pass accountId for shared mailboxes, not for primary account
-      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
-
-      // Get emails per page from settings
-      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
-      const result = await client.searchEmails(query, jmapMailboxId, accountId, emailsPerPage, 0);
-      const externals = await emailHooks.onProvideSearchResults.transform([] as ExternalSearchResult[], { query, filters: get().searchFilters });
-      set({
-        emails: result.emails,
-        externalSearchResults: externals,
-        hasMoreEmails: result.hasMore,
-        totalEmails: result.total,
-        isLoading: false
-      });
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : "Failed to search emails",
-        isLoading: false,
-        emails: [],
-        externalSearchResults: [],
-        hasMoreEmails: false,
-        totalEmails: 0
-      });
-    }
-  },
-
-  advancedSearch: async (client) => {
-    const { searchQuery, searchFilters, selectedMailbox, mailboxes, searchAbortController } = get();
-
-    if (searchAbortController) {
-      searchAbortController.abort();
-    }
-
-    const controller = new AbortController();
-    set({
-      isLoading: true,
-      error: null,
-      emails: [],
-      hasMoreEmails: false,
-      totalEmails: 0,
-      searchAbortController: controller,
-    });
-
-    try {
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
-      const jmapMailboxId = mailbox?.originalId || selectedMailbox;
-      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
-
-      const filter = buildJMAPFilter(searchQuery, searchFilters, jmapMailboxId);
-      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
-      const result = await client.advancedSearchEmails(filter, accountId, emailsPerPage, 0);
-
-      if (controller.signal.aborted) return;
-
-      const externals = await emailHooks.onProvideSearchResults.transform([] as ExternalSearchResult[], { query: searchQuery, filters: searchFilters });
-
-      set({
-        emails: result.emails,
-        externalSearchResults: externals,
-        hasMoreEmails: result.hasMore,
-        totalEmails: result.total,
-        isLoading: false,
-        searchAbortController: null,
-      });
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      set({
-        error: error instanceof Error ? error.message : "Failed to search emails",
-        isLoading: false,
-        emails: [],
-        externalSearchResults: [],
-        hasMoreEmails: false,
-        totalEmails: 0,
-        searchAbortController: null,
-      });
-    }
-  },
-
-  setSearchFilters: (filters) => {
-    set((state) => ({
-      searchFilters: { ...state.searchFilters, ...filters },
-    }));
-  },
-
-  clearSearchFilters: () => {
-    set({ searchFilters: { ...DEFAULT_SEARCH_FILTERS } });
-  },
-
-  toggleAdvancedSearch: () => {
-    set((state) => ({ isAdvancedSearchOpen: !state.isAdvancedSearchOpen }));
-  },
+  // Search actions are provided by the SearchSlice spread above.
 
   toggleStar: async (client, emailId) => {
     try {
