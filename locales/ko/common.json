@@ -512,7 +512,8 @@
       "ai_verdict": "AI 판정",
       "account": "계정",
       "no_subject": "(제목 없음)"
-    }
+    },
+    "no_preview": "미리보기 없음"
   },
   "email_composer": {
     "new_message": "새 메시지",
@@ -633,7 +634,9 @@
     "rate_limited_title": "서버 인증이 일시적으로 제한되었어요.",
     "rate_limited_detail": "OrdoNuntius가 계정 잠금을 방지하기 위해 백그라운드 요청을 일시 중지했어요. {seconds}초 후에 다시 시도할게요.",
     "rate_limited_action_title": "계정 잠금 방지를 위해 요청이 일시 중지되었어요.",
-    "rate_limited_action_detail": "추가 인증 요청을 보내기 전에 서버의 쿨다운이 끝날 때까지 대기 중이에요. {seconds}초 후에 다시 시도해 주세요."
+    "rate_limited_action_detail": "추가 인증 요청을 보내기 전에 서버의 쿨다운이 끝날 때까지 대기 중이에요. {seconds}초 후에 다시 시도해 주세요.",
+    "managed_by_administrator": "Managed by administrator",
+    "resize": "Resize"
   },
   "notifications": {
     "email_sent": "메일이 전송되었어요",
@@ -915,7 +918,11 @@
         "status_busy": "처리 중…",
         "status_inactive": "이 기기에서 활성화되지 않음",
         "status_unsupported": "이 브라우저는 Web Push를 지원하지 않습니다",
-        "title": "백그라운드 알림"
+        "title": "백그라운드 알림",
+        "sign_in_first": "Sign in first",
+        "invalid_relay_url": "Enter a valid https:// URL",
+        "enable_failed_generic": "Failed to enable push",
+        "disable_failed_generic": "Failed to disable push"
       }
     },
     "language_region": {
@@ -1825,7 +1832,10 @@
     "delete": "대화 삭제",
     "star": "대화 전체에 별표 달기",
     "unstar": "대화 전체 별표 해제",
-    "toggle_thread": "스레드 켜기/끄기"
+    "toggle_thread": "스레드 켜기/끄기",
+    "no_subject": "(제목 없음)",
+    "no_preview": "미리보기 없음",
+    "unknown_sender": "알 수 없음"
   },
   "identities": {
     "modal_title": "보내는 사람 관리",
@@ -2832,7 +2842,10 @@
     "enter_export_passphrase": "내보내기 비밀번호 설정",
     "export_passphrase_desc": "내보낼 PKCS#12 파일을 보호할 비밀번호를 설정해 주세요",
     "export_storage_desc": "내보내기를 위해 키를 해독해야 해요. 저장소 비밀번호를 입력해 주세요",
-    "incorrect_passphrase": "비밀번호가 올바르지 않아요"
+    "incorrect_passphrase": "비밀번호가 올바르지 않아요",
+    "import_failed_generic": "Import failed",
+    "import_cert_failed_generic": "Failed to import certificate",
+    "unlock_failed_generic": "Unlock failed"
   },
   "tour": {
     "step_counter": "총 {total}단계 중 {current}단계",
@@ -2963,5 +2976,11 @@
     "clear_formatting": "Clear Formatting",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "settings_plugins": {
+    "forced_by_admin": "Plugin \"{name}\" is forced by admin and cannot be disabled",
+    "requires_approval": "Plugin \"{name}\" requires admin approval before it can be enabled",
+    "disabled": "Plugin \"{name}\" disabled",
+    "enabled": "Plugin \"{name}\" enabled"
   }
 }

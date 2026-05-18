@@ -512,7 +512,8 @@
       "ai_verdict": "Verdikt AI",
       "account": "Účet",
       "no_subject": "(bez předmětu)"
-    }
+    },
+    "no_preview": "Není k dispozici náhled"
   },
   "email_composer": {
     "new_message": "Nová zpráva",
@@ -633,7 +634,9 @@
     "rate_limited_title": "Ověřování serveru je dočasně omezeno.",
     "rate_limited_detail": "Požadavky na pozadí byly pozastaveny, aby se zabránilo zablokování. Další pokus za {seconds} s.",
     "rate_limited_action_title": "Požadavek pozastaven, aby se zabránilo zablokování.",
-    "rate_limited_action_detail": "Aplikace čeká na ukončení doby blokování serveru před odesláním dalších ověřovaných požadavků. Zkuste to znovu za {seconds} s."
+    "rate_limited_action_detail": "Aplikace čeká na ukončení doby blokování serveru před odesláním dalších ověřovaných požadavků. Zkuste to znovu za {seconds} s.",
+    "managed_by_administrator": "Managed by administrator",
+    "resize": "Resize"
   },
   "notifications": {
     "email_sent": "Zpráva byla úspěšně odeslána",
@@ -915,7 +918,11 @@
         "status_busy": "Pracuji…",
         "status_inactive": "Není povoleno na tomto zařízení",
         "status_unsupported": "Tento prohlížeč nepodporuje Web Push",
-        "title": "Oznámení na pozadí"
+        "title": "Oznámení na pozadí",
+        "sign_in_first": "Sign in first",
+        "invalid_relay_url": "Enter a valid https:// URL",
+        "enable_failed_generic": "Failed to enable push",
+        "disable_failed_generic": "Failed to disable push"
       }
     },
     "language_region": {
@@ -1825,7 +1832,10 @@
     "delete": "Odstranit konverzaci",
     "star": "Označit konverzaci hvězdičkou",
     "unstar": "Odebrat hvězdičku z konverzace",
-    "toggle_thread": "Přepnout zobrazení vlákna"
+    "toggle_thread": "Přepnout zobrazení vlákna",
+    "no_subject": "(žádný předmět)",
+    "no_preview": "Není k dispozici náhled",
+    "unknown_sender": "Neznámý"
   },
   "identities": {
     "modal_title": "Správa identit odesílatele",
@@ -2832,7 +2842,10 @@
     "enter_export_passphrase": "Nastavte heslo pro export",
     "export_passphrase_desc": "Vyberte heslo pro ochranu exportovaného souboru PKCS#12",
     "export_storage_desc": "Zadejte heslo úložiště pro dešifrování klíče k exportu",
-    "incorrect_passphrase": "Nesprávné heslo"
+    "incorrect_passphrase": "Nesprávné heslo",
+    "import_failed_generic": "Import failed",
+    "import_cert_failed_generic": "Failed to import certificate",
+    "unlock_failed_generic": "Unlock failed"
   },
   "tour": {
     "step_counter": "Krok {current} z {total}",
@@ -2963,5 +2976,11 @@
     "clear_formatting": "Clear Formatting",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "settings_plugins": {
+    "forced_by_admin": "Plugin \"{name}\" is forced by admin and cannot be disabled",
+    "requires_approval": "Plugin \"{name}\" requires admin approval before it can be enabled",
+    "disabled": "Plugin \"{name}\" disabled",
+    "enabled": "Plugin \"{name}\" enabled"
   }
 }

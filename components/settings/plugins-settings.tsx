@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { usePluginStore } from '@/stores/plugin-store';
 import { usePolicyStore } from '@/stores/policy-store';
 import { SettingsSection, ToggleSwitch } from './settings-section';
@@ -18,6 +19,7 @@ const STATUS_COLORS: Record<PluginStatus, string> = {
 };
 
 export function PluginsSettings() {
+  const t = useTranslations('settings_plugins');
   const { plugins, enablePlugin, disablePlugin, updatePluginSettings, initializePlugins, initialized } = usePluginStore();
   const { isFeatureEnabled, isPluginForceEnabled, isPluginApproved, fetchPolicy, loaded } = usePolicyStore();
   const [expandedPlugin, setExpandedPlugin] = useState<string | null>(null);
@@ -50,23 +52,23 @@ export function PluginsSettings() {
 
     const isForceEnabled = plugin.forceEnabled || isPluginForceEnabled(plugin.id);
     if (isForceEnabled) {
-      toast.info(`Plugin "${plugin.name}" is forced by admin and cannot be disabled`);
+      toast.info(t('forced_by_admin', { name: plugin.name }));
       return;
     }
 
     const requireApproval = isFeatureEnabled('requirePluginApproval');
     const isApproved = plugin.adminApproved || plugin.managed || isPluginApproved(plugin.id);
     if (!plugin.enabled && requireApproval && !isApproved) {
-      toast.info(`Plugin "${plugin.name}" requires admin approval before it can be enabled`);
+      toast.info(t('requires_approval', { name: plugin.name }));
       return;
     }
 
     if (plugin.enabled) {
       disablePlugin(plugin.id);
-      toast.info(`Plugin "${plugin.name}" disabled`);
+      toast.info(t('disabled', { name: plugin.name }));
     } else {
       await enablePlugin(plugin.id);
-      toast.success(`Plugin "${plugin.name}" enabled`);
+      toast.success(t('enabled', { name: plugin.name }));
     }
   };
 

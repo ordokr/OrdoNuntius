@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 interface ResizeHandleProps {
@@ -15,6 +16,7 @@ interface ResizeHandleProps {
 const KEYBOARD_STEP = 10;
 
 export function ResizeHandle({ onResizeStart, onResize, onResizeEnd, onDoubleClick, orientation = "vertical", className }: ResizeHandleProps) {
+  const tCommon = useTranslations("common");
   const isDragging = useRef(false);
   const startPos = useRef(0);
   const isHorizontal = orientation === "horizontal";
@@ -71,7 +73,7 @@ export function ResizeHandle({ onResizeStart, onResize, onResizeEnd, onDoubleCli
     <div
       role="separator"
       aria-orientation={isHorizontal ? "horizontal" : "vertical"}
-      aria-label="Resize"
+      aria-label={tCommon("resize")}
       tabIndex={0}
       onMouseDown={handleMouseDown}
       onKeyDown={handleKeyDown}

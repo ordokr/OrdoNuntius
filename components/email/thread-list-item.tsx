@@ -60,6 +60,7 @@ interface SingleEmailItemProps {
 
 const SingleEmailItemImpl = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
   function SingleEmailItem({ email, selected, onClick, onContextMenu, showPreview, colorTag, currentMailboxRole: currentMailboxRoleProp, emailKeywordsById, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetColorTag, onMarkAsSpam }, ref) {
+    const t = useTranslations('threads');
     const isUnread = !email.keywords?.$seen;
     const isStarred = email.keywords?.$flagged;
     const isAnswered = email.keywords?.$answered;
@@ -285,7 +286,7 @@ const SingleEmailItemImpl = React.forwardRef<HTMLDivElement, SingleEmailItemProp
                         ? "font-bold text-foreground"
                         : "font-medium text-muted-foreground"
                     )}>
-                      {sender?.name || sender?.email || "Unknown"}
+                      {sender?.name || sender?.email || t('unknown_sender')}
                     </span>
                     <div className="flex items-center gap-1.5">
                       {isStarred && (
@@ -335,7 +336,7 @@ const SingleEmailItemImpl = React.forwardRef<HTMLDivElement, SingleEmailItemProp
                     ? "font-semibold text-foreground"
                     : "font-normal text-foreground/90"
                 )}>
-                  {email.subject || "(no subject)"}
+                  {email.subject || t('no_subject')}
                 </div>
 
                 {showPreview && density !== 'extra-compact' && density !== 'compact' && (
@@ -345,7 +346,7 @@ const SingleEmailItemImpl = React.forwardRef<HTMLDivElement, SingleEmailItemProp
                       ? "text-muted-foreground"
                       : "text-muted-foreground/80"
                   )}>
-                    {trimmedPreview || "No preview available"}
+                    {trimmedPreview || t('no_preview')}
                   </p>
                 )}
               </>
@@ -780,7 +781,7 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
                       ? "font-semibold text-foreground"
                       : "font-normal text-foreground/90"
                   )}>
-                    {latestEmail.subject || "(no subject)"}
+                    {latestEmail.subject || t('no_subject')}
                   </div>
 
                   {showPreview && density !== 'extra-compact' && density !== 'compact' && (
@@ -790,7 +791,7 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
                         ? "text-muted-foreground"
                         : "text-muted-foreground/80"
                     )}>
-                      {trimmedPreview || "No preview available"}
+                      {trimmedPreview || t('no_preview')}
                     </p>
                   )}
                 </>

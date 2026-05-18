@@ -64,11 +64,11 @@ export function NotificationSettings() {
 
   const handleEnablePush = async () => {
     if (!client) {
-      setPushStatus({ kind: 'error', message: 'Sign in first' });
+      setPushStatus({ kind: 'error', message: t('push.sign_in_first') });
       return;
     }
     if (!isValidRelay) {
-      setPushStatus({ kind: 'error', message: 'Enter a valid https:// URL' });
+      setPushStatus({ kind: 'error', message: t('push.invalid_relay_url') });
       return;
     }
     setPushStatus({ kind: 'busy' });
@@ -86,7 +86,7 @@ export function NotificationSettings() {
       }
       setPushStatus({
         kind: 'error',
-        message: err instanceof Error ? err.message : 'Failed to enable push',
+        message: err instanceof Error ? err.message : t('push.enable_failed_generic'),
       });
     }
   };
@@ -107,7 +107,7 @@ export function NotificationSettings() {
     } catch (err) {
       setPushStatus({
         kind: 'error',
-        message: err instanceof Error ? err.message : 'Failed to disable push',
+        message: err instanceof Error ? err.message : t('push.disable_failed_generic'),
       });
     }
   };

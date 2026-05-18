@@ -218,7 +218,7 @@ file in this index — visited when its turn arrives.)
 168. [x] `components/email/rich-text-editor.tsx` — **i18n fixed**: all 18 toolbar tooltip `title=` attrs wired to a new `rich_text_editor` namespace (bold/italic/underline/strikethrough/heading_1/heading_2/bullet_list/ordered_list/quote/code_block/align_left/align_center/align_right/link/table/clear_formatting/undo/redo).
 169. [s] `components/email/smime-status-banner.tsx` — clean.
 170. [s] `components/email/thread-email-item.tsx` — clean. Same hardcoded "Unknown"/"No preview" English (cross-locale).
-171. [s] `components/email/thread-list-item.tsx` — clean, already heavily optimized in earlier perf passes (granular selectors, hoisted prop pattern, memoized component). Same hardcoded "(no subject)" / "No preview available" i18n concern as siblings.
+171. [x] `components/email/thread-list-item.tsx` — **i18n fixed**: 6 hardcoded strings ("Unknown" ×2, "(no subject)" ×2, "No preview available" ×2) wired to `threads.unknown_sender` / `threads.no_subject` / `threads.no_preview`. SingleEmailItem nested component gets its own `useTranslations('threads')` call.
 172. [x] `components/email/unsubscribe-banner.tsx` — **real UX bug fixed**: mobile `ConfirmDialog` was showing the `success_http`/`success_mailto` strings ("Unsubscribe page opened in new tab" / "Unsubscribe request sent to your email client") as the *pre-action* confirmation message — telling the user the action had completed while still asking them to confirm. Now shows the destination URL. Also dropped the unused `senderEmail` prop from the interface + both callsites in `email-viewer.tsx`.
 173. [s] `components/error/error-boundary.tsx` — clean class + functional wrapper for translation injection.
 174. [s] `components/error/error-fallbacks.tsx` — clean.
@@ -241,7 +241,7 @@ file in this index — visited when its turn arrives.)
 191. [s] `components/layout/icon-picker.tsx` — clean; `allIconNames` properly memoized (Object.keys over Lucide's ~1000 icons runs once).
 192. [s] `components/layout/inline-app-view.tsx` — clean. Note: iframe sandbox is `allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox` for user-configured app URLs — intentional but worth noting (security trade-off lives with the user's choice of app URL).
 193. [s] `components/layout/mailbox-context-menu.tsx` — clean, well-structured path-shortening logic.
-194. [s] `components/layout/resize-handle.tsx` — clean, keyboard-accessible. Hardcoded `aria-label="Resize"` (i18n cross-locale).
+194. [x] `components/layout/resize-handle.tsx` — **i18n fixed**: `aria-label` wired to `common.resize`. Mounted only under `[locale]/` (calendar + contacts), safe for `useTranslations`.
 195. [s] `components/layout/sidebar-apps-modal.tsx` — clean, validates http/https protocol on user-entered URLs.
 196. [s] `components/plugins/plugin-error-boundary.tsx` — clean class error boundary, per-plugin isolation.
 197. [s] `components/plugins/plugin-slot-renderer.tsx` — clean.
@@ -277,16 +277,16 @@ file in this index — visited when its turn arrives.)
 227. [s] `components/settings/keyword-settings.tsx` — clean.
 228. [s] `components/settings/language-settings.tsx` — clean, 17 lines.
 229. [s] `components/settings/layout-settings.tsx` — clean.
-230. [s] `components/settings/notification-settings.tsx` — clean; hardcoded English error messages (cross-locale).
-231. [s] `components/settings/plugins-settings.tsx` — clean; hardcoded English toast strings (cross-locale).
+230. [x] `components/settings/notification-settings.tsx` — **i18n fixed**: 4 push-status error messages ("Sign in first", "Enter a valid https:// URL", "Failed to enable push", "Failed to disable push") wired to `settings.notifications.push.*` namespace.
+231. [x] `components/settings/plugins-settings.tsx` — **i18n fixed**: 4 toast strings (force-enabled / requires-approval / disabled / enabled) wired to new `settings_plugins` namespace with `{name}` ICU param.
 232. [s] `components/settings/protocol-handler-settings.tsx` — clean.
 233. [s] `components/settings/reading-settings.tsx` — clean.
-234. [s] `components/settings/settings-section.tsx` — clean shared building-block; `aria-label="Managed by administrator"` hardcoded English.
+234. [s] `components/settings/settings-section.tsx` — `aria-label="Managed by administrator"` **must stay English**: `SettingItem` is consumed by `app/admin/_tabs/*` which has no `NextIntlClientProvider`, same SSR-crash trap as PWAInstallPrompt. Comment added explaining the constraint.
 235. [s] `components/settings/share-collection-dialog.tsx` — clean; preset detection helpers + cancellation-guarded principal fetch.
 236. [s] `components/settings/sidebar-apps-settings.tsx` — clean.
 237. [s] `components/settings/smime-certificate-modal.tsx` — clean.
 238. [s] `components/settings/smime-passphrase-dialog.tsx` — clean.
-239. [s] `components/settings/smime-settings.tsx` — clean; lazy-imports pkcs12-import on export. Hardcoded English error fallbacks (cross-locale).
+239. [x] `components/settings/smime-settings.tsx` — **i18n fixed**: 3 error fallback strings (Import failed / Failed to import certificate / Unlock failed) wired to `smime.*_generic` keys.
 240. [s] `components/settings/spam-siege-game.tsx` — clean (game/easter-egg).
 241. [s] `components/settings/template-settings.tsx` — clean.
 242. [s] `components/settings/themes-settings.tsx` — clean.

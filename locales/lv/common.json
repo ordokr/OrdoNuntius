@@ -512,7 +512,8 @@
       "ai_verdict": "AI vērtējums",
       "account": "Konts",
       "no_subject": "(bez temata)"
-    }
+    },
+    "no_preview": "Nav pieejams priekšskatījums"
   },
   "email_composer": {
     "new_message": "Jauns ziņojums",
@@ -633,7 +634,9 @@
     "rate_limited_title": "Autentifikācija serverī ir īslaicīgi ierobežota.",
     "rate_limited_detail": "OrdoNuntius ir apturējis fonā veiktos pieprasījumus, lai izvairītos no bloķēšanas. Mēģinās vēlreiz pēc {seconds} s.",
     "rate_limited_action_title": "Pieprasījums apturēts, lai izvairītos no bloķēšanas.",
-    "rate_limited_action_detail": "OrdoNuntius gaida servera noildzes beigas pirms jaunu autentificētu pieprasījumu sūtīšanas. Mēģiniet vēlreiz pēc {seconds} s."
+    "rate_limited_action_detail": "OrdoNuntius gaida servera noildzes beigas pirms jaunu autentificētu pieprasījumu sūtīšanas. Mēģiniet vēlreiz pēc {seconds} s.",
+    "managed_by_administrator": "Managed by administrator",
+    "resize": "Resize"
   },
   "notifications": {
     "email_sent": "Vēstule veiksmīgi nosūtīta",
@@ -915,7 +918,11 @@
         "status_busy": "Notiek darbs…",
         "status_inactive": "Nav iespējots šajā ierīcē",
         "status_unsupported": "Šī pārlūkprogramma neatbalsta Web Push",
-        "title": "Fona paziņojumi"
+        "title": "Fona paziņojumi",
+        "sign_in_first": "Sign in first",
+        "invalid_relay_url": "Enter a valid https:// URL",
+        "enable_failed_generic": "Failed to enable push",
+        "disable_failed_generic": "Failed to disable push"
       }
     },
     "language_region": {
@@ -1825,7 +1832,10 @@
     "delete": "Dzēst sarunu",
     "star": "Pievienot zvaigznīti sarunai",
     "unstar": "Noņemt zvaigznīti sarunai",
-    "toggle_thread": "Pārslēgt sarunu"
+    "toggle_thread": "Pārslēgt sarunu",
+    "no_subject": "(bez tēmas)",
+    "no_preview": "Nav pieejams priekšskatījums",
+    "unknown_sender": "Nezināms"
   },
   "identities": {
     "modal_title": "Pārvaldīt sūtītāja identitātes",
@@ -2832,7 +2842,10 @@
     "export_passphrase_desc": "Izvēlieties paroli eksportējamajam PKCS#12 failam",
     "export_storage_desc": "Ievadiet krātuves paroli atslēgas atšifrēšanai pirms eksporta",
     "incorrect_passphrase": "Nepareiza parole",
-    "status_signed_self_signed": "Paraksts ir derīgs, bet sertifikāts ir pašparakstīts (nav uzticams)"
+    "status_signed_self_signed": "Paraksts ir derīgs, bet sertifikāts ir pašparakstīts (nav uzticams)",
+    "import_failed_generic": "Import failed",
+    "import_cert_failed_generic": "Failed to import certificate",
+    "unlock_failed_generic": "Unlock failed"
   },
   "tour": {
     "step_counter": "{current}. solis no {total}",
@@ -2963,5 +2976,11 @@
     "clear_formatting": "Clear Formatting",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "settings_plugins": {
+    "forced_by_admin": "Plugin \"{name}\" is forced by admin and cannot be disabled",
+    "requires_approval": "Plugin \"{name}\" requires admin approval before it can be enabled",
+    "disabled": "Plugin \"{name}\" disabled",
+    "enabled": "Plugin \"{name}\" enabled"
   }
 }

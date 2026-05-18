@@ -512,7 +512,8 @@
       "ai_verdict": "Вердикт ИИ",
       "account": "Аккаунт",
       "no_subject": "(без темы)"
-    }
+    },
+    "no_preview": "Предпросмотр недоступен"
   },
   "email_composer": {
     "new_message": "Новое письмо",
@@ -633,7 +634,9 @@
     "rate_limited_title": "Аутентификация на сервере временно ограничена.",
     "rate_limited_detail": "OrdoNuntius приостановил фоновые запросы, чтобы избежать блокировки. Повтор через {seconds}с.",
     "rate_limited_action_title": "Запрос приостановлен, чтобы избежать блокировки.",
-    "rate_limited_action_detail": "OrdoNuntius ждет окончания серверного тайм-аута перед отправкой новых аутентифицированных запросов. Повторите через {seconds}с."
+    "rate_limited_action_detail": "OrdoNuntius ждет окончания серверного тайм-аута перед отправкой новых аутентифицированных запросов. Повторите через {seconds}с.",
+    "managed_by_administrator": "Managed by administrator",
+    "resize": "Resize"
   },
   "notifications": {
     "email_sent": "Письмо успешно отправлено",
@@ -915,7 +918,11 @@
         "status_busy": "Выполняется…",
         "status_inactive": "Не включено на этом устройстве",
         "status_unsupported": "Этот браузер не поддерживает Web Push",
-        "title": "Фоновые уведомления"
+        "title": "Фоновые уведомления",
+        "sign_in_first": "Sign in first",
+        "invalid_relay_url": "Enter a valid https:// URL",
+        "enable_failed_generic": "Failed to enable push",
+        "disable_failed_generic": "Failed to disable push"
       }
     },
     "language_region": {
@@ -1825,7 +1832,10 @@
     "delete": "Удалить разговор",
     "star": "Добавить звёздочку к разговору",
     "unstar": "Убрать звёздочку у разговора",
-    "toggle_thread": "Переключить цепочку"
+    "toggle_thread": "Переключить цепочку",
+    "no_subject": "(без темы)",
+    "no_preview": "Предпросмотр недоступен",
+    "unknown_sender": "Неизвестен"
   },
   "identities": {
     "modal_title": "Управление идентификациями отправителя",
@@ -2832,7 +2842,10 @@
     "enter_export_passphrase": "Установите парольную фразу для экспорта",
     "export_passphrase_desc": "Выберите парольную фразу для защиты экспортируемого файла PKCS#12",
     "export_storage_desc": "Введите парольную фразу хранилища для расшифрования ключа перед экспортом",
-    "incorrect_passphrase": "Неверная парольная фраза"
+    "incorrect_passphrase": "Неверная парольная фраза",
+    "import_failed_generic": "Import failed",
+    "import_cert_failed_generic": "Failed to import certificate",
+    "unlock_failed_generic": "Unlock failed"
   },
   "tour": {
     "step_counter": "Шаг {current} из {total}",
@@ -2963,5 +2976,11 @@
     "clear_formatting": "Clear Formatting",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "settings_plugins": {
+    "forced_by_admin": "Plugin \"{name}\" is forced by admin and cannot be disabled",
+    "requires_approval": "Plugin \"{name}\" requires admin approval before it can be enabled",
+    "disabled": "Plugin \"{name}\" disabled",
+    "enabled": "Plugin \"{name}\" enabled"
   }
 }

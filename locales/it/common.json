@@ -512,7 +512,8 @@
       "ai_verdict": "Verdetto IA",
       "account": "Account",
       "no_subject": "(nessun oggetto)"
-    }
+    },
+    "no_preview": "Anteprima non disponibile"
   },
   "email_composer": {
     "new_message": "Nuovo messaggio",
@@ -633,7 +634,9 @@
     "rate_limited_title": "L'autenticazione del server e temporaneamente limitata.",
     "rate_limited_detail": "OrdoNuntius ha sospeso le richieste in background per evitare il blocco. Nuovo tentativo tra {seconds}s.",
     "rate_limited_action_title": "Richiesta sospesa per evitare il blocco.",
-    "rate_limited_action_detail": "OrdoNuntius attende che termini il cooldown del server prima di inviare altre richieste autenticate. Riprova tra {seconds}s."
+    "rate_limited_action_detail": "OrdoNuntius attende che termini il cooldown del server prima di inviare altre richieste autenticate. Riprova tra {seconds}s.",
+    "managed_by_administrator": "Managed by administrator",
+    "resize": "Resize"
   },
   "notifications": {
     "email_sent": "Messaggio inviato con successo",
@@ -915,7 +918,11 @@
         "status_busy": "In elaborazione…",
         "status_inactive": "Non abilitato su questo dispositivo",
         "status_unsupported": "Questo browser non supporta Web Push",
-        "title": "Notifiche in background"
+        "title": "Notifiche in background",
+        "sign_in_first": "Sign in first",
+        "invalid_relay_url": "Enter a valid https:// URL",
+        "enable_failed_generic": "Failed to enable push",
+        "disable_failed_generic": "Failed to disable push"
       }
     },
     "language_region": {
@@ -1825,7 +1832,10 @@
     "delete": "Elimina conversazione",
     "star": "Aggiungi stella alla conversazione",
     "unstar": "Rimuovi stella dalla conversazione",
-    "toggle_thread": "Espandi/comprimi discussione"
+    "toggle_thread": "Espandi/comprimi discussione",
+    "no_subject": "(senza oggetto)",
+    "no_preview": "Anteprima non disponibile",
+    "unknown_sender": "Sconosciuto"
   },
   "identities": {
     "modal_title": "Gestisci identità di invio",
@@ -2832,7 +2842,10 @@
     "enter_export_passphrase": "Imposta la passphrase di esportazione",
     "export_passphrase_desc": "Scegli una passphrase per proteggere il file PKCS#12 esportato",
     "export_storage_desc": "Inserisci la passphrase di archiviazione per decrittare la chiave prima dell'esportazione",
-    "incorrect_passphrase": "Passphrase errata"
+    "incorrect_passphrase": "Passphrase errata",
+    "import_failed_generic": "Import failed",
+    "import_cert_failed_generic": "Failed to import certificate",
+    "unlock_failed_generic": "Unlock failed"
   },
   "tour": {
     "step_counter": "Passo {current} di {total}",
@@ -2963,5 +2976,11 @@
     "clear_formatting": "Clear Formatting",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "settings_plugins": {
+    "forced_by_admin": "Plugin \"{name}\" is forced by admin and cannot be disabled",
+    "requires_approval": "Plugin \"{name}\" requires admin approval before it can be enabled",
+    "disabled": "Plugin \"{name}\" disabled",
+    "enabled": "Plugin \"{name}\" enabled"
   }
 }

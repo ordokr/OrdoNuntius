@@ -512,7 +512,8 @@
       "ai_verdict": "Висновок ШІ",
       "account": "Обліковий запис",
       "no_subject": "(без теми)"
-    }
+    },
+    "no_preview": "Попередній перегляд недоступний"
   },
   "email_composer": {
     "new_message": "Нове повідомлення",
@@ -633,7 +634,9 @@
     "rate_limited_title": "Швидкість автентифікації сервера тимчасово обмежена.",
     "rate_limited_detail": "OrdoNuntius призупинив фонові запити, щоб уникнути блокування. Повторна спроба через {seconds} с.",
     "rate_limited_action_title": "Запит призупинено, щоб уникнути блокування.",
-    "rate_limited_action_detail": "OrdoNuntius чекає закінчення часу відновлення сервера, перш ніж надсилати додаткові автентифіковані запити. Повторіть спробу через {seconds} с."
+    "rate_limited_action_detail": "OrdoNuntius чекає закінчення часу відновлення сервера, перш ніж надсилати додаткові автентифіковані запити. Повторіть спробу через {seconds} с.",
+    "managed_by_administrator": "Managed by administrator",
+    "resize": "Resize"
   },
   "notifications": {
     "email_sent": "Електронна пошта успішно надіслана",
@@ -915,7 +918,11 @@
         "status_busy": "Виконується…",
         "status_inactive": "Не ввімкнено на цьому пристрої",
         "status_unsupported": "Цей браузер не підтримує Web Push",
-        "title": "Фонові сповіщення"
+        "title": "Фонові сповіщення",
+        "sign_in_first": "Sign in first",
+        "invalid_relay_url": "Enter a valid https:// URL",
+        "enable_failed_generic": "Failed to enable push",
+        "disable_failed_generic": "Failed to disable push"
       }
     },
     "language_region": {
@@ -1825,7 +1832,10 @@
     "delete": "Видалити бесіду",
     "star": "Зоряна розмова",
     "unstar": "Зняти зірочку з розмови",
-    "toggle_thread": "Перемкнути потік"
+    "toggle_thread": "Перемкнути потік",
+    "no_subject": "(без теми)",
+    "no_preview": "Попередній перегляд недоступний",
+    "unknown_sender": "Невідомо"
   },
   "identities": {
     "modal_title": "Керування ідентифікаторами надсилання",
@@ -2832,7 +2842,10 @@
     "enter_export_passphrase": "Установіть парольну фразу експорту",
     "export_passphrase_desc": "Виберіть парольну фразу для захисту експортованого файлу PKCS#12",
     "export_storage_desc": "Введіть парольну фразу для зберігання, щоб розшифрувати ключ для експорту",
-    "incorrect_passphrase": "Неправильна парольна фраза"
+    "incorrect_passphrase": "Неправильна парольна фраза",
+    "import_failed_generic": "Import failed",
+    "import_cert_failed_generic": "Failed to import certificate",
+    "unlock_failed_generic": "Unlock failed"
   },
   "tour": {
     "step_counter": "Крок {current} з {total}",
@@ -2963,5 +2976,11 @@
     "clear_formatting": "Clear Formatting",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "settings_plugins": {
+    "forced_by_admin": "Plugin \"{name}\" is forced by admin and cannot be disabled",
+    "requires_approval": "Plugin \"{name}\" requires admin approval before it can be enabled",
+    "disabled": "Plugin \"{name}\" disabled",
+    "enabled": "Plugin \"{name}\" enabled"
   }
 }

@@ -38,6 +38,9 @@ export function SettingItem({ label, description, children, locked }: SettingIte
       <div className="flex-1 min-w-0 sm:pr-4">
         <div className="flex items-center gap-1.5">
           <label className="text-sm font-medium text-foreground">{label}</label>
+          {/* aria-label intentionally hardcoded English: SettingItem is
+              used by app/admin/_tabs/* which has no NextIntlClientProvider.
+              Same constraint as PWAInstallPrompt — see comment there. */}
           {locked && <Lock className="w-3 h-3 text-muted-foreground" aria-label="Managed by administrator" />}
         </div>
         {description && (

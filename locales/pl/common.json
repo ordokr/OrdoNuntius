@@ -512,7 +512,8 @@
       "ai_verdict": "Werdykt AI",
       "account": "Konto",
       "no_subject": "(brak tematu)"
-    }
+    },
+    "no_preview": "Brak podglądu"
   },
   "email_composer": {
     "new_message": "Nowa wiadomość",
@@ -633,7 +634,9 @@
     "rate_limited_title": "Uwierzytelnianie serwera jest tymczasowo ograniczone.",
     "rate_limited_detail": "OrdoNuntius wstrzymał żądania w tle, aby uniknąć blokady. Ponowna próba za {seconds}s.",
     "rate_limited_action_title": "Żądanie wstrzymane, aby uniknąć blokady.",
-    "rate_limited_action_detail": "OrdoNuntius czeka na zakończenie okresu blokady serwera przed wysłaniem kolejnych uwierzytelnionych żądań. Spróbuj ponownie za {seconds}s."
+    "rate_limited_action_detail": "OrdoNuntius czeka na zakończenie okresu blokady serwera przed wysłaniem kolejnych uwierzytelnionych żądań. Spróbuj ponownie za {seconds}s.",
+    "managed_by_administrator": "Managed by administrator",
+    "resize": "Resize"
   },
   "notifications": {
     "email_sent": "Wiadomość wysłana pomyślnie",
@@ -915,7 +918,11 @@
         "status_busy": "Przetwarzanie…",
         "status_inactive": "Niewłączone na tym urządzeniu",
         "status_unsupported": "Ta przeglądarka nie obsługuje Web Push",
-        "title": "Powiadomienia w tle"
+        "title": "Powiadomienia w tle",
+        "sign_in_first": "Sign in first",
+        "invalid_relay_url": "Enter a valid https:// URL",
+        "enable_failed_generic": "Failed to enable push",
+        "disable_failed_generic": "Failed to disable push"
       }
     },
     "language_region": {
@@ -1825,7 +1832,10 @@
     "delete": "Usuń konwersację",
     "star": "Oznacz konwersację gwiazdką",
     "unstar": "Usuń gwiazdkę z konwersacji",
-    "toggle_thread": "Przełącz widok wątku"
+    "toggle_thread": "Przełącz widok wątku",
+    "no_subject": "(bez tematu)",
+    "no_preview": "Brak podglądu",
+    "unknown_sender": "Nieznany"
   },
   "identities": {
     "modal_title": "Zarządzaj tożsamościami nadawcy",
@@ -2832,7 +2842,10 @@
     "enter_export_passphrase": "Ustaw hasło eksportu",
     "export_passphrase_desc": "Wybierz hasło do ochrony eksportowanego pliku PKCS#12",
     "export_storage_desc": "Wprowadź hasło magazynu, aby odszyfrować klucz do eksportu",
-    "incorrect_passphrase": "Nieprawidłowe hasło"
+    "incorrect_passphrase": "Nieprawidłowe hasło",
+    "import_failed_generic": "Import failed",
+    "import_cert_failed_generic": "Failed to import certificate",
+    "unlock_failed_generic": "Unlock failed"
   },
   "tour": {
     "step_counter": "Krok {current} z {total}",
@@ -2963,5 +2976,11 @@
     "clear_formatting": "Clear Formatting",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "settings_plugins": {
+    "forced_by_admin": "Plugin \"{name}\" is forced by admin and cannot be disabled",
+    "requires_approval": "Plugin \"{name}\" requires admin approval before it can be enabled",
+    "disabled": "Plugin \"{name}\" disabled",
+    "enabled": "Plugin \"{name}\" enabled"
   }
 }

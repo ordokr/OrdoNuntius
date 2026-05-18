@@ -512,7 +512,8 @@
       "collapse": "Hide details"
     },
     "send": "Send",
-    "more": "more"
+    "more": "more",
+    "no_preview": "No preview available"
   },
   "email_composer": {
     "new_message": "New Message",
@@ -633,7 +634,9 @@
     "rate_limited_title": "Server authentication is temporarily rate limited.",
     "rate_limited_detail": "OrdoNuntius has paused background requests to avoid lockout. Retrying in {seconds}s.",
     "rate_limited_action_title": "Request paused to avoid lockout.",
-    "rate_limited_action_detail": "OrdoNuntius is waiting for the server cooldown to end before sending more authenticated requests. Try again in {seconds}s."
+    "rate_limited_action_detail": "OrdoNuntius is waiting for the server cooldown to end before sending more authenticated requests. Try again in {seconds}s.",
+    "managed_by_administrator": "Managed by administrator",
+    "resize": "Resize"
   },
   "notifications": {
     "email_sent": "Email sent successfully",
@@ -894,7 +897,11 @@
         "disable": "Disable",
         "confirm_disable_title": "Disable background notifications?",
         "confirm_disable_message": "This device will stop receiving alerts when the site is closed.",
-        "ios_hint": "On iOS, install the site to your home screen first - Safari only delivers Web Push to installed PWAs."
+        "ios_hint": "On iOS, install the site to your home screen first - Safari only delivers Web Push to installed PWAs.",
+        "sign_in_first": "Sign in first",
+        "invalid_relay_url": "Enter a valid https:// URL",
+        "enable_failed_generic": "Failed to enable push",
+        "disable_failed_generic": "Failed to disable push"
       },
       "sound_selection": {
         "title": "Notification Sound",
@@ -1825,7 +1832,10 @@
     "delete": "Delete conversation",
     "star": "Star conversation",
     "unstar": "Unstar conversation",
-    "toggle_thread": "Toggle thread"
+    "toggle_thread": "Toggle thread",
+    "no_subject": "(no subject)",
+    "no_preview": "No preview available",
+    "unknown_sender": "Unknown"
   },
   "identities": {
     "modal_title": "Manage Sending Identities",
@@ -2855,7 +2865,10 @@
     "enter_export_passphrase": "Set Export Passphrase",
     "export_passphrase_desc": "Choose a passphrase to protect the exported PKCS#12 file",
     "export_storage_desc": "Enter the storage passphrase to decrypt the key for export",
-    "incorrect_passphrase": "Incorrect passphrase"
+    "incorrect_passphrase": "Incorrect passphrase",
+    "import_failed_generic": "Import failed",
+    "import_cert_failed_generic": "Failed to import certificate",
+    "unlock_failed_generic": "Unlock failed"
   },
   "tour": {
     "step_counter": "Step {current} of {total}",
@@ -2963,5 +2976,11 @@
     "clear_formatting": "Clear Formatting",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "settings_plugins": {
+    "forced_by_admin": "Plugin \"{name}\" is forced by admin and cannot be disabled",
+    "requires_approval": "Plugin \"{name}\" requires admin approval before it can be enabled",
+    "disabled": "Plugin \"{name}\" disabled",
+    "enabled": "Plugin \"{name}\" enabled"
   }
 }

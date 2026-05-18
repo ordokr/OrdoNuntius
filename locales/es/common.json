@@ -512,7 +512,8 @@
       "ai_verdict": "Veredicto de IA",
       "account": "Cuenta",
       "no_subject": "(sin asunto)"
-    }
+    },
+    "no_preview": "Sin vista previa"
   },
   "email_composer": {
     "new_message": "Nuevo Mensaje",
@@ -633,7 +634,9 @@
     "rate_limited_title": "La autenticación del servidor está limitada temporalmente.",
     "rate_limited_detail": "OrdoNuntius ha pausado las solicitudes en segundo plano para evitar un bloqueo. Reintentando en {seconds}s.",
     "rate_limited_action_title": "Solicitud pausada para evitar el bloqueo.",
-    "rate_limited_action_detail": "OrdoNuntius está esperando a que termine el enfriamiento del servidor antes de enviar más solicitudes autenticadas. Inténtalo de nuevo en {seconds}s."
+    "rate_limited_action_detail": "OrdoNuntius está esperando a que termine el enfriamiento del servidor antes de enviar más solicitudes autenticadas. Inténtalo de nuevo en {seconds}s.",
+    "managed_by_administrator": "Managed by administrator",
+    "resize": "Resize"
   },
   "notifications": {
     "email_sent": "Correo enviado exitosamente",
@@ -915,7 +918,11 @@
         "status_busy": "Trabajando…",
         "status_inactive": "No habilitado en este dispositivo",
         "status_unsupported": "Este navegador no admite Web Push",
-        "title": "Notificaciones en segundo plano"
+        "title": "Notificaciones en segundo plano",
+        "sign_in_first": "Sign in first",
+        "invalid_relay_url": "Enter a valid https:// URL",
+        "enable_failed_generic": "Failed to enable push",
+        "disable_failed_generic": "Failed to disable push"
       }
     },
     "language_region": {
@@ -1825,7 +1832,10 @@
     "delete": "Eliminar conversación",
     "star": "Destacar conversación",
     "unstar": "Quitar destacado de conversación",
-    "toggle_thread": "Expandir/contraer hilo"
+    "toggle_thread": "Expandir/contraer hilo",
+    "no_subject": "(sin asunto)",
+    "no_preview": "Sin vista previa",
+    "unknown_sender": "Desconocido"
   },
   "identities": {
     "modal_title": "Administrar Identidades de Envío",
@@ -2832,7 +2842,10 @@
     "enter_export_passphrase": "Definir contraseña de exportación",
     "export_passphrase_desc": "Elige una contraseña para proteger el archivo PKCS#12 exportado",
     "export_storage_desc": "Introduce la contraseña de almacenamiento para descifrar la clave antes de exportarla",
-    "incorrect_passphrase": "Contraseña incorrecta"
+    "incorrect_passphrase": "Contraseña incorrecta",
+    "import_failed_generic": "Import failed",
+    "import_cert_failed_generic": "Failed to import certificate",
+    "unlock_failed_generic": "Unlock failed"
   },
   "tour": {
     "step_counter": "Paso {current} de {total}",
@@ -2963,5 +2976,11 @@
     "clear_formatting": "Clear Formatting",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "settings_plugins": {
+    "forced_by_admin": "Plugin \"{name}\" is forced by admin and cannot be disabled",
+    "requires_approval": "Plugin \"{name}\" requires admin approval before it can be enabled",
+    "disabled": "Plugin \"{name}\" disabled",
+    "enabled": "Plugin \"{name}\" enabled"
   }
 }

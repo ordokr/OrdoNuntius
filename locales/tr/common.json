@@ -512,7 +512,8 @@
       "ai_verdict": "Yapay zeka kararı",
       "account": "Hesap",
       "no_subject": "(konu yok)"
-    }
+    },
+    "no_preview": "Önizleme yok"
   },
   "email_composer": {
     "new_message": "Yeni İleti",
@@ -633,7 +634,9 @@
     "rate_limited_title": "Sunucu kimlik doğrulaması geçici olarak hız sınırlamasına tabi.",
     "rate_limited_detail": "Hesap kilitlenmesini önlemek için OrdoNuntius arka plan isteklerini duraklattı. {seconds} saniye içinde yeniden deneniyor.",
     "rate_limited_action_title": "Kilitlenmeyi önlemek için istek duraklatıldı.",
-    "rate_limited_action_detail": "OrdoNuntius, daha fazla kimlik doğrulama isteği göndermeden önce sunucunun soğuma süresinin bitmesini bekliyor. {seconds} saniye içinde tekrar deneyin."
+    "rate_limited_action_detail": "OrdoNuntius, daha fazla kimlik doğrulama isteği göndermeden önce sunucunun soğuma süresinin bitmesini bekliyor. {seconds} saniye içinde tekrar deneyin.",
+    "managed_by_administrator": "Managed by administrator",
+    "resize": "Resize"
   },
   "notifications": {
     "email_sent": "E-posta başarıyla gönderildi",
@@ -915,7 +918,11 @@
         "status_busy": "Çalışıyor…",
         "status_inactive": "Bu cihazda etkinleştirilmedi",
         "status_unsupported": "Bu tarayıcı Web Push'u desteklemiyor",
-        "title": "Arka plan bildirimleri"
+        "title": "Arka plan bildirimleri",
+        "sign_in_first": "Sign in first",
+        "invalid_relay_url": "Enter a valid https:// URL",
+        "enable_failed_generic": "Failed to enable push",
+        "disable_failed_generic": "Failed to disable push"
       }
     },
     "language_region": {
@@ -1825,7 +1832,10 @@
     "delete": "Konuşmayı sil",
     "star": "Konuşmaya yıldız ekle",
     "unstar": "Konuşmanın yıldızını kaldır",
-    "toggle_thread": "İleti dizisini aç/kapat"
+    "toggle_thread": "İleti dizisini aç/kapat",
+    "no_subject": "(konu yok)",
+    "no_preview": "Önizleme yok",
+    "unknown_sender": "Bilinmiyor"
   },
   "identities": {
     "modal_title": "Gönderme Kimliklerini Yönet",
@@ -2855,7 +2865,10 @@
     "enter_export_passphrase": "Dışa Aktarma Parolası Ayarla",
     "export_passphrase_desc": "Dışa aktarılan PKCS#12 dosyasını korumak için bir parola seçin",
     "export_storage_desc": "Dışa aktarma için anahtarın şifresini çözmek üzere depolama parolasını girin",
-    "incorrect_passphrase": "Yanlış parola"
+    "incorrect_passphrase": "Yanlış parola",
+    "import_failed_generic": "Import failed",
+    "import_cert_failed_generic": "Failed to import certificate",
+    "unlock_failed_generic": "Unlock failed"
   },
   "tour": {
     "step_counter": "{total} adımdan {current}.",
@@ -2963,5 +2976,11 @@
     "clear_formatting": "Clear Formatting",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "settings_plugins": {
+    "forced_by_admin": "Plugin \"{name}\" is forced by admin and cannot be disabled",
+    "requires_approval": "Plugin \"{name}\" requires admin approval before it can be enabled",
+    "disabled": "Plugin \"{name}\" disabled",
+    "enabled": "Plugin \"{name}\" enabled"
   }
 }

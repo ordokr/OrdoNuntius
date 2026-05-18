@@ -512,7 +512,8 @@
       "ai_verdict": "AIの判定",
       "account": "アカウント",
       "no_subject": "(件名なし)"
-    }
+    },
+    "no_preview": "プレビューはありません"
   },
   "email_composer": {
     "new_message": "新規メッセージ",
@@ -633,7 +634,9 @@
     "rate_limited_title": "サーバー認証は一時的に制限されています。",
     "rate_limited_detail": "ロックアウトを避けるため、OrdoNuntius はバックグラウンド要求を一時停止しました。{seconds} 秒後に再試行します。",
     "rate_limited_action_title": "ロックアウトを避けるため要求を一時停止しました。",
-    "rate_limited_action_detail": "OrdoNuntius はサーバーのクールダウンが終わるまで、追加の認証付きリクエストを送信しません。{seconds} 秒後に再試行してください。"
+    "rate_limited_action_detail": "OrdoNuntius はサーバーのクールダウンが終わるまで、追加の認証付きリクエストを送信しません。{seconds} 秒後に再試行してください。",
+    "managed_by_administrator": "Managed by administrator",
+    "resize": "Resize"
   },
   "notifications": {
     "email_sent": "メールを送信しました",
@@ -915,7 +918,11 @@
         "status_busy": "処理中…",
         "status_inactive": "このデバイスでは有効になっていません",
         "status_unsupported": "このブラウザは Web Push をサポートしていません",
-        "title": "バックグラウンド通知"
+        "title": "バックグラウンド通知",
+        "sign_in_first": "Sign in first",
+        "invalid_relay_url": "Enter a valid https:// URL",
+        "enable_failed_generic": "Failed to enable push",
+        "disable_failed_generic": "Failed to disable push"
       }
     },
     "language_region": {
@@ -1825,7 +1832,10 @@
     "delete": "会話を削除",
     "star": "会話にスターを付ける",
     "unstar": "会話のスターを外す",
-    "toggle_thread": "スレッドの展開/折りたたみ"
+    "toggle_thread": "スレッドの展開/折りたたみ",
+    "no_subject": "(件名なし)",
+    "no_preview": "プレビューはありません",
+    "unknown_sender": "不明"
   },
   "identities": {
     "modal_title": "送信者情報を管理",
@@ -2832,7 +2842,10 @@
     "enter_export_passphrase": "エクスポート用パスフレーズを設定",
     "export_passphrase_desc": "エクスポートする PKCS#12 ファイルを保護するパスフレーズを選択してください",
     "export_storage_desc": "エクスポートのために鍵を復号する保存用パスフレーズを入力してください",
-    "incorrect_passphrase": "パスフレーズが正しくありません"
+    "incorrect_passphrase": "パスフレーズが正しくありません",
+    "import_failed_generic": "Import failed",
+    "import_cert_failed_generic": "Failed to import certificate",
+    "unlock_failed_generic": "Unlock failed"
   },
   "tour": {
     "step_counter": "ステップ {current} / {total}",
@@ -2963,5 +2976,11 @@
     "clear_formatting": "Clear Formatting",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "settings_plugins": {
+    "forced_by_admin": "Plugin \"{name}\" is forced by admin and cannot be disabled",
+    "requires_approval": "Plugin \"{name}\" requires admin approval before it can be enabled",
+    "disabled": "Plugin \"{name}\" disabled",
+    "enabled": "Plugin \"{name}\" enabled"
   }
 }

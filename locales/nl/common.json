@@ -512,7 +512,8 @@
       "ai_verdict": "AI-oordeel",
       "account": "Account",
       "no_subject": "(geen onderwerp)"
-    }
+    },
+    "no_preview": "Geen voorbeeld beschikbaar"
   },
   "email_composer": {
     "new_message": "Nieuw bericht",
@@ -633,7 +634,9 @@
     "rate_limited_title": "Serverauthenticatie is tijdelijk beperkt.",
     "rate_limited_detail": "OrdoNuntius heeft achtergrondverzoeken gepauzeerd om een blokkade te voorkomen. Nieuwe poging over {seconds}s.",
     "rate_limited_action_title": "Verzoek gepauzeerd om blokkade te voorkomen.",
-    "rate_limited_action_detail": "OrdoNuntius wacht tot de servercooldown voorbij is voordat er nieuwe geauthenticeerde verzoeken worden verzonden. Probeer het over {seconds}s opnieuw."
+    "rate_limited_action_detail": "OrdoNuntius wacht tot de servercooldown voorbij is voordat er nieuwe geauthenticeerde verzoeken worden verzonden. Probeer het over {seconds}s opnieuw.",
+    "managed_by_administrator": "Managed by administrator",
+    "resize": "Resize"
   },
   "notifications": {
     "email_sent": "E-mail succesvol verzonden",
@@ -915,7 +918,11 @@
         "status_busy": "Bezig…",
         "status_inactive": "Niet ingeschakeld op dit apparaat",
         "status_unsupported": "Deze browser ondersteunt geen Web Push",
-        "title": "Achtergrondmeldingen"
+        "title": "Achtergrondmeldingen",
+        "sign_in_first": "Sign in first",
+        "invalid_relay_url": "Enter a valid https:// URL",
+        "enable_failed_generic": "Failed to enable push",
+        "disable_failed_generic": "Failed to disable push"
       }
     },
     "language_region": {
@@ -1825,7 +1832,10 @@
     "delete": "Gesprek verwijderen",
     "star": "Ster toevoegen aan gesprek",
     "unstar": "Ster verwijderen van gesprek",
-    "toggle_thread": "Gesprek in-/uitvouwen"
+    "toggle_thread": "Gesprek in-/uitvouwen",
+    "no_subject": "(geen onderwerp)",
+    "no_preview": "Geen voorbeeld beschikbaar",
+    "unknown_sender": "Onbekend"
   },
   "identities": {
     "modal_title": "Verzendidentiteiten beheren",
@@ -2832,7 +2842,10 @@
     "enter_export_passphrase": "Exportwachtwoordzin instellen",
     "export_passphrase_desc": "Kies een wachtwoordzin om het geëxporteerde PKCS#12-bestand te beschermen",
     "export_storage_desc": "Voer de opslagwachtwoordzin in om de sleutel voor export te ontsleutelen",
-    "incorrect_passphrase": "Onjuiste wachtwoordzin"
+    "incorrect_passphrase": "Onjuiste wachtwoordzin",
+    "import_failed_generic": "Import failed",
+    "import_cert_failed_generic": "Failed to import certificate",
+    "unlock_failed_generic": "Unlock failed"
   },
   "tour": {
     "step_counter": "Stap {current} van {total}",
@@ -2963,5 +2976,11 @@
     "clear_formatting": "Clear Formatting",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "settings_plugins": {
+    "forced_by_admin": "Plugin \"{name}\" is forced by admin and cannot be disabled",
+    "requires_approval": "Plugin \"{name}\" requires admin approval before it can be enabled",
+    "disabled": "Plugin \"{name}\" disabled",
+    "enabled": "Plugin \"{name}\" enabled"
   }
 }

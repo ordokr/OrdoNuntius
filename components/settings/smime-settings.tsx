@@ -114,7 +114,7 @@ export function SmimeSettings() {
       setPendingP12Pass("");
       setImportError(null);
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : "Import failed");
+      setImportError(err instanceof Error ? err.message : t("import_failed_generic"));
     }
   };
 
@@ -129,7 +129,7 @@ export function SmimeSettings() {
         const store = useSmimeStore.getState();
         await store.importPublicCert(reader.result as ArrayBuffer, "manual");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to import certificate");
+        setError(err instanceof Error ? err.message : t("import_cert_failed_generic"));
       }
     };
     reader.readAsArrayBuffer(file);
@@ -152,7 +152,7 @@ export function SmimeSettings() {
       setUnlockTargetId(null);
       setUnlockError(null);
     } catch (err) {
-      setUnlockError(err instanceof Error ? err.message : "Unlock failed");
+      setUnlockError(err instanceof Error ? err.message : t("unlock_failed_generic"));
     }
   };
 

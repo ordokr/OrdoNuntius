@@ -512,7 +512,8 @@
       "ai_verdict": "KI-Urteil",
       "account": "Konto",
       "no_subject": "(kein Betreff)"
-    }
+    },
+    "no_preview": "Keine Vorschau verfügbar"
   },
   "email_composer": {
     "new_message": "Neue Nachricht",
@@ -633,7 +634,9 @@
     "rate_limited_title": "Die Serverauthentifizierung ist vorubergehend begrenzt.",
     "rate_limited_detail": "OrdoNuntius hat Hintergrundanfragen pausiert, um eine Sperre zu vermeiden. Neuer Versuch in {seconds}s.",
     "rate_limited_action_title": "Anfrage pausiert, um eine Sperre zu vermeiden.",
-    "rate_limited_action_detail": "OrdoNuntius wartet, bis die Serverabklingzeit endet, bevor weitere authentifizierte Anfragen gesendet werden. Versuchen Sie es in {seconds}s erneut."
+    "rate_limited_action_detail": "OrdoNuntius wartet, bis die Serverabklingzeit endet, bevor weitere authentifizierte Anfragen gesendet werden. Versuchen Sie es in {seconds}s erneut.",
+    "managed_by_administrator": "Managed by administrator",
+    "resize": "Resize"
   },
   "notifications": {
     "email_sent": "E-Mail erfolgreich gesendet",
@@ -915,7 +918,11 @@
         "status_busy": "Wird verarbeitet…",
         "status_inactive": "Auf diesem Gerät nicht aktiviert",
         "status_unsupported": "Dieser Browser unterstützt Web Push nicht",
-        "title": "Hintergrundbenachrichtigungen"
+        "title": "Hintergrundbenachrichtigungen",
+        "sign_in_first": "Sign in first",
+        "invalid_relay_url": "Enter a valid https:// URL",
+        "enable_failed_generic": "Failed to enable push",
+        "disable_failed_generic": "Failed to disable push"
       }
     },
     "language_region": {
@@ -1825,7 +1832,10 @@
     "delete": "Unterhaltung löschen",
     "star": "Unterhaltung mit Stern markieren",
     "unstar": "Stern von Unterhaltung entfernen",
-    "toggle_thread": "Unterhaltung ein-/ausklappen"
+    "toggle_thread": "Unterhaltung ein-/ausklappen",
+    "no_subject": "(kein Betreff)",
+    "no_preview": "Keine Vorschau verfügbar",
+    "unknown_sender": "Unbekannt"
   },
   "identities": {
     "modal_title": "Sendeidentitäten verwalten",
@@ -2832,7 +2842,10 @@
     "enter_export_passphrase": "Export-Passphrase festlegen",
     "export_passphrase_desc": "Wählen Sie eine Passphrase zum Schutz der exportierten PKCS#12-Datei",
     "export_storage_desc": "Geben Sie die Speicher-Passphrase ein, um den Schlüssel für den Export zu entschlüsseln",
-    "incorrect_passphrase": "Falsche Passphrase"
+    "incorrect_passphrase": "Falsche Passphrase",
+    "import_failed_generic": "Import failed",
+    "import_cert_failed_generic": "Failed to import certificate",
+    "unlock_failed_generic": "Unlock failed"
   },
   "tour": {
     "step_counter": "Schritt {current} von {total}",
@@ -2963,5 +2976,11 @@
     "clear_formatting": "Clear Formatting",
     "undo": "Undo",
     "redo": "Redo"
+  },
+  "settings_plugins": {
+    "forced_by_admin": "Plugin \"{name}\" is forced by admin and cannot be disabled",
+    "requires_approval": "Plugin \"{name}\" requires admin approval before it can be enabled",
+    "disabled": "Plugin \"{name}\" disabled",
+    "enabled": "Plugin \"{name}\" enabled"
   }
 }
