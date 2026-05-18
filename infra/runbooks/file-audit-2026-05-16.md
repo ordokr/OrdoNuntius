@@ -255,7 +255,7 @@ file in this index — visited when its turn arrives.)
 205. [s] `components/providers/intl-provider.tsx` — excellent design: template-literal dynamic import + module-scope cache + SSR seed. Comments explain perf rationale.
 206. [s] `components/providers/rate-limit-toast-provider.tsx` — clean.
 207. [s] `components/providers/theme-provider.tsx` — 13 lines, clean.
-208. [s] `components/pwa-install-prompt.tsx` — **logged**: all-English-hardcoded strings ("Install {appName}", "Install our app...", "Not now", "Install", "Don't remind me again", etc.). No `useTranslations` call at all. Real i18n bug; cross-locale fix needed.
+208. [x] `components/pwa-install-prompt.tsx` — **i18n bug fixed**: was all-English-hardcoded. Now wired to a new `pwa_install` namespace (title, description, dismiss_aria_label, not_now, install, remind_never) added to all 16 locales.
 209. [s] `components/search/advanced-search-panel.tsx` — clean.
 210. [s] `components/search/search-chips.tsx` — clean.
 211. [s] `components/service-worker-registration.tsx` — clean.
@@ -295,7 +295,7 @@ file in this index — visited when its turn arrives.)
 245. [s] `components/templates/template-form.tsx` — clean.
 246. [s] `components/templates/template-manager-modal.tsx` — clean.
 247. [s] `components/templates/template-picker.tsx` — clean.
-248. [s] `components/totp-reauth-dialog.tsx` — **logged**: all-English-hardcoded strings ("Session Expired", "Your 2FA code has rotated", "Enter a fresh authentication code…", "Cancel", "Verify", etc.). No `useTranslations` call at all. Real i18n bug surfaces every time a TOTP session expires for non-English users.
+248. [x] `components/totp-reauth-dialog.tsx` — **i18n bug fixed**: was all-English-hardcoded. Now wired to a new `totp_reauth` namespace (title, subtitle, instructions, oauth_hint, code_placeholder, code_aria_label, dialog_aria_label, cancel, verify) added to all 16 locales.
 249. [s] `components/tour/tour-overlay.tsx` — clean.
 250. [s] `components/tour/tour-provider.tsx` — clean.
 251. [s] `components/tour/tour-steps.ts` — clean data file.
@@ -419,7 +419,7 @@ file in this index — visited when its turn arrives.)
 369. [s] `lib/tnef.ts` — TNEF parser; clean.
 370. [s] `lib/unified-mailbox.ts` — clean.
 371. [x] `lib/utils.ts` — `formatDate` was hardcoded to `"en-US"` locale, rendering US month names regardless of user locale. Now uses browser default. Logged: relative-time strings ("Just now", "5m ago") still English; cross-locale.
-372. [s] `lib/validation.ts` — logged: `getEmailValidationError` returns hardcoded English strings (cross-locale i18n bug).
+372. [x] `lib/validation.ts` — **i18n bug fixed**: added `getEmailValidationErrorCode` returning typed codes (`EMAIL_REQUIRED`/`EMAIL_TOO_LONG`/`EMAIL_INVALID_CHARS`/`EMAIL_INVALID`); callers translate via the new `validation_errors` namespace. Legacy `getEmailValidationError` kept as `@deprecated` for back-compat. `identity-form.tsx` migrated to the code-based API.
 373. [s] `lib/vcard.ts` — vCard parser/serializer; clean.
 374. [s] `lib/version-check/fetcher.ts` — clean.
 375. [s] `lib/version-check/index.ts` — clean.

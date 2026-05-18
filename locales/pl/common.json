@@ -2908,5 +2908,30 @@
       "manager": "Menedżer",
       "custom": "Niestandardowe"
     }
+  },
+  "totp_reauth": {
+    "title": "Session Expired",
+    "subtitle": "Your 2FA code has rotated",
+    "instructions": "Enter a fresh authentication code from your authenticator app to continue.",
+    "oauth_hint": "To avoid being prompted repeatedly, ask your administrator to enable OAuth authentication (either Stalwart's built-in OAuth or an external identity provider).",
+    "code_placeholder": "000000",
+    "code_aria_label": "Authentication code",
+    "dialog_aria_label": "Two-factor authentication required",
+    "cancel": "Cancel",
+    "verify": "Verify"
+  },
+  "pwa_install": {
+    "title": "Install {appName}",
+    "description": "Install our app for quick access and offline support.",
+    "dismiss_aria_label": "Dismiss install prompt",
+    "not_now": "Not now",
+    "install": "Install",
+    "remind_never": "Don't remind me again"
+  },
+  "validation_errors": {
+    "email_required": "Email address is required",
+    "email_too_long": "Email address is too long (max 254 characters)",
+    "email_invalid_chars": "Email address contains invalid characters",
+    "email_invalid": "Please enter a valid email address"
   }
 }

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Identity, EmailAddress } from '@/lib/jmap/types';
 import { sanitizeSignatureHtml } from '@/lib/email-sanitization';
-import { getEmailValidationError, validateEmailList } from '@/lib/validation';
+import { getEmailValidationErrorCode, validateEmailList } from '@/lib/validation';
 
 interface IdentityFormData {
   name: string;
@@ -26,6 +26,7 @@ interface IdentityFormProps {
 export function IdentityForm({ identity, onSave, onCancel }: IdentityFormProps) {
   const t = useTranslations('identities.form');
   const tValidation = useTranslations('identities.validation_errors');
+  const tValidationGlobal = useTranslations('validation_errors');
   const tDisplay = useTranslations('identities.display');
   const isEditing = !!identity;
 
@@ -62,10 +63,17 @@ export function IdentityForm({ identity, onSave, onCancel }: IdentityFormProps) 
       newErrors.name = t('name_required');
     }
 
-    // Use secure email validation
-    const emailError = getEmailValidationError(formData.email);
-    if (emailError) {
-      newErrors.email = emailError;
+    // Use secure email validation. Translate the error code at the
+    // call site — the validation lib stays pure and locale-free.
+    const emailErrorCode = getEmailValidationErrorCode(formData.email);
+    if (emailErrorCode) {
+      const codeToKey: Record<NonNullable<typeof emailErrorCode>, string> = {
+        EMAIL_REQUIRED: 'email_required',
+        EMAIL_TOO_LONG: 'email_too_long',
+        EMAIL_INVALID_CHARS: 'email_invalid_chars',
+        EMAIL_INVALID: 'email_invalid',
+      };
+      newErrors.email = tValidationGlobal(codeToKey[emailErrorCode]);
     }
 
     // Validate reply-to email list

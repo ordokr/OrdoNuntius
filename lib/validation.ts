@@ -49,22 +49,46 @@ export function validateEmailList(csv: string): {
 }
 
 /**
- * Get user-friendly validation error message
+ * Validation error codes returned by `getEmailValidationErrorCode`.
+ * Callers translate these via the `validation_errors` namespace; this
+ * module stays as a pure utility that doesn't pull next-intl in.
+ */
+export type EmailValidationErrorCode =
+  | 'EMAIL_REQUIRED'
+  | 'EMAIL_TOO_LONG'
+  | 'EMAIL_INVALID_CHARS'
+  | 'EMAIL_INVALID'
+  | null;
+
+/**
+ * Returns an error code (or null) for an email address. Translation
+ * happens at the call site — see `validation_errors` in locale JSON.
+ */
+export function getEmailValidationErrorCode(email: string): EmailValidationErrorCode {
+  if (!email?.trim()) return 'EMAIL_REQUIRED';
+  if (email.length > 254) return 'EMAIL_TOO_LONG';
+  if (/[\r\n\0<>]/.test(email)) return 'EMAIL_INVALID_CHARS';
+  if (!isValidEmail(email)) return 'EMAIL_INVALID';
+  return null;
+}
+
+/**
+ * Get user-friendly validation error message.
+ *
+ * @deprecated Use `getEmailValidationErrorCode` and translate at the
+ * call site. Kept for back-compat with existing callers; returns the
+ * English string corresponding to the code so behavior is unchanged
+ * for any caller that hasn't migrated.
  */
 export function getEmailValidationError(email: string): string | null {
-  if (!email?.trim()) return 'Email address is required';
-
-  if (email.length > 254) return 'Email address is too long (max 254 characters)';
-
-  if (/[\r\n\0<>]/.test(email)) {
-    return 'Email address contains invalid characters';
+  const code = getEmailValidationErrorCode(email);
+  if (!code) return null;
+  switch (code) {
+    case 'EMAIL_REQUIRED': return 'Email address is required';
+    case 'EMAIL_TOO_LONG': return 'Email address is too long (max 254 characters)';
+    case 'EMAIL_INVALID_CHARS': return 'Email address contains invalid characters';
+    case 'EMAIL_INVALID': return 'Please enter a valid email address';
   }
-
-  if (!isValidEmail(email)) {
-    return 'Please enter a valid email address';
-  }
-
-  return null;
 }
 
 /**

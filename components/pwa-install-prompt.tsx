@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { X, Download } from "lucide-react";
 import { useConfig } from "@/hooks/use-config";
 
@@ -12,6 +13,7 @@ interface BeforeInstallPromptEvent extends Event {
 const DISMISSED_KEY = "pwa-install-dismissed";
 
 export function PWAInstallPrompt() {
+  const t = useTranslations("pwa_install");
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -82,17 +84,17 @@ export function PWAInstallPrompt() {
           )}
           <div>
             <h3 className="font-semibold text-sm text-neutral-900 dark:text-white">
-              Install {appName}
+              {t("title", { appName })}
             </h3>
             <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
-              Install our app for quick access and offline support.
+              {t("description")}
             </p>
           </div>
         </div>
         <button
           onClick={handleDismiss}
           className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
-          aria-label="Dismiss install prompt"
+          aria-label={t("dismiss_aria_label")}
         >
           <X className="w-4 h-4" />
         </button>
@@ -103,20 +105,20 @@ export function PWAInstallPrompt() {
             onClick={handleDismiss}
             className="flex-1 px-3 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
           >
-            Not now
+            {t("not_now")}
           </button>
           <button
             onClick={handleInstall}
             className="flex-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors"
           >
-            Install
+            {t("install")}
           </button>
         </div>
         <button
           onClick={handleDismissForever}
           className="w-full text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors text-center"
         >
-          Don&apos;t remind me again
+          {t("remind_never")}
         </button>
       </div>
     </div>
