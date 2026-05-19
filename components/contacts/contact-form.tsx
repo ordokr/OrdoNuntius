@@ -459,8 +459,13 @@ export function ContactForm({ contact, addressBooks, allKeywords, defaultAddress
 
     const orgUnits = department.trim() ? [{ name: department.trim() }] : undefined;
 
+    // Fused filter+forEach loops: drop the intermediate filter arrays.
+    // Walk each source array with for-of and conditionally push to the
+    // record, with a manual running index.
     const addressesMap: Record<string, ContactCard["addresses"] extends Record<string, infer V> ? V : never> = {};
-    addresses.filter(a => a.street.trim() || a.locality.trim() || a.country.trim()).forEach((a, i) => {
+    let addrIdx = 0;
+    for (const a of addresses) {
+      if (!(a.street.trim() || a.locality.trim() || a.country.trim())) continue;
       const components: Array<{ kind: string; value: string }> = [];
       if (a.street.trim()) components.push({ kind: "name", value: a.street.trim() });
       if (a.locality.trim()) components.push({ kind: "locality", value: a.locality.trim() });
@@ -470,28 +475,34 @@ export function ContactForm({ contact, addressBooks, allKeywords, defaultAddress
       const obj: Record<string, unknown> = { components, isOrdered: true, defaultSeparator: ", " };
       if (a.context) obj.contexts = { [a.context]: true };
       // @ts-expect-error - dynamic build
-      addressesMap[`a${i}`] = obj;
-    });
+      addressesMap[`a${addrIdx++}`] = obj;
+    }
 
     const onlineServicesMap: Record<string, ContactOnlineService> = {};
-    onlineServices.filter(s => s.uri.trim()).forEach((s, i) => {
+    let osIdx = 0;
+    for (const s of onlineServices) {
+      if (!s.uri.trim()) continue;
       const obj: ContactOnlineService = { uri: s.uri.trim() };
       if (s.service.trim()) obj.service = s.service.trim();
       if (s.label.trim()) obj.label = s.label.trim();
-      onlineServicesMap[`os${i}`] = obj;
-    });
+      onlineServicesMap[`os${osIdx++}`] = obj;
+    }
 
     const anniversariesMap: Record<string, ContactAnniversary> = {};
-    anniversaries.filter(a => a.date.trim()).forEach((a, i) => {
-      anniversariesMap[`an${i}`] = { date: stringToPartialDate(a.date.trim()), kind: a.kind };
-    });
+    let annIdx = 0;
+    for (const a of anniversaries) {
+      if (!a.date.trim()) continue;
+      anniversariesMap[`an${annIdx++}`] = { date: stringToPartialDate(a.date.trim()), kind: a.kind };
+    }
 
     const personalInfoMap: Record<string, ContactPersonalInfo> = {};
-    personalInfoEntries.filter(p => p.value.trim()).forEach((p, i) => {
+    let piIdx = 0;
+    for (const p of personalInfoEntries) {
+      if (!p.value.trim()) continue;
       const obj: ContactPersonalInfo = { value: p.value.trim(), kind: p.kind };
       if (p.level) obj.level = p.level as "high" | "medium" | "low";
-      personalInfoMap[`pi${i}`] = obj;
-    });
+      personalInfoMap[`pi${piIdx++}`] = obj;
+    }
 
     const keywordsMap: Record<string, boolean> = {};
     if (keywordsStr.trim()) {

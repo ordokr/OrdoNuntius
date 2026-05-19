@@ -61,7 +61,10 @@ export function CalendarAgendaView({
     const groups: DayGroup[] = [];
     const groupMap = new Map<string, DayGroup>();
 
-    sorted.forEach((ev) => {
+    // for-of avoids the per-call .forEach closure allocation. Runs for
+    // every event in the agenda view's date range; the closure cost
+    // shows up at the top of profiles when scrolling long ranges.
+    for (const ev of sorted) {
       try {
         const { startDay, endDay } = getEventDayBounds(ev);
         const cursor = new Date(startDay);
@@ -77,7 +80,7 @@ export function CalendarAgendaView({
           cursor.setDate(cursor.getDate() + 1);
         }
       } catch { /* skip invalid dates */ }
-    });
+    }
 
     // Always include today's date in the groups so the view has a "Today" anchor
     const todayKey = format(new Date(), "yyyy-MM-dd");
