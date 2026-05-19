@@ -482,7 +482,34 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
     const isSelected = selectedEmailId === latestEmail.id ||
       thread.emails.some(e => e.id === selectedEmailId);
 
-    // isChecked already computed above via selector — drop the duplicate.
+    // Stabilized per-row callback wrappers. These bind `latestEmail` so children
+    // (SingleEmailItem, EmailHoverActions) get callbacks with no email arg —
+    // their preferred signature. useCallback'd against [parentCb, latestEmail]:
+    // since `thread` is memoized in EmailList, latestEmail is referentially
+    // stable, and parent callbacks are useCallback'd, so these refs stay stable
+    // across parent re-renders. Inline arrow versions defeated both children's
+    // React.memo, re-rendering every visible row on every parent update.
+    const handleSingleClick = useCallback(() => {
+      onEmailSelect(latestEmail);
+    }, [onEmailSelect, latestEmail]);
+    const handleHoverToggleStar = useCallback(() => {
+      onToggleStar?.(latestEmail);
+    }, [onToggleStar, latestEmail]);
+    const handleHoverMarkAsRead = useCallback((read: boolean) => {
+      onMarkAsRead?.(latestEmail, read);
+    }, [onMarkAsRead, latestEmail]);
+    const handleHoverDelete = useCallback(() => {
+      onDelete?.(latestEmail);
+    }, [onDelete, latestEmail]);
+    const handleHoverArchive = useCallback(() => {
+      onArchive?.(latestEmail);
+    }, [onArchive, latestEmail]);
+    const handleHoverSetColorTag = useCallback((color: string | null) => {
+      onSetColorTag?.(latestEmail.id, color);
+    }, [onSetColorTag, latestEmail]);
+    const handleHoverMarkAsSpam = useCallback(() => {
+      onMarkAsSpam?.(latestEmail);
+    }, [onMarkAsSpam, latestEmail]);
 
     if (emailCount === 1) {
       return (
@@ -490,18 +517,18 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
           ref={ref}
           email={latestEmail}
           selected={selectedEmailId === latestEmail.id}
-          onClick={() => onEmailSelect(latestEmail)}
+          onClick={handleSingleClick}
           onContextMenu={onContextMenu}
           showPreview={showPreview}
           colorTag={colorTag}
           currentMailboxRole={currentMailboxRole}
           emailKeywordsById={emailKeywordsById}
-          onToggleStar={onToggleStar ? () => onToggleStar(latestEmail) : undefined}
-          onMarkAsRead={onMarkAsRead ? (read) => onMarkAsRead(latestEmail, read) : undefined}
-          onDelete={onDelete ? () => onDelete(latestEmail) : undefined}
-          onArchive={onArchive ? () => onArchive(latestEmail) : undefined}
-          onSetColorTag={onSetColorTag ? (color) => onSetColorTag(latestEmail.id, color) : undefined}
-          onMarkAsSpam={onMarkAsSpam ? () => onMarkAsSpam(latestEmail) : undefined}
+          onToggleStar={onToggleStar ? handleHoverToggleStar : undefined}
+          onMarkAsRead={onMarkAsRead ? handleHoverMarkAsRead : undefined}
+          onDelete={onDelete ? handleHoverDelete : undefined}
+          onArchive={onArchive ? handleHoverArchive : undefined}
+          onSetColorTag={onSetColorTag ? handleHoverSetColorTag : undefined}
+          onMarkAsSpam={onMarkAsSpam ? handleHoverMarkAsSpam : undefined}
         />
       );
     }
@@ -819,12 +846,12 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
           <EmailHoverActions
             email={latestEmail}
             backgroundClassName={colorTag ? colorTag : ((isSelected || isChecked) ? "bg-accent" : "bg-muted")}
-            onToggleStar={onToggleStar ? () => onToggleStar(latestEmail) : undefined}
-            onMarkAsRead={onMarkAsRead ? (read) => onMarkAsRead(latestEmail, read) : undefined}
-            onDelete={onDelete ? () => onDelete(latestEmail) : undefined}
-            onArchive={onArchive ? () => onArchive(latestEmail) : undefined}
-            onSetColorTag={onSetColorTag ? (color) => onSetColorTag(latestEmail.id, color) : undefined}
-            onMarkAsSpam={onMarkAsSpam ? () => onMarkAsSpam(latestEmail) : undefined}
+            onToggleStar={onToggleStar ? handleHoverToggleStar : undefined}
+            onMarkAsRead={onMarkAsRead ? handleHoverMarkAsRead : undefined}
+            onDelete={onDelete ? handleHoverDelete : undefined}
+            onArchive={onArchive ? handleHoverArchive : undefined}
+            onSetColorTag={onSetColorTag ? handleHoverSetColorTag : undefined}
+            onMarkAsSpam={onMarkAsSpam ? handleHoverMarkAsSpam : undefined}
           />
         </div>
 

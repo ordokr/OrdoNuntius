@@ -805,7 +805,7 @@ export function Sidebar({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedMailbox, isCollapsed, expandedFolders, mailboxTree]);
+  }, [selectedMailbox, isCollapsed, expandedFolders, mailboxTree, handleToggleExpand]);
 
   const toggleUnified = () => {
     setUnifiedExpanded((prev: boolean) => {

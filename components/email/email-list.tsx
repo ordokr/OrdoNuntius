@@ -266,15 +266,20 @@ export function EmailList({
   }, [client, hasMoreEmails, isLoadingMore, isLoading]);
 
   const handleToggleThreadExpansion = useCallback(async (threadId: string) => {
+    // Read expandedThreadIds via getState() at call time so the callback
+    // ref doesn't change every time any thread expands/collapses. Without
+    // this, `handleToggleThreadExpansion` got a new identity per
+    // expandedThreadIds mutation → every visible ThreadListItem saw a
+    // fresh `onToggleExpand` prop → memo defeated → all 50 rows re-rendered.
+    const { expandedThreadIds, toggleThreadExpansion, fetchThreadEmails } = useEmailStore.getState();
     const isExpanded = expandedThreadIds.has(threadId);
-    const { toggleThreadExpansion, fetchThreadEmails } = useEmailStore.getState();
     if (!isExpanded && client) {
       toggleThreadExpansion(threadId);
       await fetchThreadEmails(client, threadId);
     } else {
       toggleThreadExpansion(threadId);
     }
-  }, [client, expandedThreadIds]);
+  }, [client]);
 
   // Range-based load more: trigger when last visible item is near the end.
   // Debounce to prevent rapid cascade when thread grouping reduces item
@@ -470,7 +475,7 @@ export function EmailList({
                 position: 'relative',
               }}
             >
-              {virtualizer.getVirtualItems().map((virtualItem) => {
+              {virtualItems.map((virtualItem) => {
                 const thread = threadGroups[virtualItem.index];
                 return (
                   <div
