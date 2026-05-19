@@ -165,7 +165,12 @@ export function generateScript(
 
   const ordoNuntiusRequires = computeRequires(ordoNuntiusRules, vacation);
   const externalRequires = options.externalRequires ?? [];
-  const allRequires = [...new Set([...ordoNuntiusRequires, ...externalRequires])].sort();
+  // Direct Set build skips the two spread allocations + the final
+  // `[...new Set]` materialization. Was 4 array allocations; now 1.
+  const requireSet = new Set<string>();
+  for (const r of ordoNuntiusRequires) requireSet.add(r);
+  for (const r of externalRequires) requireSet.add(r);
+  const allRequires = Array.from(requireSet).sort();
 
   if (allRequires.length > 0) {
     lines.push(`require [${allRequires.map(r => `"${r}"`).join(', ')}];`);

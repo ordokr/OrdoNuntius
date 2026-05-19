@@ -43,6 +43,20 @@ const RESTRICTABLE_SETTINGS = [
   { key: 'debugMode', label: 'Debug Mode', category: 'Advanced', type: 'boolean' },
 ];
 
+// Computed once at module load — RESTRICTABLE_SETTINGS is a const so the
+// derived category list never changes. Was rebuilt on every render via
+// `[...new Set(RESTRICTABLE_SETTINGS.map(s => s.category))]`.
+const RESTRICTABLE_CATEGORIES = (() => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of RESTRICTABLE_SETTINGS) {
+    if (seen.has(s.category)) continue;
+    seen.add(s.category);
+    out.push(s.category);
+  }
+  return out;
+})();
+
 export function PolicyTab() {
   const [policy, setPolicy] = useState<SettingsPolicy>({ ...DEFAULT_POLICY });
   const [loading, setLoading] = useState(true);
@@ -127,7 +141,7 @@ export function PolicyTab() {
     return <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">Loading...</div>;
   }
 
-  const categories = [...new Set(RESTRICTABLE_SETTINGS.map(s => s.category))];
+  const categories = RESTRICTABLE_CATEGORIES;
 
   return (
     <div className="space-y-6">
