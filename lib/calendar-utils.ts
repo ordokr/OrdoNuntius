@@ -81,10 +81,27 @@ export function getEventDisplayEndDate(event: CalendarEvent): Date {
 }
 
 export function getEventDayBounds(event: CalendarEvent): { startDay: Date; endDay: Date } {
-  return {
-    startDay: startOfDay(getEventStartDate(event)),
-    endDay: startOfDay(getEventDisplayEndDate(event)),
-  };
+  // Compute start once and thread it through end computation. The
+  // straight composition `startOfDay(getEventStartDate)` +
+  // `startOfDay(getEventDisplayEndDate)` would invoke
+  // getEventStartDate THREE times (once directly, twice via
+  // getEventDisplayEndDate → getEventEndDate + the disp-end check),
+  // each doing a parseISO. This single-parse path is called per event
+  // in every calendar render (buildWeekSegments, eventsByDate map,
+  // mini-calendar dotted dates, etc.).
+  const start = getEventStartDate(event);
+  let end: Date;
+  if (!event.showWithoutTime && event.utcEnd) {
+    end = parseISO(event.utcEnd);
+  } else if (event.duration) {
+    end = new Date(start.getTime() + parseDuration(event.duration) * 60000);
+  } else {
+    end = start;
+  }
+  const displayEnd = (event.showWithoutTime && end.getTime() > start.getTime())
+    ? subMilliseconds(end, 1)
+    : end;
+  return { startDay: startOfDay(start), endDay: startOfDay(displayEnd) };
 }
 
 export function getTimedEventBoundsForDay(
