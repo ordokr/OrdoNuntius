@@ -77,37 +77,40 @@ export function TaskListView({
   const [quickAddTitle, setQuickAddTitle] = useState("");
 
   const filteredTasks = useMemo(() => {
-    // Build a Set for O(1) `selectedCalendarIds` lookup — was `.includes()`
-    // which is O(M) per check. Combined with `for...in` over task.calendarIds
-    // this drops the per-task `Object.keys` array allocation too.
+    // Fused filter pass. Was up to 4 chained `.filter(...)` calls (calendar
+    // membership, hide-completed, filter-mode, overdue), each walking the
+    // task list and allocating a new array. Single walk with conditional
+    // push: 500 tasks goes from ~2000 ops + 4 arrays to 500 ops + 1 array.
     const calendarSet = new Set(selectedCalendarIds);
-    let result = tasks.filter(task => {
+    const result: typeof tasks = [];
+    for (const task of tasks) {
+      // calendar membership
+      let calMatch = false;
       for (const id in task.calendarIds) {
-        if (calendarSet.has(id)) return true;
+        if (calendarSet.has(id)) { calMatch = true; break; }
       }
-      return false;
-    });
+      if (!calMatch) continue;
 
-    if (!showCompleted) {
-      result = result.filter(task => task.progress !== "completed" && task.progress !== "cancelled");
-    }
+      // hide-completed
+      if (!showCompleted && (task.progress === "completed" || task.progress === "cancelled")) continue;
 
-    switch (filter) {
-      case "pending":
-        result = result.filter(task => task.progress === "needs-action" || task.progress === "in-process");
-        break;
-      case "completed":
-        result = result.filter(task => task.progress === "completed");
-        break;
-      case "overdue":
-        // Was: `parseISO(task.due)` parsed twice per surviving task (once
-        // for isPast, once for isToday). Parse once.
-        result = result.filter(task => {
-          if (!task.due || task.progress === "completed" || task.progress === "cancelled") return false;
+      // filter-mode
+      switch (filter) {
+        case "pending":
+          if (task.progress !== "needs-action" && task.progress !== "in-process") continue;
+          break;
+        case "completed":
+          if (task.progress !== "completed") continue;
+          break;
+        case "overdue": {
+          if (!task.due || task.progress === "completed" || task.progress === "cancelled") continue;
           const d = parseISO(task.due);
-          return isPast(d) && !isToday(d);
-        });
-        break;
+          if (!isPast(d) || isToday(d)) continue;
+          break;
+        }
+      }
+
+      result.push(task);
     }
 
     // Sort: overdue first, then by due date (no due date last), then by
