@@ -498,13 +498,27 @@ export function EmailComposer({
   const trustedSendersAddressBook = useSettingsStore((s) => s.trustedSendersAddressBook);
   const addTemplate = useTemplateStore((s) => s.addTemplate);
   const sendRawEmail = useEmailStore((s) => s.sendRawEmail);
-  const smimeStore = useSmimeStore();
+  // Granular selectors instead of `useSmimeStore()` whole-store subscription.
+  // The previous form re-rendered the composer on every S/MIME mutation (cert
+  // imports, unlocks, settings toggles) and worse, the `canSmimeEncrypt`
+  // useMemo listed the whole `smimeStore` object as a dep — so every set()
+  // in the store invalidated the memo and re-walked the recipient strings
+  // even mid-keystroke. Now: subscribe only to the slices we actually read,
+  // and call actions via getState() inside handlers.
+  const smimeIdentityKeyBindings = useSmimeStore(s => s.identityKeyBindings);
+  const smimeKeyRecords = useSmimeStore(s => s.keyRecords);
+  const smimePublicCerts = useSmimeStore(s => s.publicCerts);
 
   // Determine S/MIME availability for the selected identity. canSmimeEncrypt
   // does a cert-lookup over every recipient on every keystroke without this
   // memo — composer re-renders constantly while typing.
   const currentSmimeIdentityId = selectedIdentityId || primaryIdentity?.id;
-  const smimeKeyRecord = currentSmimeIdentityId ? smimeStore.getKeyRecordForIdentity(currentSmimeIdentityId) : undefined;
+  const smimeKeyRecord = useMemo(() => {
+    if (!currentSmimeIdentityId) return undefined;
+    const keyId = smimeIdentityKeyBindings[currentSmimeIdentityId];
+    if (!keyId) return undefined;
+    return smimeKeyRecords.find((k) => k.id === keyId);
+  }, [currentSmimeIdentityId, smimeIdentityKeyBindings, smimeKeyRecords]);
   const canSmimeSign = !!smimeKeyRecord;
   const canSmimeEncrypt = useMemo(() => {
     if (!smimeKeyRecord) return false;
@@ -519,16 +533,17 @@ export function EmailComposer({
       }
     }
     if (allRecipients.length === 0) return false;
-    const { missing } = smimeStore.getRecipientCerts(allRecipients);
+    const { missing } = useSmimeStore.getState().getRecipientCerts(allRecipients);
     return missing.length === 0;
-  }, [smimeKeyRecord, to, cc, bcc, smimeStore]);
+  }, [smimeKeyRecord, to, cc, bcc, smimePublicCerts]);
 
   // Initialize S/MIME defaults from store when identity changes
   useEffect(() => {
+    const store = useSmimeStore.getState();
     if (currentSmimeIdentityId) {
-      setSmimeSign(!!smimeStore.defaultSignIdentity[currentSmimeIdentityId] && canSmimeSign);
+      setSmimeSign(!!store.defaultSignIdentity[currentSmimeIdentityId] && canSmimeSign);
     }
-    setSmimeEncrypt(smimeStore.defaultEncrypt && canSmimeEncrypt);
+    setSmimeEncrypt(store.defaultEncrypt && canSmimeEncrypt);
   // Only run when identity changes, not on every recipient edit
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSmimeIdentityId]);
@@ -1234,12 +1249,12 @@ export function EmailComposer({
         }
 
         // 2. Ensure key is unlocked for signing
-        if (smimeSign_ && smimeKeyRecord && !smimeStore.isKeyUnlocked(smimeKeyRecord.id)) {
+        if (smimeSign_ && smimeKeyRecord && !useSmimeStore.getState().isKeyUnlocked(smimeKeyRecord.id)) {
           const passphrase = await new Promise<string>((resolve, reject) => {
             setSmimePassphrasePrompt({ keyId: smimeKeyRecord.id, resolve, reject });
           });
           try {
-            await smimeStore.unlockKey(smimeKeyRecord.id, passphrase);
+            await useSmimeStore.getState().unlockKey(smimeKeyRecord.id, passphrase);
           } finally {
             setSmimePassphrasePrompt(null);
             setSmimePassphraseInput('');
@@ -1311,7 +1326,7 @@ export function EmailComposer({
 
         // 5. Sign if enabled
         if (smimeSign_ && smimeKeyRecord) {
-          const privateKey = smimeStore.getUnlockedKey(smimeKeyRecord.id);
+          const privateKey = useSmimeStore.getState().getUnlockedKey(smimeKeyRecord.id);
           if (!privateKey) throw new Error('S/MIME key is not unlocked');
           const cmsBlob = await smimeSign(
             mimeBytes,
@@ -1326,7 +1341,7 @@ export function EmailComposer({
         // 6. Encrypt if enabled
         if (smimeEncrypt_ && smimeKeyRecord) {
           const allRecipients = [...toAddresses, ...ccAddresses, ...bccAddresses];
-          const { found, missing } = smimeStore.getRecipientCerts(allRecipients);
+          const { found, missing } = useSmimeStore.getState().getRecipientCerts(allRecipients);
           if (missing.length > 0) {
             throw new Error(`Missing certificates for: ${missing.join(', ')}`);
           }
