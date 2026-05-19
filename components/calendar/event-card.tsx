@@ -37,18 +37,21 @@ function getEventColor(event: CalendarEvent, calendar?: Calendar): string {
   return sanitizeColor(event.color, sanitizeColor(calendar?.color));
 }
 
+// Single-regex ISO 8601 duration parser. Was 4 separate `duration.match(...)`
+// calls per parse — each allocates a RegExpMatchArray. One match returns
+// all components at once.
+const DURATION_RE = /^P?(?:(\d+)W)?(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/;
 function parseDuration(duration: string | undefined): number {
   if (!duration) return 0;
-  let totalMinutes = 0;
-  const weekMatch = duration.match(/(\d+)W/);
-  const hourMatch = duration.match(/(\d+)H/);
-  const minMatch = duration.match(/(\d+)M/);
-  const dayMatch = duration.match(/(\d+)D/);
-  if (weekMatch) totalMinutes += parseInt(weekMatch[1]) * 7 * 24 * 60;
-  if (dayMatch) totalMinutes += parseInt(dayMatch[1]) * 24 * 60;
-  if (hourMatch) totalMinutes += parseInt(hourMatch[1]) * 60;
-  if (minMatch) totalMinutes += parseInt(minMatch[1]);
-  return totalMinutes;
+  const m = DURATION_RE.exec(duration);
+  if (!m) return 0;
+  let total = 0;
+  if (m[1]) total += parseInt(m[1]) * 7 * 24 * 60;
+  if (m[2]) total += parseInt(m[2]) * 24 * 60;
+  if (m[3]) total += parseInt(m[3]) * 60;
+  if (m[4]) total += parseInt(m[4]);
+  // S (seconds) intentionally ignored — caller works in minutes.
+  return total;
 }
 
 function createEventDragPreview(title: string, timeRange: string, color: string): HTMLElement {
