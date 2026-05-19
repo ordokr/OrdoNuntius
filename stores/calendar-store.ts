@@ -182,8 +182,21 @@ export const useCalendarStore = create<CalendarStore>()(
         try {
           const calendars = await client.getAllCalendars();
           const { selectedCalendarIds } = get();
-          const validIds = calendars.map(c => c.id);
-          const stillValid = selectedCalendarIds.filter(id => validIds.includes(id) || id === BIRTHDAY_CALENDAR_ID);
+          // O(C + S) — was O(C + S × V) with selectedCalendarIds.filter(
+          // id => validIds.includes(id)). Build the id Set in the same
+          // walk that produces the validIds[] fallback, then membership-
+          // test with the Set instead of Array.includes.
+          const validIds: string[] = new Array(calendars.length);
+          const validIdSet = new Set<string>();
+          for (let i = 0; i < calendars.length; i++) {
+            const id = calendars[i].id;
+            validIds[i] = id;
+            validIdSet.add(id);
+          }
+          const stillValid: string[] = [];
+          for (const id of selectedCalendarIds) {
+            if (validIdSet.has(id) || id === BIRTHDAY_CALENDAR_ID) stillValid.push(id);
+          }
           set({
             calendars,
             isLoading: false,
@@ -202,9 +215,15 @@ export const useCalendarStore = create<CalendarStore>()(
             after: start,
             before: end,
           });
-          // Filter out malformed events missing required 'start' field
-          const validEvents = rawEvents.filter(e => typeof e.start === 'string' && e.start);
-          const droppedEvents = rawEvents.length - validEvents.length;
+          // Single walk: build validEvents + count dropped in one pass.
+          // Was: `.filter(...)` then `rawEvents.length - validEvents.length`
+          // — separate intermediate array + a second length math step.
+          const validEvents: typeof rawEvents = [];
+          let droppedEvents = 0;
+          for (const e of rawEvents) {
+            if (typeof e.start === 'string' && e.start) validEvents.push(e);
+            else droppedEvents++;
+          }
           // Expand recurring events client-side (Stalwart doesn't support
           // mutations on synthetic IDs from server-side expandRecurrences)
           const events = expandRecurringEvents(validEvents, start, end);
