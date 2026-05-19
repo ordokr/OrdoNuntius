@@ -1,6 +1,7 @@
 import { parseISO } from 'date-fns';
 import type { Email, Attachment, CalendarEvent, CalendarParticipant, EmailBodyPart } from '@/lib/jmap/types';
 import { normalizeCalendarEventLike } from '@/lib/calendar-event-normalization';
+import { splitTrimmed } from '@/lib/utils';
 
 export type InvitationMethod =
   | 'publish'
@@ -49,7 +50,7 @@ function parseContentType(value?: string | null): { mimeType: string; params: Re
     return { mimeType: '', params: {} };
   }
 
-  const parts = value.split(';').map((part) => part.trim()).filter(Boolean);
+  const parts = splitTrimmed(value, ';');
   const [mimeType = '', ...paramParts] = parts;
   const params: Record<string, string> = {};
 

@@ -4,16 +4,16 @@ import { BUILT_IN_PLACEHOLDERS } from './template-types';
 import { generateUUID } from './utils';
 
 const PLACEHOLDER_REGEX = /\{\{(\w+)\}\}/g;
+// Non-global twin so `.test()` / `.exec()` callers don't have to spin up a
+// fresh RegExp on every invocation just to escape the stateful `.lastIndex`.
+const PLACEHOLDER_TEST_REGEX = /\{\{(\w+)\}\}/;
 const MAX_TEMPLATE_NAME_LENGTH = 200;
 const STRIP_HTML_CONFIG = { ALLOWED_TAGS: [] as string[], ALLOWED_ATTR: [] as string[] };
 
 export function extractPlaceholders(text: string): string[] {
+  // `matchAll` is stateless — no `new RegExp(...)` allocation per call.
   const matches = new Set<string>();
-  let match: RegExpExecArray | null;
-  const regex = new RegExp(PLACEHOLDER_REGEX.source, 'g');
-  while ((match = regex.exec(text)) !== null) {
-    matches.add(match[1]);
-  }
+  for (const m of text.matchAll(PLACEHOLDER_REGEX)) matches.add(m[1]);
   return Array.from(matches);
 }
 
@@ -28,7 +28,7 @@ export function substitutePlaceholders(
 }
 
 export function hasUnresolvedPlaceholders(text: string): boolean {
-  return new RegExp(PLACEHOLDER_REGEX.source).test(text);
+  return PLACEHOLDER_TEST_REGEX.test(text);
 }
 
 export function validateTemplateName(name: string): string | null {

@@ -1,3 +1,5 @@
+import { splitTrimmed } from '@/lib/utils';
+
 type RGB = { r: number; g: number; b: number; a?: number };
 
 const namedColors: Record<string, string> = {
@@ -169,7 +171,7 @@ export function transformInlineStyles(cssText: string, theme: 'light' | 'dark'):
     return cssText;
   }
 
-  const styleProps = cssText.split(';').map((prop) => prop.trim()).filter(Boolean);
+  const styleProps = splitTrimmed(cssText, ';');
 
   const transformedProps = styleProps.map((prop) => {
     const colonIndex = prop.indexOf(':');

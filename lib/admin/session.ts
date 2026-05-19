@@ -4,6 +4,7 @@ import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'node:
 import { getSessionSecret } from '@/lib/auth/session-secret';
 import { ADMIN_SESSION_COOKIE, DEFAULT_ADMIN_SESSION_TTL } from './types';
 import type { AdminSessionPayload } from './types';
+import { splitTrimmed } from '@/lib/utils';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
@@ -138,7 +139,7 @@ export async function clearAdminSessionCookie(): Promise<void> {
 export function getClientIP(request: Request): string {
   const forwarded = request.headers.get('x-forwarded-for');
   if (forwarded) {
-    const parts = forwarded.split(',').map(s => s.trim()).filter(Boolean);
+    const parts = splitTrimmed(forwarded);
     const depth = Math.max(1, parseInt(process.env.TRUSTED_PROXY_DEPTH || '1', 10));
     // Take the entry at position (length - depth), clamped to 0
     const index = Math.max(0, parts.length - depth);

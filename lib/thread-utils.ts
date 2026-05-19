@@ -135,10 +135,16 @@ export function mergeThreadEmails(
 
   // Convert back to array and sort. Schwartzian transform: O(n) date
   // parses instead of O(n log n) (each Date() call parses the string).
-  const mergedEmails = Array.from(emailMap.values())
-    .map(e => ({ e, ms: new Date(e.receivedAt).getTime() }))
-    .sort((a, b) => b.ms - a.ms)
-    .map(x => x.e);
+  // Was: Array.from(...).map(...).sort(...).map(...) — 3 intermediate
+  // arrays. Direct-build into a pre-sized array, then unwrap in place.
+  const decorated: { e: Email; ms: number }[] = new Array(emailMap.size);
+  let di = 0;
+  for (const e of emailMap.values()) {
+    decorated[di++] = { e, ms: new Date(e.receivedAt).getTime() };
+  }
+  decorated.sort((a, b) => b.ms - a.ms);
+  const mergedEmails: Email[] = new Array(decorated.length);
+  for (let j = 0; j < decorated.length; j++) mergedEmails[j] = decorated[j].e;
 
   const latestEmail = mergedEmails[0];
   const participantNames = getThreadParticipants(mergedEmails);

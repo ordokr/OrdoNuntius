@@ -294,13 +294,16 @@ function collectSubResults(node: unknown, sink: SubResult[]): void {
       description: typeof obj.description === 'string' ? obj.description : undefined,
     });
   }
-  for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === 'string' && key !== 'label' && key !== 'title' && key.endsWith('_label')) {
-      sink.push({ label: value });
-    }
-  }
-  for (const value of Object.values(obj)) {
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
+  // Single for...in walk handles both leaf-string sinks and nested-object
+  // recursion. Was two walks via Object.entries + Object.values, each
+  // materializing arrays/tuples per object.
+  for (const key in obj) {
+    const value = obj[key];
+    if (typeof value === 'string') {
+      if (key !== 'label' && key !== 'title' && key.endsWith('_label')) {
+        sink.push({ label: value });
+      }
+    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
       collectSubResults(value, sink);
     }
   }
@@ -386,29 +389,30 @@ export default function SettingsPage() {
       haystacks[tabId] = strings.join(' ').toLowerCase();
     }
     if (installedPlugins.length) {
-      const haystackText = installedPlugins.map((p) => {
-        const fieldText = p.settingsSchema
-          ? Object.values(p.settingsSchema)
-              .map((s) => `${s.label} ${s.description ?? ''}`)
-              .join(' ')
-          : '';
-        return `${p.name} ${p.description} ${p.author} ${fieldText}`;
-      }).join(' ');
-      haystacks.plugins = `${haystacks.plugins ?? ''} ${haystackText}`.toLowerCase();
-      const pluginSubs: SubResult[] = installedPlugins.flatMap((p) => {
-        const items: SubResult[] = [{ label: p.name, description: p.description }];
+      // Single walk builds both the haystack and the sub-result list — was
+      // two map/flatMap walks each calling Object.values(schema) separately,
+      // plus a per-plugin .map(...).join(' ') intermediate. for...in over the
+      // schema also drops the Object.values array allocation per plugin.
+      const pluginSubs: SubResult[] = [];
+      const haystackParts: string[] = [];
+      for (const p of installedPlugins) {
+        let fieldText = '';
+        pluginSubs.push({ label: p.name, description: p.description });
         if (p.settingsSchema) {
-          for (const schema of Object.values(p.settingsSchema)) {
-            items.push({
+          for (const key in p.settingsSchema) {
+            const schema = p.settingsSchema[key];
+            fieldText += `${schema.label} ${schema.description ?? ''} `;
+            pluginSubs.push({
               label: schema.label,
               description: schema.description,
               pluginId: p.id,
             });
           }
         }
-        return items;
-      });
-      subs.plugins = [...(subs.plugins ?? []), ...pluginSubs];
+        haystackParts.push(`${p.name} ${p.description} ${p.author} ${fieldText}`);
+      }
+      haystacks.plugins = `${haystacks.plugins ?? ''} ${haystackParts.join(' ')}`.toLowerCase();
+      subs.plugins = subs.plugins ? [...subs.plugins, ...pluginSubs] : pluginSubs;
     }
     if (installedThemes.length) {
       const text = installedThemes.map((th) => `${th.name} ${th.description} ${th.author}`).join(' ');
