@@ -166,14 +166,15 @@ export function truncateText(text: string, maxLength: number): string {
   return text.substring(0, maxLength).trim() + "...";
 }
 
+// Module-level constants — `sizes` was rebuilt per call; precomputing
+// Math.log(1024) removes the per-call divisor recomputation.
+const FILE_SIZE_UNITS = ['Bytes', 'KB', 'MB', 'GB', 'TB'] as const;
+const LOG_1024 = Math.log(1024);
+
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 Bytes';
-
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  const i = Math.floor(Math.log(bytes) / LOG_1024);
+  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + FILE_SIZE_UNITS[i];
 }
 
 // Types for mailbox tree

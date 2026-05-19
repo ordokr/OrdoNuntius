@@ -114,15 +114,18 @@ export function parseReceivedHeaders(headers: string[]): ReceivedHeaderInfo[] {
   return path;
 }
 
+// Module-level constants — sizes array used to be rebuilt per call;
+// LOG_1024 pre-computes the divisor.
+const BYTES_UNITS = ['B', 'KB', 'MB', 'GB'] as const;
+const LOG_1024_BH = Math.log(1024);
+
 /**
  * Format bytes to human readable size
  */
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+  const i = Math.floor(Math.log(bytes) / LOG_1024_BH);
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${BYTES_UNITS[i]}`;
 }
 
 /**
