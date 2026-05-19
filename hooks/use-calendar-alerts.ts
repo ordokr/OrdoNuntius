@@ -19,11 +19,22 @@ const PROACTIVE_FETCH_HOURS = 24;
 const PROACTIVE_THROTTLE_MS = CHECK_INTERVAL_MS * 5;
 
 export function useCalendarAlerts() {
-  const { isAuthenticated, client } = useAuthStore();
-  const { events, calendars, supportsCalendar } = useCalendarStore();
-  const { calendarNotificationsEnabled, calendarNotificationSound, enableCalendarTasks, notificationSoundChoice } = useSettingsStore();
-  const { tasks: storeTasks } = useTaskStore();
-  const { acknowledgedAlerts, acknowledgeAlert, cleanupStaleAlerts } = useCalendarNotificationStore();
+  // Per-field selectors instead of whole-store destructures. This hook
+  // mounts at the app shell level and was re-running on every set() in
+  // 5 different stores — including mutations it didn't read (auth username
+  // changes, task add/edit/delete, settings unrelated to alerts).
+  // Actions are stable; pull them via getState() inside callbacks.
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated);
+  const client = useAuthStore(s => s.client);
+  const events = useCalendarStore(s => s.events);
+  const calendars = useCalendarStore(s => s.calendars);
+  const supportsCalendar = useCalendarStore(s => s.supportsCalendar);
+  const calendarNotificationsEnabled = useSettingsStore(s => s.calendarNotificationsEnabled);
+  const calendarNotificationSound = useSettingsStore(s => s.calendarNotificationSound);
+  const enableCalendarTasks = useSettingsStore(s => s.enableCalendarTasks);
+  const notificationSoundChoice = useSettingsStore(s => s.notificationSoundChoice);
+  const storeTasks = useTaskStore(s => s.tasks);
+  const acknowledgedAlerts = useCalendarNotificationStore(s => s.acknowledgedAlerts);
   const addToast = useToastStore((s) => s.addToast);
   const t = useTranslations('calendar.notifications');
   const locale = useLocale();
@@ -50,7 +61,7 @@ export function useCalendarAlerts() {
         if (shownKeysRef.current.has(key)) continue;
 
         shownKeysRef.current.add(key);
-        acknowledgeAlert(key, alert.fireTimeMs);
+        useCalendarNotificationStore.getState().acknowledgeAlert(key, alert.fireTimeMs);
 
         if (calendarNotificationSound) {
           playNotificationSound(notificationSoundChoice);
@@ -86,7 +97,7 @@ export function useCalendarAlerts() {
           if (shownKeysRef.current.has(key)) continue;
 
           shownKeysRef.current.add(key);
-          acknowledgeAlert(key, taskAlert.fireTimeMs);
+          useCalendarNotificationStore.getState().acknowledgeAlert(key, taskAlert.fireTimeMs);
 
           if (calendarNotificationSound) {
             playNotificationSound(notificationSoundChoice);
@@ -113,7 +124,7 @@ export function useCalendarAlerts() {
   }, [
     calendarNotificationsEnabled, calendarNotificationSound, notificationSoundChoice,
     isAuthenticated, events, calendars, acknowledgedAlerts,
-    acknowledgeAlert, addToast, t, locale, enableCalendarTasks, storeTasks,
+    addToast, t, locale, enableCalendarTasks, storeTasks,
   ]);
 
   const proactiveFetch = useCallback(async () => {
@@ -136,7 +147,7 @@ export function useCalendarAlerts() {
   useEffect(() => {
     if (!calendarNotificationsEnabled || !isAuthenticated) return;
 
-    cleanupStaleAlerts();
+    useCalendarNotificationStore.getState().cleanupStaleAlerts();
     proactiveFetch();
 
     const timer = setTimeout(() => checkAlerts(), 500);

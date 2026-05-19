@@ -25,8 +25,15 @@ interface UseTagDropReturn {
 
 export function useTagDrop({ tagId, onSuccess, onError }: UseTagDropOptions): UseTagDropReturn {
   const [isOver, setIsOver] = useState(false);
-  const { client } = useAuthStore();
-  const { fetchEmails, fetchTagCounts, selectedMailbox } = useEmailStore();
+  // Granular selectors instead of whole-store destructure. The previous
+  // `{ fetchEmails, fetchTagCounts, selectedMailbox } = useEmailStore()`
+  // re-ran every tag-drop hook in the sidebar on every email-store
+  // mutation (fetches, mark-as-read, push deltas, selection toggles).
+  // With ~10 tag rows this multiplied re-executions during typical
+  // inbox usage. Now: subscribe only to selectedMailbox + client; pull
+  // stable action refs via getState() at drop time.
+  const client = useAuthStore(s => s.client);
+  const selectedMailbox = useEmailStore(s => s.selectedMailbox);
   const { isDragging, endDrag } = useDragDropContext();
 
   const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
@@ -90,10 +97,9 @@ export function useTagDrop({ tagId, onSuccess, onError }: UseTagDropOptions): Us
         return client.updateEmailKeywords(emailId, keywords);
       }));
 
-      // Refresh the email list
+      // Refresh the email list + tag counts via stable action refs.
+      const { fetchEmails, fetchTagCounts } = useEmailStore.getState();
       await fetchEmails(client, selectedMailbox);
-
-      // Refresh tag counts
       fetchTagCounts(client);
 
       onSuccess?.(emailIds.length, tagId);
@@ -103,7 +109,7 @@ export function useTagDrop({ tagId, onSuccess, onError }: UseTagDropOptions): Us
     } finally {
       endDrag();
     }
-  }, [client, isDragging, tagId, fetchEmails, fetchTagCounts, selectedMailbox, endDrag, onSuccess, onError]);
+  }, [client, isDragging, tagId, selectedMailbox, endDrag, onSuccess, onError]);
 
   return {
     dropHandlers: {
