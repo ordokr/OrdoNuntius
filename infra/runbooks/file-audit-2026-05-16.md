@@ -627,3 +627,40 @@ initial perf sweep was committed and live.
   - **`reply-identity`** — identities indexed by normalized email /
     base / domain in one pass instead of 3× `.map()` + 2× nested
     `.find()`-of-`.some()`.
+
+### Continuation sweep, batch 3 (2026-05-19 evening)
+
+  - **JMAP pipelining**: `getThreadEmails` was Thread/get → Email/get
+    in two sequential requests. Replaced with a single JMAP request
+    using `#ids` resultOf reference — 2 RTT → 1 RTT on every thread
+    expansion.
+  - **JMAP send-path parallelization**: `sendEmail`,
+    `sendImipInvitation`, `sendImipCancellation` each fired
+    `getMailboxes()` then `Identity/get` sequentially at top. Both
+    reads are independent — Promise.all parallelizes them, 2 RTT → 1
+    RTT before any actual send work.
+  - **buildMailboxTree fusions** in `lib/utils.ts`: two `.filter()`
+    walks (own vs shared) + a `forEach` to populate the mailbox map
+    → one walk that does all three. Per-shared-account: 2 `.reduce()`
+    calls fused into 1. Sidebar render saves several walks/allocs per
+    mailbox refresh.
+  - **deduplicateMailboxes** + **flattenMailboxTree** in
+    `lib/utils.ts`: forEach → for-of throughout (with `return` →
+    `continue` correctness fix where applicable). Two pre-passes
+    fused into one.
+  - **email-store fetchMailboxes inbox lookup**: was filter + 2 finds
+    (role match + name fallback) → single-pass walk that does both.
+  - **stores/calendar-store cleanField loops** (2 sites): `Object
+    .keys(o).forEach(k => delete-if-undef)` → `for...in` directly.
+  - **lib/jmap/client CalendarTask filter**: per-task `Object.keys
+    (calendarIds).some(...)` → for-in early-break.
+  - **lib/plugin-api hook bus map**: 24 spreads of `...Object
+    .fromEntries(Object.entries(xHooks))` → 24 `...xHooks` spreads
+    (the entries-then-fromEntries roundtrip just rebuilt the same
+    plain object).
+  - **lib/jmap/client Schwartzian sorts** in `getEmails`,
+    `searchEmails`, `advancedSearchEmails`, `getThreadEmails`: the
+    `(a, b) => new Date(b.receivedAt).getTime() - new Date(a.received
+    At).getTime()` comparator was paying date-parse 2N log N times
+    during sort. Decorate-once + sort-by-ms pattern brings it to N
+    parses.
