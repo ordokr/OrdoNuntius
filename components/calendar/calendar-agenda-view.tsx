@@ -54,9 +54,13 @@ export function CalendarAgendaView({
     // Schwartzian: each `getEventStartDate(ev)` does a `parseISO`, so the
     // raw comparator parses both sides per comparison across an
     // O(N log N) sort. Pre-compute event-start ms once per event.
-    const decorated = events.map(ev => ({ ev, ms: getEventStartDate(ev).getTime() }));
+    // Pre-sized decorated array; iterate decorated directly instead of
+    // unwrapping into a separate `sorted` array (drops one .map alloc).
+    const decorated: { ev: CalendarEvent; ms: number }[] = new Array(events.length);
+    for (let i = 0; i < events.length; i++) {
+      decorated[i] = { ev: events[i], ms: getEventStartDate(events[i]).getTime() };
+    }
     decorated.sort((a, b) => a.ms - b.ms);
-    const sorted = decorated.map(d => d.ev);
 
     const groups: DayGroup[] = [];
     const groupMap = new Map<string, DayGroup>();
@@ -64,7 +68,7 @@ export function CalendarAgendaView({
     // for-of avoids the per-call .forEach closure allocation. Runs for
     // every event in the agenda view's date range; the closure cost
     // shows up at the top of profiles when scrolling long ranges.
-    for (const ev of sorted) {
+    for (const { ev } of decorated) {
       try {
         const { startDay, endDay } = getEventDayBounds(ev);
         const cursor = new Date(startDay);

@@ -109,9 +109,15 @@ export function ContactsSidebar({
     // Schwartzian: was `.sort((a, b) => getContactDisplayName(a).localeCompare(
     // getContactDisplayName(b)))` which calls getContactDisplayName twice
     // per comparison (so O(N log N) total). Decorate once → O(N).
-    const decorated = groups.map(g => ({ g, name: getContactDisplayName(g) }));
+    // Pre-sized arrays drop both .map() intermediates.
+    const decorated: { g: typeof groups[number]; name: string }[] = new Array(groups.length);
+    for (let i = 0; i < groups.length; i++) {
+      decorated[i] = { g: groups[i], name: getContactDisplayName(groups[i]) };
+    }
     decorated.sort((a, b) => a.name.localeCompare(b.name));
-    return decorated.map(d => d.g);
+    const out: typeof groups = new Array(decorated.length);
+    for (let i = 0; i < decorated.length; i++) out[i] = decorated[i].g;
+    return out;
   }, [groups]);
 
   const isAllActive = activeCategory === "all";

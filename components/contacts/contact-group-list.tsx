@@ -42,7 +42,9 @@ export function ContactGroupList({
       decorated.push({ g, name, lowerName });
     }
     decorated.sort((a, b) => a.name.localeCompare(b.name));
-    return decorated.map(d => d.g);
+    const out: typeof groups = new Array(decorated.length);
+    for (let i = 0; i < decorated.length; i++) out[i] = decorated[i].g;
+    return out;
   }, [groups, searchQuery]);
 
   return (

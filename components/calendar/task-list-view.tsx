@@ -116,11 +116,13 @@ export function TaskListView({
     // Sort: overdue first, then by due date (no due date last), then by
     // priority. Schwartzian transform — was parsing the same due-date string
     // multiple times per item across the sort's O(N log N) comparisons. Now
-    // each due-date string is parsed exactly once, total O(N).
-    const decorated = result.map(task => ({
-      task,
-      dueMs: task.due ? new Date(task.due).getTime() : null,
-    }));
+    // each due-date string is parsed exactly once, total O(N). Pre-sized
+    // decorated array + indexed unwrap drops two .map() intermediates.
+    const decorated: { task: CalendarTask; dueMs: number | null }[] = new Array(result.length);
+    for (let i = 0; i < result.length; i++) {
+      const t = result[i];
+      decorated[i] = { task: t, dueMs: t.due ? new Date(t.due).getTime() : null };
+    }
     decorated.sort((a, b) => {
       const ap = a.task.progress, bp = b.task.progress;
       if (ap === "completed" && bp !== "completed") return 1;
@@ -136,7 +138,9 @@ export function TaskListView({
       const bPri = b.task.priority || 10;
       return aPri - bPri;
     });
-    return decorated.map(d => d.task);
+    const out: CalendarTask[] = new Array(decorated.length);
+    for (let i = 0; i < decorated.length; i++) out[i] = decorated[i].task;
+    return out;
   }, [tasks, selectedCalendarIds, filter, showCompleted]);
 
   // O(1) calendar lookup by id — was `calendars.find(c => task.calendarIds[c.id])`
