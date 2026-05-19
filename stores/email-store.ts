@@ -142,14 +142,19 @@ function findTrashMailbox(
     return !mb.isShared;
   };
 
-  const byRole = mailboxes.find(mb => mb.role === 'trash' && matchesScope(mb));
-  if (byRole) return byRole;
-
-  return mailboxes.find(mb => {
-    if (!matchesScope(mb)) return false;
-    const lower = mb.name.toLowerCase();
-    return lower.includes('trash') || lower.includes('deleted');
-  });
+  // Single walk: classify each in-scope mailbox as role-trash or name-trash.
+  // Was two .find() scans. Role match wins; bail at the first role hit.
+  let byRole: Mailbox | undefined;
+  let byName: Mailbox | undefined;
+  for (const mb of mailboxes) {
+    if (!matchesScope(mb)) continue;
+    if (mb.role === 'trash') { byRole = mb; break; }
+    if (!byName) {
+      const lower = mb.name.toLowerCase();
+      if (lower.includes('trash') || lower.includes('deleted')) byName = mb;
+    }
+  }
+  return byRole ?? byName;
 }
 
 export const useEmailStore = create<EmailStore>((set, get, store) => ({
