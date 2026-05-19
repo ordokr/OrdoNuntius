@@ -715,15 +715,22 @@ export const useContactStore = create<ContactStore>()(
         const deletedIds = new Set(ids);
 
         if (client && supportsSync) {
-          for (const id of ids) {
-            try {
-              const contact = contacts.find(c => c.id === id);
-              const originalId = contact?.originalId || id;
-              const accountId = contact?.isShared ? contact.accountId : undefined;
-              await client.deleteContact(originalId, accountId);
-            } catch (error) {
-              console.error(`Failed to delete contact ${id}:`, error);
-              deletedIds.delete(id);
+          // Build id→contact Map once instead of `contacts.find()` per id
+          // (was O(D × C)). Parallel deletes via Promise.allSettled — was
+          // sequential awaits, paying N × RTT for N contacts.
+          const byId = new Map<string, typeof contacts[number]>();
+          for (const c of contacts) byId.set(c.id, c);
+
+          const results = await Promise.allSettled(ids.map(id => {
+            const contact = byId.get(id);
+            const originalId = contact?.originalId || id;
+            const accountId = contact?.isShared ? contact.accountId : undefined;
+            return client.deleteContact(originalId, accountId);
+          }));
+          for (let i = 0; i < results.length; i++) {
+            if (results[i].status === 'rejected') {
+              console.error(`Failed to delete contact ${ids[i]}:`, (results[i] as PromiseRejectedResult).reason);
+              deletedIds.delete(ids[i]);
             }
           }
           if (deletedIds.size < ids.length) {
@@ -752,9 +759,13 @@ export const useContactStore = create<ContactStore>()(
         const targetBookOriginalId = addressBook.originalId || addressBook.id;
         const targetAccountId = addressBook.accountId;
         const primaryAccountId = client.getContactsAccountId();
+        // O(1) id→contact lookup — was `contacts.find(c => c.id === id)`
+        // per requested move (O(D × C) for D moves over C total contacts).
+        const byId = new Map<string, typeof contacts[number]>();
+        for (const c of contacts) byId.set(c.id, c);
 
         for (const id of contactIds) {
-          const contact = contacts.find(c => c.id === id);
+          const contact = byId.get(id);
           if (!contact) continue;
 
           const originalId = contact.originalId || id;
