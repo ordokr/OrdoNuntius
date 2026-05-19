@@ -117,6 +117,10 @@ const CALENDAR_PROPERTIES = [
   "myRights",
 ] as const;
 
+// Module-level spam-score header probe list. Was rebuilt per
+// parseEmailHeaders call (per email viewer mount).
+const SPAM_HEADER_NAMES = ['X-Spam-Status', 'X-Spam-Result', 'X-Rspamd-Score'] as const;
+
 // Stalwart's default property list for AddressBook/get omits shareWith, so
 // existing shares would be invisible after a fresh login.
 const ADDRESS_BOOK_PROPERTIES = [
@@ -1138,7 +1142,9 @@ export class JMAPClient implements IJMAPClient {
       email.authenticationResults = parseAuthenticationResults(value);
     }
 
-    for (const headerName of ['X-Spam-Status', 'X-Spam-Result', 'X-Rspamd-Score']) {
+    // Use the module-level SPAM_HEADER_NAMES instead of allocating the
+    // array literal on every parseEmailHeaders call (per email viewer mount).
+    for (const headerName of SPAM_HEADER_NAMES) {
       if (!headersRecord[headerName]) continue;
       const value = Array.isArray(headersRecord[headerName]) ? headersRecord[headerName][0] : headersRecord[headerName];
       const spamResult = parseSpamScore(value as string);
