@@ -158,9 +158,11 @@ function createOccurrence(
   // Build the occurrence object once, then conditionally assign utcStart/
   // utcEnd. Was: two `...(cond ? {utcStart} : {})` spreads per occurrence,
   // each allocating an empty/single-field object literal.
+  // `...undefined` is valid (ES2018) and produces nothing — drops the `|| {}`
+  // fallback allocation on every non-overridden occurrence.
   const occ: CalendarEvent = {
     ...master,
-    ...(override || {}),
+    ...override,
     id: `${master.id}:${recurrenceId}`,
     originalId: master.originalId || master.id,
     uid: master.uid,

@@ -251,7 +251,10 @@ function cleanRecurrenceRules(event: Record<string, unknown>): void {
     const singularKey = keyMap[pluralKey];
     const rules = event[pluralKey];
     if (rules === undefined) continue;
-    delete event[pluralKey];
+    // Set to undefined instead of `delete` — JSON.stringify omits undefined
+    // values just like missing keys, but `delete` transitions the object to
+    // V8 dictionary mode (slow property access for the rest of its lifetime).
+    event[pluralKey] = undefined;
     if (!Array.isArray(rules)) {
       // null means "remove recurrence" - pass through with the correct key
       event[singularKey] = rules;
