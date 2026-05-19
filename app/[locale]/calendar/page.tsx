@@ -9,6 +9,7 @@ import {
   addMonths, subMonths, addWeeks, subWeeks, addDays, subDays,
   startOfDay, format, parseISO,
 } from "date-fns";
+import { useShallow } from "zustand/react/shallow";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { isCalendarViewMode } from "@/stores/calendar-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
@@ -75,7 +76,21 @@ export default function CalendarPage() {
   const tWebcalAction = useTranslations("calendar.webcal_action");
   const isMobile = useIsMobile();
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
-  const { client, isAuthenticated, logout, checkAuth, switchAccount, activeAccountId, isLoading: authLoading } = useAuthStore();
+  // useShallow narrows from "any store mutation" to "any of the listed
+  // fields changed (shallow equal)". The calendar page was destructuring
+  // 7 auth + 22 calendar + 9 settings fields in plain useStore() calls —
+  // every set() on any of those three stores re-rendered the entire
+  // calendar view tree (month/week/day/agenda/task), even on mutations
+  // the page didn't read.
+  const { client, isAuthenticated, logout, checkAuth, switchAccount, activeAccountId, isLoading: authLoading } = useAuthStore(useShallow(s => ({
+    client: s.client,
+    isAuthenticated: s.isAuthenticated,
+    logout: s.logout,
+    checkAuth: s.checkAuth,
+    switchAccount: s.switchAccount,
+    activeAccountId: s.activeAccountId,
+    isLoading: s.isLoading,
+  })));
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const quota = useEmailStore(s => s.quota);
   const {
@@ -85,8 +100,43 @@ export default function CalendarPage() {
     setSelectedDate, setViewMode, toggleCalendarVisibility, updateCalendar, shareCalendar,
     removeCalendar, clearCalendarEvents,
     refreshAllSubscriptions, icalSubscriptions,
-  } = useCalendarStore();
-  const { firstDayOfWeek, timeFormat, showWeekNumbers, enableCalendarTasks, showTasksOnCalendar, calendarHoverPreview, showBirthdayCalendar, birthdayCalendarColor, updateSetting } = useSettingsStore();
+  } = useCalendarStore(useShallow(s => ({
+    calendars: s.calendars,
+    events: s.events,
+    selectedDate: s.selectedDate,
+    viewMode: s.viewMode,
+    selectedCalendarIds: s.selectedCalendarIds,
+    isLoading: s.isLoading,
+    isLoadingEvents: s.isLoadingEvents,
+    supportsCalendar: s.supportsCalendar,
+    error: s.error,
+    fetchCalendars: s.fetchCalendars,
+    fetchEvents: s.fetchEvents,
+    createEvent: s.createEvent,
+    updateEvent: s.updateEvent,
+    deleteEvent: s.deleteEvent,
+    rsvpEvent: s.rsvpEvent,
+    setSelectedDate: s.setSelectedDate,
+    setViewMode: s.setViewMode,
+    toggleCalendarVisibility: s.toggleCalendarVisibility,
+    updateCalendar: s.updateCalendar,
+    shareCalendar: s.shareCalendar,
+    removeCalendar: s.removeCalendar,
+    clearCalendarEvents: s.clearCalendarEvents,
+    refreshAllSubscriptions: s.refreshAllSubscriptions,
+    icalSubscriptions: s.icalSubscriptions,
+  })));
+  const { firstDayOfWeek, timeFormat, showWeekNumbers, enableCalendarTasks, showTasksOnCalendar, calendarHoverPreview, showBirthdayCalendar, birthdayCalendarColor, updateSetting } = useSettingsStore(useShallow(s => ({
+    firstDayOfWeek: s.firstDayOfWeek,
+    timeFormat: s.timeFormat,
+    showWeekNumbers: s.showWeekNumbers,
+    enableCalendarTasks: s.enableCalendarTasks,
+    showTasksOnCalendar: s.showTasksOnCalendar,
+    calendarHoverPreview: s.calendarHoverPreview,
+    showBirthdayCalendar: s.showBirthdayCalendar,
+    birthdayCalendarColor: s.birthdayCalendarColor,
+    updateSetting: s.updateSetting,
+  })));
   // Was `useTaskStore()` subscribing to the whole store — any task
   // mutation re-rendered the entire calendar page including non-task
   // views (month/week/day). Now we subscribe granularly so the page only
@@ -97,7 +147,7 @@ export default function CalendarPage() {
   const taskShowCompleted = useTaskStore(state => state.showCompleted);
   const selectedTaskId = useTaskStore(state => state.selectedTaskId);
   const fetchTasksFn = useTaskStore(state => state.fetchTasks);
-  const { identities } = useIdentityStore();
+  const identities = useIdentityStore(s => s.identities);
   const contacts = useContactStore((s) => s.contacts);
   const normalizedViewMode = isCalendarViewMode(viewMode) ? viewMode : "month";
 
