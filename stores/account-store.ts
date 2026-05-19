@@ -2,6 +2,23 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { generateAccountId, generateAvatarColor, getMaxAccounts } from '@/lib/account-utils';
 
+// id→account lookup map cached against the accounts array identity. The
+// inbox/viewer code calls getAccountById per visible row to resolve avatar
+// colors / display labels — at 50+ visible rows × multiple stores reading,
+// repeated `accounts.find(...)` linear scans added up. WeakMap keys on the
+// array reference; replaced when zustand swaps the accounts array on
+// set(). Lazy build so we don't pay for the Map when no lookup happens.
+const _accountByIdCache = new WeakMap<readonly AccountEntry[], Map<string, AccountEntry>>();
+function accountByIdLookup(accounts: readonly AccountEntry[]): Map<string, AccountEntry> {
+  let m = _accountByIdCache.get(accounts);
+  if (!m) {
+    m = new Map<string, AccountEntry>();
+    for (const a of accounts) m.set(a.id, a);
+    _accountByIdCache.set(accounts, m);
+  }
+  return m;
+}
+
 export interface AccountEntry {
   /** Unique key: `${username}@${serverHostname}` */
   id: string;
@@ -134,13 +151,13 @@ export const useAccountStore = create<AccountState>()(
       },
 
       setActiveAccount: (accountId) => {
-        const account = get().accounts.find((a) => a.id === accountId);
+        const account = accountByIdLookup(get().accounts).get(accountId);
         if (!account) return;
         set({ activeAccountId: accountId });
       },
 
       setDefaultAccount: (accountId) => {
-        const account = get().accounts.find((a) => a.id === accountId);
+        const account = accountByIdLookup(get().accounts).get(accountId);
         if (!account) return;
         set((s) => ({
           defaultAccountId: accountId,
@@ -154,7 +171,7 @@ export const useAccountStore = create<AccountState>()(
       getDefaultAccount: () => {
         const state = get();
         if (state.defaultAccountId) {
-          const account = state.accounts.find((a) => a.id === state.defaultAccountId);
+          const account = accountByIdLookup(state.accounts).get(state.defaultAccountId);
           if (account) return account;
         }
         return state.accounts[0] ?? null;
@@ -170,11 +187,12 @@ export const useAccountStore = create<AccountState>()(
 
       getActiveAccount: () => {
         const state = get();
-        return state.accounts.find((a) => a.id === state.activeAccountId) ?? null;
+        if (!state.activeAccountId) return null;
+        return accountByIdLookup(state.accounts).get(state.activeAccountId) ?? null;
       },
 
       getAccountById: (accountId) => {
-        return get().accounts.find((a) => a.id === accountId);
+        return accountByIdLookup(get().accounts).get(accountId);
       },
 
       getNextCookieSlot: () => {
