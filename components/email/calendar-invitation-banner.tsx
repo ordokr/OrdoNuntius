@@ -367,7 +367,14 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
   const currentUserEmail = useAuthStore((s) => s.primaryIdentity?.email);
   const calendarInvitationParsingEnabled = useSettingsStore((s) => s.calendarInvitationParsingEnabled);
   const timeFormat = useSettingsStore((s) => s.timeFormat);
-  const { calendars, supportsCalendar, importEvents, rsvpEvent, updateEvent, events: storeEvents, setSelectedDate } = useCalendarStore();
+  // Per-field selectors instead of whole-store destructure. The banner is
+  // rendered inside email-viewer and was re-rendering on every calendar
+  // mutation in the app — including unrelated fetches and event edits
+  // happening in background tabs. Actions are stable; pull via getState()
+  // at action time.
+  const calendars = useCalendarStore(s => s.calendars);
+  const supportsCalendar = useCalendarStore(s => s.supportsCalendar);
+  const storeEvents = useCalendarStore(s => s.events);
 
   const [state, setState] = useState<BannerState>('loading');
   const [parsedEvent, setParsedEvent] = useState<Partial<CalendarEvent> | null>(null);
@@ -589,8 +596,9 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
         && myParticipant
         && (!eventForRsvp?.participants || Object.keys(eventForRsvp.participants).length === 0)
       );
+      const calendarActions = useCalendarStore.getState();
       if (eventForRsvp && existingEventParticipant) {
-        await rsvpEvent(client, eventForRsvp.id, existingEventParticipant.id, status, replyToForRsvp);
+        await calendarActions.rsvpEvent(client, eventForRsvp.id, existingEventParticipant.id, status, replyToForRsvp);
         await sendImipReply();
         setRsvpStatus(status);
         setActionNotice(t('rsvp_sent'));
@@ -601,7 +609,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
         if (!repairedParticipants) {
           setActionError(t('action_failed'));
         } else {
-          await updateEvent(client, eventForRsvp.id, {
+          await calendarActions.updateEvent(client, eventForRsvp.id, {
             participants: repairedParticipants,
             replyTo: replyToForRsvp ?? undefined,
           }, true);
@@ -613,7 +621,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
       } else if (eventForRsvp) {
         setActionError(t('action_failed'));
       } else if (calId) {
-        const imported = await importEvents(client, [parsedEvent], calId);
+        const imported = await calendarActions.importEvents(client, [parsedEvent], calId);
         if (imported > 0) {
           const newEvent = useCalendarStore.getState().events.find(
             (e) => e.uid === parsedEvent.uid
@@ -621,7 +629,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
           const participant = myParticipant
             || (newEvent && currentUserEmail ? findParticipantByEmail(newEvent, currentUserEmail) : null);
           if (newEvent && participant) {
-            await rsvpEvent(client, newEvent.id, participant.id, status, replyToForRsvp);
+            await calendarActions.rsvpEvent(client, newEvent.id, participant.id, status, replyToForRsvp);
             await sendImipReply();
             setRsvpStatus(status);
             setActionNotice(t('rsvp_sent'));
@@ -652,7 +660,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
     if (targetDate) {
       const parsedDate = new Date(targetDate);
       if (!Number.isNaN(parsedDate.getTime())) {
-        setSelectedDate(parsedDate);
+        useCalendarStore.getState().setSelectedDate(parsedDate);
       }
     }
 
@@ -670,7 +678,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
     setActionError(null);
     setIsProcessing(true);
     try {
-      const count = await importEvents(client, [parsedEvent], calId);
+      const count = await useCalendarStore.getState().importEvents(client, [parsedEvent], calId);
       if (count > 0) {
         setActionNotice(t('added'));
         setState('parsed');
@@ -729,7 +737,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
     setIsProcessing(true);
 
     try {
-      await updateEvent(client, existingEvent.id, proposalPatch, true);
+      await useCalendarStore.getState().updateEvent(client, existingEvent.id, proposalPatch, true);
       setActionNotice(t('proposal_applied'));
       setState('parsed');
       setRsvpStatus(null);
