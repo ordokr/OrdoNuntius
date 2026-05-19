@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '@/stores/settings-store';
 import { SettingsSection, SettingItem, Select, ToggleSwitch } from './settings-section';
 import { TrustedSendersModal } from '@/components/trusted-senders-modal';
@@ -12,7 +13,8 @@ import { useContactStore } from '@/stores/contact-store';
 export function ContentSendersSettings() {
   const t = useTranslations('settings.email_behavior');
   const [showTrustedModal, setShowTrustedModal] = useState(false);
-  const { isSettingLocked, isSettingHidden } = usePolicyStore();
+  const isSettingLocked = usePolicyStore(s => s.isSettingLocked);
+  const isSettingHidden = usePolicyStore(s => s.isSettingHidden);
 
   const {
     externalContentPolicy,
@@ -20,8 +22,14 @@ export function ContentSendersSettings() {
     trustedSenders,
     trustedSendersAddressBook,
     updateSetting,
-  } = useSettingsStore();
-  const { trustedSenderEmails } = useContactStore();
+  } = useSettingsStore(useShallow(s => ({
+    externalContentPolicy: s.externalContentPolicy,
+    emailAlwaysLightMode: s.emailAlwaysLightMode,
+    trustedSenders: s.trustedSenders,
+    trustedSendersAddressBook: s.trustedSendersAddressBook,
+    updateSetting: s.updateSetting,
+  })));
+  const trustedSenderEmails = useContactStore(s => s.trustedSenderEmails);
 
   const getTrustedSendersCount = () => {
     const count = trustedSendersAddressBook ? trustedSenderEmails.length : trustedSenders.length;

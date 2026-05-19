@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '@/stores/settings-store';
 import type { ArchiveMode, HoverAction } from '@/stores/settings-store';
 import { ALL_HOVER_ACTIONS } from '@/stores/settings-store';
@@ -16,7 +17,9 @@ export function ReadingSettings() {
   const t = useTranslations('settings.email_behavior');
   const [isReorganizing, setIsReorganizing] = useState(false);
   const [reorganizeResult, setReorganizeResult] = useState<string | null>(null);
-  const { isSettingLocked, isSettingHidden, isFeatureEnabled } = usePolicyStore();
+  const isSettingLocked = usePolicyStore(s => s.isSettingLocked);
+  const isSettingHidden = usePolicyStore(s => s.isSettingHidden);
+  const isFeatureEnabled = usePolicyStore(s => s.isFeatureEnabled);
 
   const {
     markAsReadDelay,
@@ -36,7 +39,25 @@ export function ReadingSettings() {
     hideInlineImageAttachments,
     attachmentImagePreviewsEnabled,
     updateSetting,
-  } = useSettingsStore();
+  } = useSettingsStore(useShallow(s => ({
+    markAsReadDelay: s.markAsReadDelay,
+    deleteAction: s.deleteAction,
+    permanentlyDeleteJunk: s.permanentlyDeleteJunk,
+    showPreview: s.showPreview,
+    mailLayout: s.mailLayout,
+    disableThreading: s.disableThreading,
+    plainTextMode: s.plainTextMode,
+    emailsPerPage: s.emailsPerPage,
+    mailAttachmentAction: s.mailAttachmentAction,
+    attachmentPosition: s.attachmentPosition,
+    archiveMode: s.archiveMode,
+    hoverActions: s.hoverActions,
+    hoverActionsMode: s.hoverActionsMode,
+    hoverActionsCorner: s.hoverActionsCorner,
+    hideInlineImageAttachments: s.hideInlineImageAttachments,
+    attachmentImagePreviewsEnabled: s.attachmentImagePreviewsEnabled,
+    updateSetting: s.updateSetting,
+  })));
 
   const isFocusedLayout = mailLayout === 'focus';
 

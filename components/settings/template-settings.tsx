@@ -20,7 +20,9 @@ export function TemplateSettings() {
   const t = useTranslations('settings.templates');
   const tNotif = useTranslations('notifications');
 
-  const { templates, exportAllTemplates, importTemplates: storeImport } = useTemplateStore();
+  const templates = useTemplateStore(s => s.templates);
+  const exportAllTemplates = useTemplateStore(s => s.exportAllTemplates);
+  const storeImport = useTemplateStore(s => s.importTemplates);
 
   const [showManager, setShowManager] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);

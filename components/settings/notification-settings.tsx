@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '@/stores/settings-store';
 import { SettingsSection, SettingItem, ToggleSwitch, Select } from './settings-section';
 import { playNotificationSound, NOTIFICATION_SOUNDS } from '@/lib/notification-sound';
@@ -38,8 +39,17 @@ export function NotificationSettings() {
     calendarNotificationSound,
     calendarInvitationParsingEnabled,
     updateSetting,
-  } = useSettingsStore();
-  const { isSettingLocked, isSettingHidden } = usePolicyStore();
+  } = useSettingsStore(useShallow(s => ({
+    emailNotificationsEnabled: s.emailNotificationsEnabled,
+    emailNotificationSound: s.emailNotificationSound,
+    notificationSoundChoice: s.notificationSoundChoice,
+    calendarNotificationsEnabled: s.calendarNotificationsEnabled,
+    calendarNotificationSound: s.calendarNotificationSound,
+    calendarInvitationParsingEnabled: s.calendarInvitationParsingEnabled,
+    updateSetting: s.updateSetting,
+  })));
+  const isSettingLocked = usePolicyStore(s => s.isSettingLocked);
+  const isSettingHidden = usePolicyStore(s => s.isSettingHidden);
   const client = useAuthStore((s) => s.client);
   const username = useAuthStore((s) => s.username);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();

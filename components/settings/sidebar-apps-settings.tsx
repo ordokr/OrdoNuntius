@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SettingsSection, SettingItem, ToggleSwitch } from "./settings-section";
 import { IconPicker } from "@/components/layout/icon-picker";
+import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore, type SidebarApp } from "@/stores/settings-store";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -180,7 +181,15 @@ function AppForm({
 export function SidebarAppsSettings() {
   const t = useTranslations("settings.sidebar_apps");
   const tApps = useTranslations("sidebar_apps");
-  const { sidebarApps, keepAppsLoaded, addSidebarApp, updateSidebarApp, removeSidebarApp, reorderSidebarApps, updateSetting } = useSettingsStore();
+  const { sidebarApps, keepAppsLoaded, addSidebarApp, updateSidebarApp, removeSidebarApp, reorderSidebarApps, updateSetting } = useSettingsStore(useShallow(s => ({
+    sidebarApps: s.sidebarApps,
+    keepAppsLoaded: s.keepAppsLoaded,
+    addSidebarApp: s.addSidebarApp,
+    updateSidebarApp: s.updateSidebarApp,
+    removeSidebarApp: s.removeSidebarApp,
+    reorderSidebarApps: s.reorderSidebarApps,
+    updateSetting: s.updateSetting,
+  })));
   const [editingApp, setEditingApp] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();

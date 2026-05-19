@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
+import { useShallow } from 'zustand/react/shallow';
 import { usePluginStore } from '@/stores/plugin-store';
 import { usePolicyStore } from '@/stores/policy-store';
 import { SettingsSection, ToggleSwitch } from './settings-section';
@@ -20,8 +21,21 @@ const STATUS_COLORS: Record<PluginStatus, string> = {
 
 export function PluginsSettings() {
   const t = useTranslations('settings_plugins');
-  const { plugins, enablePlugin, disablePlugin, updatePluginSettings, initializePlugins, initialized } = usePluginStore();
-  const { isFeatureEnabled, isPluginForceEnabled, isPluginApproved, fetchPolicy, loaded } = usePolicyStore();
+  const { plugins, enablePlugin, disablePlugin, updatePluginSettings, initializePlugins, initialized } = usePluginStore(useShallow(s => ({
+    plugins: s.plugins,
+    enablePlugin: s.enablePlugin,
+    disablePlugin: s.disablePlugin,
+    updatePluginSettings: s.updatePluginSettings,
+    initializePlugins: s.initializePlugins,
+    initialized: s.initialized,
+  })));
+  const { isFeatureEnabled, isPluginForceEnabled, isPluginApproved, fetchPolicy, loaded } = usePolicyStore(useShallow(s => ({
+    isFeatureEnabled: s.isFeatureEnabled,
+    isPluginForceEnabled: s.isPluginForceEnabled,
+    isPluginApproved: s.isPluginApproved,
+    fetchPolicy: s.fetchPolicy,
+    loaded: s.loaded,
+  })));
   const [expandedPlugin, setExpandedPlugin] = useState<string | null>(null);
 
   useEffect(() => {

@@ -9,8 +9,13 @@ import { toast } from '@/stores/toast-store';
 import { usePolicyStore } from '@/stores/policy-store';
 
 export function ThemesSettings() {
-  const { installedThemes, activeThemeId, activateTheme } = useThemeStore();
-  const { isThemeDisabled, getThemePolicy, getForcedThemeId, isThemeForceEnabled } = usePolicyStore();
+  const installedThemes = useThemeStore(s => s.installedThemes);
+  const activeThemeId = useThemeStore(s => s.activeThemeId);
+  const activateTheme = useThemeStore(s => s.activateTheme);
+  const isThemeDisabled = usePolicyStore(s => s.isThemeDisabled);
+  const getThemePolicy = usePolicyStore(s => s.getThemePolicy);
+  const getForcedThemeId = usePolicyStore(s => s.getForcedThemeId);
+  const isThemeForceEnabled = usePolicyStore(s => s.isThemeForceEnabled);
   const themePolicy = getThemePolicy();
   const forcedThemeId = getForcedThemeId(installedThemes.map((theme) => theme.id));
 

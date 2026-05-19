@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { SettingsSection, SettingItem, ToggleSwitch } from "@/components/settings/settings-section";
 import { SmimePassphraseDialog } from "@/components/settings/smime-passphrase-dialog";
 import { SmimeCertificateModal } from "@/components/settings/smime-certificate-modal";
+import { useShallow } from "zustand/react/shallow";
 import { useSmimeStore } from "@/stores/smime-store";
 import { useIdentityStore } from "@/stores/identity-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -48,9 +49,32 @@ export function SmimeSettings() {
     setAutoImportSignerCerts,
     isKeyUnlocked,
     setError,
-  } = useSmimeStore();
+  } = useSmimeStore(useShallow(s => ({
+    keyRecords: s.keyRecords,
+    publicCerts: s.publicCerts,
+    identityKeyBindings: s.identityKeyBindings,
+    defaultSignIdentity: s.defaultSignIdentity,
+    defaultEncrypt: s.defaultEncrypt,
+    rememberUnlockedKeys: s.rememberUnlockedKeys,
+    autoImportSignerCerts: s.autoImportSignerCerts,
+    isLoading: s.isLoading,
+    error: s.error,
+    load: s.load,
+    importPKCS12: s.importPKCS12,
+    removeKeyRecord: s.removeKeyRecord,
+    removePublicCert: s.removePublicCert,
+    bindIdentityToKey: s.bindIdentityToKey,
+    unlockKey: s.unlockKey,
+    lockKey: s.lockKey,
+    setSignDefault: s.setSignDefault,
+    setEncryptDefault: s.setEncryptDefault,
+    setRememberUnlockedKeys: s.setRememberUnlockedKeys,
+    setAutoImportSignerCerts: s.setAutoImportSignerCerts,
+    isKeyUnlocked: s.isKeyUnlocked,
+    setError: s.setError,
+  })));
 
-  const { identities } = useIdentityStore();
+  const identities = useIdentityStore(s => s.identities);
   const activeAccountId = useAuthStore((s) => s.activeAccountId);
 
   // Local UI state
