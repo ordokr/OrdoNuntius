@@ -4,7 +4,24 @@
  * circular dependency back to the file that composes them.
  */
 
-import type { Email } from "@/lib/jmap/types";
+import type { Email, Mailbox } from "@/lib/jmap/types";
+
+// id→mailbox lookup cached against the mailboxes array identity. The email
+// store performs `mailboxes.find(mb => mb.id === X)` in 15+ actions per
+// fetch/mutate — most of them on the hot path (batchDelete, batchMoveTo,
+// move/markAsRead, etc.). WeakMap is built lazily on first lookup and
+// freed via GC when the underlying array is replaced (zustand swaps the
+// mailboxes array reference on every fetchMailboxes / role mutation).
+const _mailboxByIdCache = new WeakMap<readonly Mailbox[], Map<string, Mailbox>>();
+export function mailboxByIdLookup(mailboxes: readonly Mailbox[]): Map<string, Mailbox> {
+  let m = _mailboxByIdCache.get(mailboxes);
+  if (!m) {
+    m = new Map<string, Mailbox>();
+    for (const mb of mailboxes) m.set(mb.id, mb);
+    _mailboxByIdCache.set(mailboxes, m);
+  }
+  return m;
+}
 
 interface SelectionState {
   emails: Email[];

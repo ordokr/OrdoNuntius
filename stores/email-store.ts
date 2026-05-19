@@ -14,7 +14,7 @@ import { createThreadSlice, type ThreadSlice } from "@/stores/email-slices/threa
 import { createSpamSlice, type SpamSlice } from "@/stores/email-slices/spam";
 import { createSearchSlice, type SearchSlice } from "@/stores/email-slices/search";
 import { createPushSlice, type PushSlice } from "@/stores/email-slices/push";
-import { getNextSelectedEmail, getNextSelectedEmailAfterRemoval } from "@/stores/email-slices/_helpers";
+import { getNextSelectedEmail, getNextSelectedEmailAfterRemoval, mailboxByIdLookup } from "@/stores/email-slices/_helpers";
 
 interface EmailStore extends UnifiedSlice, ThreadSlice, SpamSlice, SearchSlice, PushSlice {
   emails: Email[];
@@ -487,7 +487,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
 
       // Find the mailbox to get its accountId (for shared folder support)
       const mailboxes = get().mailboxes;
-      const mailbox = mailboxes.find(mb => mb.id === targetMailboxId);
+      const mailbox = mailboxByIdLookup(mailboxes).get(targetMailboxId);
       // Only pass accountId for shared mailboxes, not for primary account
       const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
       // Use originalId for JMAP queries (shared mailboxes use namespaced IDs in the store)
@@ -625,7 +625,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
 
       if (searchQuery || hasFilters) {
         const mailboxes = get().mailboxes;
-        const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+        const mailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
         const jmapMailboxId = mailbox?.originalId || selectedMailbox;
         const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
 
@@ -639,7 +639,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
         // Load more from mailbox
         // Find the mailbox to get its accountId (for shared folder support)
         const mailboxes = get().mailboxes;
-        const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+        const mailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
         // Only pass accountId for shared mailboxes, not for primary account
         const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
         // Use originalId for JMAP queries (shared mailboxes use namespaced IDs in the store)
@@ -680,7 +680,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
       // Find the selected mailbox to determine accountId (for shared folders)
       const selectedMailboxId = get().selectedMailbox;
       const mailboxes = get().mailboxes;
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailboxId);
+      const mailbox = mailboxByIdLookup(mailboxes).get(selectedMailboxId);
 
       // Only pass accountId for shared mailboxes
       const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
@@ -756,7 +756,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
       // Determine accountId for shared folders
       const selectedMailboxId = get().selectedMailbox;
       const mailboxes = get().mailboxes;
-      const currentMailbox = mailboxes.find(mb => mb.id === selectedMailboxId);
+      const currentMailbox = mailboxByIdLookup(mailboxes).get(selectedMailboxId);
       const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
 
       // If in junk folder and setting is enabled, permanently delete
@@ -918,7 +918,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
 
     try {
       const selectedMailboxId = get().selectedMailbox;
-      const currentMailbox = get().mailboxes.find(mb => mb.id === selectedMailboxId);
+      const currentMailbox = mailboxByIdLookup(get().mailboxes).get(selectedMailboxId);
       const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
 
       await client.markAsRead(emailId, read, accountId);
@@ -987,10 +987,11 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
       if (email.mailboxIds) for (const id in email.mailboxIds) currentMailboxIds.add(id);
 
       const { selectedMailbox, mailboxes } = get();
-      const currentMailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      const mbById = mailboxByIdLookup(mailboxes);
+      const currentMailbox = mbById.get(selectedMailbox);
       const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
 
-      const destMailbox = mailboxes.find(mb => mb.id === destinationMailboxId);
+      const destMailbox = mbById.get(destinationMailboxId);
       const jmapDestId = destMailbox?.originalId || destinationMailboxId;
 
       await client.moveEmail(emailId, jmapDestId, accountId);
@@ -1041,7 +1042,8 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
 
     try {
       const { emails, mailboxes, selectedMailbox, isUnifiedView } = get();
-      const destMailbox = mailboxes.find(mb => mb.id === destinationMailboxId);
+      const mbById = mailboxByIdLookup(mailboxes);
+      const destMailbox = mbById.get(destinationMailboxId);
       const jmapDestId = destMailbox?.originalId || destinationMailboxId;
       const idSet = new Set(emailIds);
       const affected = emails.filter(e => idSet.has(e.id));
@@ -1067,7 +1069,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
         }
         await Promise.all(promises);
       } else {
-        const currentMailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+        const currentMailbox = mbById.get(selectedMailbox);
         const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
         await client.batchMoveEmails(emailIds, jmapDestId, accountId);
       }
@@ -1124,9 +1126,10 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
         return;
       }
 
-      const currentMailbox = state.mailboxes.find(mb => mb.id === state.selectedMailbox);
+      const mbById = mailboxByIdLookup(state.mailboxes);
+      const currentMailbox = mbById.get(state.selectedMailbox);
       const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
-      const destMailbox = state.mailboxes.find(mb => mb.id === destinationMailboxId);
+      const destMailbox = mbById.get(destinationMailboxId);
       const jmapDestId = destMailbox?.originalId || destinationMailboxId;
 
       const thread = await client.getThread(email.threadId, accountId);
@@ -1301,7 +1304,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
       const emailIdsArray = Array.from(selectedEmailIds);
 
       // Determine if the current folder forces permanent deletion.
-      const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+      const currentMailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
       const isInTrash = currentMailbox?.role === 'trash';
       const permanentlyDeleteJunk = useSettingsStore.getState().permanentlyDeleteJunk;
       const isInJunk = currentMailbox?.role === 'junk';
@@ -1657,7 +1660,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
 
   markMailboxAsRead: async (client, mailboxId) => {
     try {
-      const mailbox = get().mailboxes.find(mb => mb.id === mailboxId);
+      const mailbox = mailboxByIdLookup(get().mailboxes).get(mailboxId);
       const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
       const jmapMailboxId = mailbox?.originalId || mailboxId;
 
