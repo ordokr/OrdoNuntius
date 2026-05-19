@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback } from "react";
+import { memo, useCallback } from "react";
 import { formatDate, stripInvisibleLeading } from "@/lib/utils";
 import { Email } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
@@ -34,7 +34,7 @@ interface EmailListItemProps {
   onMarkAsSpam?: () => void;
 }
 
-export function EmailListItem({ email, selected, currentMailboxRole: currentMailboxRoleProp, emailKeywordsById, onClick, onContextMenu, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetColorTag, onMarkAsSpam }: EmailListItemProps) {
+function EmailListItemImpl({ email, selected, currentMailboxRole: currentMailboxRoleProp, emailKeywordsById, onClick, onContextMenu, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetColorTag, onMarkAsSpam }: EmailListItemProps) {
   const t = useTranslations('email_viewer');
   // Granular selectors: subscribing to whole store would re-render this row
   // (rendered ~50× in the virtualizer) on every store mutation. See email-list.tsx
@@ -339,3 +339,8 @@ export function EmailListItem({ email, selected, currentMailboxRole: currentMail
     </div>
   );
 }
+
+// Parent (EmailList) re-renders on store mutations even when props for this
+// row didn't change. memo + zustand's granular selectors below keep row
+// renders proportional to actual changes, not virtualizer scroll ticks.
+export const EmailListItem = memo(EmailListItemImpl);

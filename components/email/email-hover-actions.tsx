@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Email } from "@/lib/jmap/types";
 import { useSettingsStore } from "@/stores/settings-store";
 import type { HoverAction } from "@/stores/settings-store";
@@ -63,7 +64,7 @@ const CORNER_CLASSES = {
   'bottom-left': 'bottom-1 left-1',
 } as const;
 
-export function EmailHoverActions({
+function EmailHoverActionsImpl({
   email,
   backgroundClassName = "bg-muted",
   onToggleStar,
@@ -177,3 +178,9 @@ export function EmailHoverActions({
     </div>
   );
 }
+
+// Rendered inside every visible row of the email list virtualizer; memo
+// keeps it from re-rendering whenever the parent re-renders for an
+// unrelated reason. Props are either the row's stable Email, stable
+// useCallback handlers from EmailList, or the static backgroundClassName.
+export const EmailHoverActions = memo(EmailHoverActionsImpl);

@@ -1,5 +1,6 @@
 'use client';
 
+import { memo, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Mail, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -14,7 +15,7 @@ interface EmailIdentityBadgeProps {
   className?: string;
 }
 
-export function EmailIdentityBadge({
+function EmailIdentityBadgeImpl({
   email,
   identities,
   compact = false,
@@ -23,6 +24,15 @@ export function EmailIdentityBadge({
   const t = useTranslations('identities.badge');
   const subAddressDelimiter = useSettingsStore((state) => state.subAddressDelimiter);
 
+  // O(1) email→identity lookup map. Was: 2 identities.find walks per row
+  // (once for the from-address, once for each TO recipient sub-address
+  // match). Built once per identities change, looked up multiple times.
+  const identitiesByEmail = useMemo(() => {
+    const m = new Map<string, Identity>();
+    for (const id of identities) m.set(id.email, id);
+    return m;
+  }, [identities]);
+
   const fromAddress = email.from?.[0]?.email;
   if (!fromAddress) return null;
 
@@ -30,9 +40,9 @@ export function EmailIdentityBadge({
   const parsedFrom = parseSubAddress(fromAddress, subAddressDelimiter);
 
   // Find matching identity (email sent BY the user)
-  const matchingIdentity = identities.find(
-    (identity) => identity.email === fromAddress || identity.email === `${parsedFrom.baseUser}@${parsedFrom.domain}`
-  );
+  const matchingIdentity =
+    identitiesByEmail.get(fromAddress) ??
+    identitiesByEmail.get(`${parsedFrom.baseUser}@${parsedFrom.domain}`);
 
   // Check if email was sent TO a sub-address (received email)
   let receivedToTag: string | null = null;
@@ -42,9 +52,7 @@ export function EmailIdentityBadge({
       const parsedTo = parseSubAddress(recipient.email, subAddressDelimiter);
       if (parsedTo.tag) {
         // Check if this base email matches any of the user's identities
-        const matchingToIdentity = identities.find(
-          (identity) => identity.email === `${parsedTo.baseUser}@${parsedTo.domain}`
-        );
+        const matchingToIdentity = identitiesByEmail.get(`${parsedTo.baseUser}@${parsedTo.domain}`);
         if (matchingToIdentity) {
           receivedToTag = parsedTo.tag;
           break;
@@ -142,3 +150,9 @@ export function EmailIdentityBadge({
     </div>
   );
 }
+
+// Rendered per visible email row in the list and on every email viewer.
+// memo prevents re-render churn when the parent re-renders for unrelated
+// state (selection, hover, scroll). Props (email, identities) are stable
+// across most parent re-renders.
+export const EmailIdentityBadge = memo(EmailIdentityBadgeImpl);
