@@ -221,7 +221,8 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
   let keyIdx = 0;
   let langIdx = 0;
 
-  for (const [fullKey, values] of Object.entries(raw)) {
+  for (const fullKey in raw) {
+    const values = raw[fullKey];
     const semiIdx = fullKey.indexOf(";");
     const propName = (semiIdx > 0 ? fullKey.substring(0, semiIdx) : fullKey).toUpperCase();
     const paramStr = semiIdx > 0 ? fullKey.substring(semiIdx + 1) : "";
