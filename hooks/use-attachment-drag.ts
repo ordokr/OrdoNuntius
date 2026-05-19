@@ -5,16 +5,29 @@ import { useCallback, useEffect, useRef, DragEvent } from "react";
 // Chromium ships the `DownloadURL` DataTransfer entry, which the OS reads on
 // drop to materialize a real file. Firefox and Safari ignore it, so we only
 // enable drag-out where it actually works.
+//
+// Result is browser-constant for the lifetime of the page, so memoize the
+// first computation — callers (one per attachment row in the viewer + per
+// drag start) would otherwise re-run UA regex tests on every render.
+let _dragOutSupportedCache: boolean | null = null;
 export function isDragOutSupported(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const uaData = (navigator as { userAgentData?: { brands?: { brand: string }[] } }).userAgentData;
-  if (uaData?.brands?.length) {
-    return uaData.brands.some((b) => /Chromium|Google Chrome|Microsoft Edge|Brave|Opera/i.test(b.brand));
+  if (_dragOutSupportedCache !== null) return _dragOutSupportedCache;
+  let supported: boolean;
+  if (typeof navigator === "undefined") {
+    supported = false;
+  } else {
+    const uaData = (navigator as { userAgentData?: { brands?: { brand: string }[] } }).userAgentData;
+    if (uaData?.brands?.length) {
+      supported = uaData.brands.some((b) => /Chromium|Google Chrome|Microsoft Edge|Brave|Opera/i.test(b.brand));
+    } else {
+      const ua = navigator.userAgent || "";
+      if (/Firefox|FxiOS/.test(ua)) supported = false;
+      else if (/^((?!chrome|android).)*safari/i.test(ua)) supported = false;
+      else supported = /Chrome|Chromium|Edg\//.test(ua);
+    }
   }
-  const ua = navigator.userAgent || "";
-  if (/Firefox|FxiOS/.test(ua)) return false;
-  if (/^((?!chrome|android).)*safari/i.test(ua)) return false;
-  return /Chrome|Chromium|Edg\//.test(ua);
+  _dragOutSupportedCache = supported;
+  return supported;
 }
 
 export interface AttachmentDragSource {
