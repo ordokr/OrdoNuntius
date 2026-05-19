@@ -109,7 +109,12 @@ export function getStatusCounts(event: CalendarEvent): StatusCounts {
 
 export function getParticipantCount(event: CalendarEvent): number {
   if (!event.participants) return 0;
-  return Object.keys(event.participants).length;
+  // for...in count avoids the `Object.keys(...).length` keys-array
+  // allocation. Called per event in EventCard render (every calendar
+  // tile in every view).
+  let n = 0;
+  for (const _ in event.participants) n++;
+  return n;
 }
 
 export function buildParticipantMap(

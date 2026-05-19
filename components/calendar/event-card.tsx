@@ -77,7 +77,13 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
 
   const calendarName = calendar?.name || "";
   const durationMinutes = parseDuration(event.duration);
-  const endTime = getEventEndDate(event);
+  // Was: getEventEndDate(event) which calls getEventStartDate(event)
+  // again (one extra parseISO per EventCard render). Since we already
+  // have `startDate` and `durationMinutes`, derive end inline when
+  // utcEnd is absent. Saves one parseISO per EventCard.
+  const endTime = !event.showWithoutTime && event.utcEnd
+    ? getEventEndDate(event) // parseISO of utcEnd — unavoidable
+    : (event.duration ? new Date(startDate.getTime() + durationMinutes * 60000) : startDate);
   const timeString = `${format(startDate, timeFmt)} – ${format(endTime, timeFmt)}`;
   const ariaLabel = `${event.title || t("events.no_title")}, ${timeString}${calendarName ? `, ${calendarName}` : ""}`;
   const participantCount = getParticipantCount(event);

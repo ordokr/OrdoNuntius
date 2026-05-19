@@ -679,10 +679,15 @@ export function EmailComposer({
   };
 
   const handleTemplateSelect = useCallback((template: EmailTemplate, filledValues: Record<string, string>) => {
-    const filledSubject = Object.keys(filledValues).length > 0
+    // Was: `Object.keys(filledValues).length > 0` twice — allocates two
+    // keys-arrays just to check emptiness. A single for-in early-return
+    // suffices and is reused for both substitutions.
+    let hasFilled = false;
+    for (const _k in filledValues) { hasFilled = true; break; }
+    const filledSubject = hasFilled
       ? substitutePlaceholders(template.subject, filledValues)
       : template.subject;
-    const filledBody = Object.keys(filledValues).length > 0
+    const filledBody = hasFilled
       ? substitutePlaceholders(template.body, filledValues)
       : template.body;
 
