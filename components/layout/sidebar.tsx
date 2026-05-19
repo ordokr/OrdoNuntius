@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, ReactNode } from "react";
+import React, { memo, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
@@ -380,17 +380,7 @@ function SidebarSectionHeader({
   );
 }
 
-function MailboxTreeItem({
-  node,
-  selectedMailbox,
-  expandedFolders,
-  onMailboxSelect,
-  onToggleExpand,
-  isCollapsed,
-  onUnreadFilterClick,
-  colorful,
-  onContextMenu,
-}: {
+interface MailboxTreeItemProps {
   node: MailboxNode;
   selectedMailbox: string;
   expandedFolders: Set<string>;
@@ -400,7 +390,19 @@ function MailboxTreeItem({
   onUnreadFilterClick?: (mailboxId: string) => void;
   colorful: boolean;
   onContextMenu?: (e: React.MouseEvent, node: MailboxNode) => void;
-}) {
+}
+
+function MailboxTreeItemImpl({
+  node,
+  selectedMailbox,
+  expandedFolders,
+  onMailboxSelect,
+  onToggleExpand,
+  isCollapsed,
+  onUnreadFilterClick,
+  colorful,
+  onContextMenu,
+}: MailboxTreeItemProps) {
   const tNotifications = useTranslations('notifications');
   const hasChildren = node.children.length > 0;
   const isExpanded = expandedFolders.has(node.id);
@@ -470,6 +472,12 @@ function MailboxTreeItem({
   );
 }
 
+// Rendered per mailbox in the sidebar tree (~30 instances on a typical
+// account). memo skips the render when the prop shape is unchanged —
+// useful when the sidebar re-renders for unrelated state (tag counts,
+// unified counts, accounts list).
+const MailboxTreeItem: React.MemoExoticComponent<(props: MailboxTreeItemProps) => React.JSX.Element> = memo(MailboxTreeItemImpl);
+
 const TAG_ICON_COLOR: Record<string, string> = {
   red: "text-red-600/75 dark:text-red-400/75",
   orange: "text-orange-600/75 dark:text-orange-400/75",
@@ -486,15 +494,7 @@ const TAG_ICON_COLOR: Record<string, string> = {
   gray: "text-gray-500",
 };
 
-function TagItem({
-  kw,
-  isSelected,
-  isCollapsed,
-  onTagSelect,
-  totalCount,
-  unreadCount,
-  colorful,
-}: {
+interface TagItemProps {
   kw: KeywordDefinition;
   isSelected: boolean;
   isCollapsed: boolean;
@@ -502,7 +502,17 @@ function TagItem({
   totalCount: number;
   unreadCount: number;
   colorful: boolean;
-}) {
+}
+
+function TagItemImpl({
+  kw,
+  isSelected,
+  isCollapsed,
+  onTagSelect,
+  totalCount,
+  unreadCount,
+  colorful,
+}: TagItemProps) {
   const t = useTranslations('notifications');
   const palette = KEYWORD_PALETTE[kw.color];
   const { isDragging: globalDragging } = useDragDropContext();
@@ -544,6 +554,10 @@ function TagItem({
     />
   );
 }
+
+// Rendered per user-defined keyword tag. memo skips re-render when only
+// unrelated sidebar state changed.
+const TagItem: React.MemoExoticComponent<(props: TagItemProps) => React.JSX.Element> = memo(TagItemImpl);
 
 function DemoBanner() {
   const t = useTranslations('sidebar');
@@ -708,22 +722,29 @@ export function Sidebar({
         debug.error('Failed to parse expanded mailboxes:', e);
       }
     } else {
+      // Accumulator-pattern recursion. Was: each recursive call built a
+      // fresh array AND the parent spread it back in (`ids.push(...rec)`)
+      // — quadratic in tree depth with the per-level array allocations.
+      // Single shared accumulator collects ids in one walk.
       const tree = buildMailboxTree(mailboxes);
-      const collectExpandable = (nodes: MailboxNode[]): string[] => {
-        const ids: string[] = [];
+      const collectExpandable = (nodes: MailboxNode[], acc: string[]): void => {
         for (const node of nodes) {
           if (node.children.length > 0) {
-            ids.push(node.id);
-            ids.push(...collectExpandable(node.children));
+            acc.push(node.id);
+            collectExpandable(node.children, acc);
           }
         }
-        return ids;
       };
-      setExpandedFolders(new Set(collectExpandable(tree)));
+      const ids: string[] = [];
+      collectExpandable(tree, ids);
+      setExpandedFolders(new Set(ids));
     }
   }, [mailboxes]);
 
-  const handleToggleExpand = (mailboxId: string) => {
+  // useCallback so MailboxTreeItem's React.memo prop check sees a stable
+  // reference — otherwise every Sidebar render gets a new function and
+  // memo breaks. setExpandedFolders is stable so empty deps is correct.
+  const handleToggleExpand = useCallback((mailboxId: string) => {
     setExpandedFolders((prev) => {
       const next = new Set(prev);
       if (next.has(mailboxId)) {
@@ -736,7 +757,7 @@ export function Sidebar({
       } catch { /* storage full or unavailable */ }
       return next;
     });
-  };
+  }, []);
 
   // Memoized so the keyboard-nav useEffect below doesn't re-install its
   // listener on every Sidebar render (mailboxTree is a dep). Also avoids
