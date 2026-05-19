@@ -3,6 +3,7 @@
 import { useCallback, useState, DragEvent } from "react";
 import { Mailbox } from "@/lib/jmap/types";
 import { useEmailStore } from "@/stores/email-store";
+import { mailboxByIdLookup } from "@/stores/email-slices/_helpers";
 import { useAuthStore } from "@/stores/auth-store";
 import { useDragDropContext } from "@/contexts/drag-drop-context";
 import { toast } from "@/stores/toast-store";
@@ -30,7 +31,9 @@ interface UseMailboxDropReturn {
 
 export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: UseMailboxDropOptions): UseMailboxDropReturn {
   const [isOver, setIsOver] = useState(false);
-  const { client } = useAuthStore();
+  // Per-field selector — was a whole-store destructure that re-rendered
+  // ~30 sidebar drop hooks on every auth-store mutation.
+  const client = useAuthStore(s => s.client);
   // Subscribe ONLY to drag-related context values that affect render
   // output (isValidTarget memo, isDropTarget flags). selectedEmailIds,
   // refreshCurrentMailbox, moveEmailsToMailbox, mailboxes, clearSelection
@@ -56,7 +59,7 @@ export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: 
     if (mailbox.isShared && dragCount > 0) {
       // Get the source mailbox's account ID from the store
       const mailboxes = useEmailStore.getState().mailboxes;
-      const sourceMb = mailboxes.find(mb => mb.id === sourceMailboxId);
+      const sourceMb = sourceMailboxId ? mailboxByIdLookup(mailboxes).get(sourceMailboxId) : undefined;
 
       // Cross-account moves are not supported
       if (sourceMb?.accountId !== mailbox.accountId) {
