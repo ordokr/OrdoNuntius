@@ -14,10 +14,8 @@ import type { CalendarEvent, Calendar, CalendarParticipant } from "@/lib/jmap/ty
 import { parseDuration, getEventColor } from "./event-card";
 import { getEventEndDate, getEventStartDate } from "@/lib/calendar-utils";
 import {
-  isOrganizer,
-  getUserParticipantId,
-  getUserStatus,
-  getParticipantList,
+  getEventParticipantSummary,
+  getUserParticipantInfo,
 } from "@/lib/calendar-participants";
 import { useFormatEventDate } from "@/hooks/use-format-event-date";
 
@@ -155,29 +153,24 @@ export function EventDetailPopover({
     return first?.uri || null;
   }, [event.virtualLocations]);
 
-  const participants = useMemo(() => getParticipantList(event), [event]);
+  // One walk: participants list (statusCounts/organizerInfo unused here).
+  const participants = useMemo(() => getEventParticipantSummary(event).list, [event]);
   const recurrenceLabel = useMemo(() => getRecurrenceLabel(event, t), [event, t]);
   const alertLabel = useMemo(() => getAlertLabel(event, t), [event, t]);
 
-  const userIsOrganizer = useMemo(() => {
-    if (!event.participants) return true;
-    return isOrganizer(event, currentUserEmails);
+  // One walk + one lowerSet build: isOrganizer + participantId + status.
+  const userInfo = useMemo(() => {
+    if (!event.participants) return { isOrganizer: true, participantId: null, status: null } as const;
+    return getUserParticipantInfo(event, currentUserEmails);
   }, [event, currentUserEmails]);
+  const userIsOrganizer = userInfo.isOrganizer;
+  const userParticipantId = userInfo.participantId;
+  const userCurrentStatus = userInfo.status;
 
   const isAttendeeMode = useMemo(() => {
     if (!event.participants) return false;
     return !event.isOrigin && !userIsOrganizer;
   }, [event, userIsOrganizer]);
-
-  const userParticipantId = useMemo(
-    () => getUserParticipantId(event, currentUserEmails),
-    [event, currentUserEmails]
-  );
-
-  const userCurrentStatus = useMemo(
-    () => getUserStatus(event, currentUserEmails),
-    [event, currentUserEmails]
-  );
 
   const formatTime = useCallback(
     (d: Date) => format(d, timeFormat === "12h" ? "h:mm a" : "HH:mm"),

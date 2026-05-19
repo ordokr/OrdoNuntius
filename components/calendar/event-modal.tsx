@@ -11,11 +11,8 @@ import { parseDuration, getEventColor } from "./event-card";
 import { buildAllDayDuration, getEventDisplayEndDate, getEventEndDate, getEventStartDate, getPrimaryCalendarId } from "@/lib/calendar-utils";
 import { ParticipantInput, type ParticipantInputHandle } from "./participant-input";
 import {
-  isOrganizer,
-  getUserParticipantId,
-  getUserStatus,
-  getParticipantList,
-  getStatusCounts,
+  getEventParticipantSummary,
+  getUserParticipantInfo,
   buildParticipantMap,
 } from "@/lib/calendar-participants";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
@@ -136,37 +133,32 @@ export function EventModal({
   const formatEventDate = useFormatEventDate();
   const [mode, setMode] = useState<"view" | "edit">(isEdit ? "view" : "edit");
 
-  const userIsOrganizer = useMemo(() => {
-    if (!event) return true;
-    if (!event.participants) return true;
-    return isOrganizer(event, currentUserEmails);
+  // Single-walk summary: list, statusCounts, organizerInfo. Replaces three
+  // separate useMemos that each walked event.participants.
+  const eventSummary = useMemo(() => {
+    if (!event) return { list: [], statusCounts: null, organizerInfo: null } as const;
+    const s = getEventParticipantSummary(event);
+    return { list: s.list, statusCounts: event.participants ? s.statusCounts : null, organizerInfo: s.organizerInfo };
+  }, [event]);
+  const existingParticipants = eventSummary.list;
+  const organizerInfo = eventSummary.organizerInfo;
+
+  // Single-walk user-relative info: isOrganizer + participantId + status.
+  // Replaces three useMemos that each rebuilt the lowerSet and re-walked.
+  const userInfo = useMemo(() => {
+    if (!event || !event.participants) {
+      return { isOrganizer: true, participantId: null, status: null } as const;
+    }
+    return getUserParticipantInfo(event, currentUserEmails);
   }, [event, currentUserEmails]);
+  const userIsOrganizer = userInfo.isOrganizer;
+  const userParticipantId = userInfo.participantId;
+  const userCurrentStatus = userInfo.status;
 
   const isAttendeeMode = useMemo(() => {
     if (!event || !event.participants) return false;
     return !event.isOrigin && !userIsOrganizer;
   }, [event, userIsOrganizer]);
-
-  const userParticipantId = useMemo(() => {
-    if (!event) return null;
-    return getUserParticipantId(event, currentUserEmails);
-  }, [event, currentUserEmails]);
-
-  const userCurrentStatus = useMemo(() => {
-    if (!event) return null;
-    return getUserStatus(event, currentUserEmails);
-  }, [event, currentUserEmails]);
-
-  const existingParticipants = useMemo(() => {
-    if (!event) return [];
-    return getParticipantList(event);
-  }, [event]);
-
-  const organizerInfo = useMemo(() => {
-    if (!event?.participants) return null;
-    const organizer = existingParticipants.find(p => p.isOrganizer);
-    return organizer ? { name: organizer.name, email: organizer.email } : null;
-  }, [event, existingParticipants]);
 
   const getInitialStart = (): Date => {
     if (event?.start) return getEventStartDate(event);
@@ -281,10 +273,7 @@ export function EventModal({
     return () => onPreviewChange(null);
   }, [startDate, startTime, endDate, endTime, allDay, title, calendarId, isEdit, onPreviewChange]);
 
-  const statusCounts = useMemo(() => {
-    if (!event?.participants) return null;
-    return getStatusCounts(event);
-  }, [event]);
+  const statusCounts = eventSummary.statusCounts;
 
   const handleAddAttendee = useCallback((p: { name: string; email: string }) => {
     setAttendees(prev => [...prev, p]);
@@ -417,7 +406,7 @@ export function EventModal({
 
     if (effectiveAttendees.length > 0 && currentUserEmails.length > 0) {
       const organizerEmail = currentUserEmails[0];
-      const organizerName = existingParticipants.find(p => p.isOrganizer)?.name || "";
+      const organizerName = organizerInfo?.name || "";
       data.participants = buildParticipantMap(
         { name: organizerName, email: organizerEmail },
         effectiveAttendees
@@ -435,7 +424,7 @@ export function EventModal({
     } finally {
       setIsSaving(false);
     }
-  }, [title, description, location, virtualLocation, startDate, startTime, endDate, endTime, allDay, calendarId, recurrence, alert, attendees, sendInvitations, currentUserEmails, existingParticipants, event, onSave, isSaving]);
+  }, [title, description, location, virtualLocation, startDate, startTime, endDate, endTime, allDay, calendarId, recurrence, alert, attendees, sendInvitations, currentUserEmails, organizerInfo, event, onSave, isSaving]);
 
   const handleRsvp = useCallback((status: CalendarParticipant['participationStatus']) => {
     if (!event || !userParticipantId || !onRsvp) return;
@@ -528,7 +517,7 @@ export function EventModal({
     const startD = getEventStartDate(event);
     const endD = getEventEndDate(event);
     const locationName = event.locations ? Object.values(event.locations)[0]?.name : null;
-    const participants = getParticipantList(event);
+    const participants = existingParticipants;
 
     return (
       <div ref={modalRef} role="dialog" aria-modal={isMobile || undefined} aria-label={event.title || t("events.no_title")} className={isMobile ? "fixed inset-0 z-50 flex flex-col bg-background" : "flex flex-col h-full bg-background"}>
@@ -640,7 +629,7 @@ export function EventModal({
     const endD = getEventEndDate(event);
     const locationName = event.locations ? Object.values(event.locations)[0]?.name || null : null;
     const virtualLoc = event.virtualLocations ? Object.values(event.virtualLocations)[0]?.uri || null : null;
-    const viewParticipants = getParticipantList(event);
+    const viewParticipants = existingParticipants;
     const recurrenceLabel = getRecurrenceLabel(event, t);
     const alertLabel = getAlertLabel(event, t);
     const eventCalendar = calendars.find(c => event.calendarIds[c.id]);
