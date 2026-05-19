@@ -60,7 +60,7 @@ export function AboutDataSettings() {
   const { settingsSyncEnabled } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { isFeatureEnabled } = usePolicyStore();
+  const isFeatureEnabled = usePolicyStore(s => s.isFeatureEnabled);
   const [showGame, setShowGame] = useState(false);
   const logoClickCount = useRef(0);
   const logoClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from 'next-intl';
+import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore, type ToolbarPosition, type MailLayout } from '@/stores/settings-store';
 import { SettingsSection, SettingItem, RadioGroup, ToggleSwitch } from './settings-section';
 import { cn } from '@/lib/utils';
@@ -115,8 +116,18 @@ function MailLayoutPreview({
 export function LayoutSettings() {
   const t = useTranslations('settings.appearance');
   const tEmail = useTranslations('settings.email_behavior');
-  const { toolbarPosition, showToolbarLabels, hideAccountSwitcher, showRailAccountList, enableUnifiedMailbox, colorfulSidebarIcons, mailLayout, updateSetting } = useSettingsStore();
-  const { isSettingLocked, isSettingHidden } = usePolicyStore();
+  const { toolbarPosition, showToolbarLabels, hideAccountSwitcher, showRailAccountList, enableUnifiedMailbox, colorfulSidebarIcons, mailLayout, updateSetting } = useSettingsStore(useShallow(s => ({
+    toolbarPosition: s.toolbarPosition,
+    showToolbarLabels: s.showToolbarLabels,
+    hideAccountSwitcher: s.hideAccountSwitcher,
+    showRailAccountList: s.showRailAccountList,
+    enableUnifiedMailbox: s.enableUnifiedMailbox,
+    colorfulSidebarIcons: s.colorfulSidebarIcons,
+    mailLayout: s.mailLayout,
+    updateSetting: s.updateSetting,
+  })));
+  const isSettingLocked = usePolicyStore(s => s.isSettingLocked);
+  const isSettingHidden = usePolicyStore(s => s.isSettingHidden);
   const accounts = useAccountStore(s => s.accounts);
 
   return (

@@ -7,8 +7,12 @@ import { usePolicyStore } from '@/stores/policy-store';
 
 export function DebugSettings() {
   const t = useTranslations('settings.advanced');
-  const { debugMode, debugCategories, updateSetting } = useSettingsStore();
-  const { isSettingLocked, isSettingHidden, isFeatureEnabled } = usePolicyStore();
+  const debugMode = useSettingsStore(s => s.debugMode);
+  const debugCategories = useSettingsStore(s => s.debugCategories);
+  const updateSetting = useSettingsStore(s => s.updateSetting);
+  const isSettingLocked = usePolicyStore(s => s.isSettingLocked);
+  const isSettingHidden = usePolicyStore(s => s.isSettingHidden);
+  const isFeatureEnabled = usePolicyStore(s => s.isFeatureEnabled);
 
   if (isSettingHidden('debugMode') || !isFeatureEnabled('debugModeEnabled')) {
     return (

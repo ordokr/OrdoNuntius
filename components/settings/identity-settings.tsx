@@ -9,7 +9,7 @@ import { useIdentityStore } from '@/stores/identity-store';
 
 export function IdentitySettings() {
   const t = useTranslations('settings.identities');
-  const { identities } = useIdentityStore();
+  const identities = useIdentityStore(s => s.identities);
   const [showModal, setShowModal] = useState(false);
 
   return (

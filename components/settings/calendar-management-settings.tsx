@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
+import { useShallow } from 'zustand/react/shallow';
 import { useCalendarStore } from '@/stores/calendar-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { getActiveAccountSlotHeaders } from '@/lib/auth/active-account-slot';
@@ -154,8 +155,24 @@ export { CalendarColorPicker, CALENDAR_COLORS };
 
 export function CalendarManagementSettings() {
   const t = useTranslations('calendar.management');
-  const { client, serverUrl, username } = useAuthStore();
-  const { calendars, updateCalendar, shareCalendar, createCalendar, removeCalendar, clearCalendarEvents, fetchCalendars, icalSubscriptions, removeICalSubscription, refreshICalSubscription, isSubscriptionCalendar } = useCalendarStore();
+  const { client, serverUrl, username } = useAuthStore(useShallow(s => ({
+    client: s.client,
+    serverUrl: s.serverUrl,
+    username: s.username,
+  })));
+  const { calendars, updateCalendar, shareCalendar, createCalendar, removeCalendar, clearCalendarEvents, fetchCalendars, icalSubscriptions, removeICalSubscription, refreshICalSubscription, isSubscriptionCalendar } = useCalendarStore(useShallow(s => ({
+    calendars: s.calendars,
+    updateCalendar: s.updateCalendar,
+    shareCalendar: s.shareCalendar,
+    createCalendar: s.createCalendar,
+    removeCalendar: s.removeCalendar,
+    clearCalendarEvents: s.clearCalendarEvents,
+    fetchCalendars: s.fetchCalendars,
+    icalSubscriptions: s.icalSubscriptions,
+    removeICalSubscription: s.removeICalSubscription,
+    refreshICalSubscription: s.refreshICalSubscription,
+    isSubscriptionCalendar: s.isSubscriptionCalendar,
+  })));
 
   const [discoveredCalDavUrls, setDiscoveredCalDavUrls] = useState<Record<string, string | null>>({});
   const [wellKnownCalDavUrl, setWellKnownCalDavUrl] = useState<string | null>(null);

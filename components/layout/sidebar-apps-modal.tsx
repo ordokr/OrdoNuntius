@@ -8,6 +8,7 @@ import { cn, generateUUID } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { IconPicker } from './icon-picker';
+import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore, type SidebarApp } from '@/stores/settings-store';
 import { useFocusTrap } from '@/hooks/use-focus-trap';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
@@ -188,7 +189,13 @@ interface SidebarAppsModalProps {
 
 export function SidebarAppsModal({ isOpen, onClose }: SidebarAppsModalProps) {
   const t = useTranslations('sidebar_apps');
-  const { sidebarApps, addSidebarApp, updateSidebarApp, removeSidebarApp } = useSettingsStore();
+  // useShallow narrows the subscription to the 4 fields actually consumed.
+  const { sidebarApps, addSidebarApp, updateSidebarApp, removeSidebarApp } = useSettingsStore(useShallow(s => ({
+    sidebarApps: s.sidebarApps,
+    addSidebarApp: s.addSidebarApp,
+    updateSidebarApp: s.updateSidebarApp,
+    removeSidebarApp: s.removeSidebarApp,
+  })));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
