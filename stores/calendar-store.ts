@@ -510,67 +510,68 @@ export const useCalendarStore = create<CalendarStore>()(
           let cleanParticipants: Record<string, CalendarParticipant> | null = null;
           if (src.participants) {
             cleanParticipants = {};
-            for (const [key, p] of Object.entries(src.participants)) {
-              const participant: Record<string, unknown> = {
-                '@type': 'Participant',
-                name: p.name,
-                email: p.email,
-                calendarAddress: p.calendarAddress,
-                description: p.description,
-                sendTo: p.sendTo,
-                kind: p.kind,
-                roles: p.roles,
-                participationStatus: p.participationStatus,
-                participationComment: p.participationComment,
-                expectReply: p.expectReply,
-                scheduleAgent: p.scheduleAgent,
-                scheduleForceSend: p.scheduleForceSend,
-                scheduleId: p.scheduleId,
-                delegatedTo: p.delegatedTo,
-                delegatedFrom: p.delegatedFrom,
-                memberOf: p.memberOf,
-                locationId: p.locationId,
-                language: p.language,
-                links: p.links,
-              };
-              for (const k in participant) {
-                if (participant[k] === undefined || participant[k] === null) delete participant[k];
-              }
+            // Was: build a 19-key object including undefined/null values,
+            // then for-in walk + delete the nullish ones. Two passes plus a
+            // raft of `delete` calls (which transition v8 objects to slow
+            // dictionary mode). Conditionally assign in one pass instead.
+            for (const key in src.participants) {
+              const p = src.participants[key];
+              const participant: Record<string, unknown> = { '@type': 'Participant' };
+              if (p.name != null) participant.name = p.name;
+              if (p.email != null) participant.email = p.email;
+              if (p.calendarAddress != null) participant.calendarAddress = p.calendarAddress;
+              if (p.description != null) participant.description = p.description;
+              if (p.sendTo != null) participant.sendTo = p.sendTo;
+              if (p.kind != null) participant.kind = p.kind;
+              if (p.roles != null) participant.roles = p.roles;
+              if (p.participationStatus != null) participant.participationStatus = p.participationStatus;
+              if (p.participationComment != null) participant.participationComment = p.participationComment;
+              if (p.expectReply != null) participant.expectReply = p.expectReply;
+              if (p.scheduleAgent != null) participant.scheduleAgent = p.scheduleAgent;
+              if (p.scheduleForceSend != null) participant.scheduleForceSend = p.scheduleForceSend;
+              if (p.scheduleId != null) participant.scheduleId = p.scheduleId;
+              if (p.delegatedTo != null) participant.delegatedTo = p.delegatedTo;
+              if (p.delegatedFrom != null) participant.delegatedFrom = p.delegatedFrom;
+              if (p.memberOf != null) participant.memberOf = p.memberOf;
+              if (p.locationId != null) participant.locationId = p.locationId;
+              if (p.language != null) participant.language = p.language;
+              if (p.links != null) participant.links = p.links;
               cleanParticipants[key] = participant as unknown as CalendarParticipant;
             }
           }
 
-          const data: Partial<CalendarEvent> = {
-            calendarIds: { [realCalendarId]: true },
-            uid: src.uid,
-            title: src.title,
-            description: src.description,
-            descriptionContentType: src.descriptionContentType,
-            start: src.start,
-            duration: src.showWithoutTime ? normalizeAllDayDuration(src.duration) : src.duration,
-            timeZone: src.showWithoutTime ? null : src.timeZone,
-            showWithoutTime: src.showWithoutTime,
-            status: src.status,
-            freeBusyStatus: src.freeBusyStatus,
-            privacy: src.privacy,
-            color: src.color,
-            keywords: src.keywords,
-            categories: src.categories,
-            locale: src.locale,
-            replyTo: src.replyTo || (src.organizerCalendarAddress ? { imip: src.organizerCalendarAddress } : undefined),
-            locations: src.locations,
-            virtualLocations: src.virtualLocations,
-            links: src.links,
-            recurrenceRules: src.recurrenceRules,
-            recurrenceOverrides: src.recurrenceOverrides,
-            excludedRecurrenceRules: src.excludedRecurrenceRules,
-            alerts: src.alerts,
-            participants: cleanParticipants,
-          };
-          for (const k in data) {
-            const v = (data as Record<string, unknown>)[k];
-            if (v === undefined || v === null) delete (data as Record<string, unknown>)[k];
-          }
+          // Same pattern as participant above — assign conditionally rather
+          // than build-then-delete. calendarIds is always set; everything
+          // else only if defined.
+          const data: Partial<CalendarEvent> = { calendarIds: { [realCalendarId]: true } };
+          const d = data as Record<string, unknown>;
+          if (src.uid != null) d.uid = src.uid;
+          if (src.title != null) d.title = src.title;
+          if (src.description != null) d.description = src.description;
+          if (src.descriptionContentType != null) d.descriptionContentType = src.descriptionContentType;
+          if (src.start != null) d.start = src.start;
+          const dur = src.showWithoutTime ? normalizeAllDayDuration(src.duration) : src.duration;
+          if (dur != null) d.duration = dur;
+          const tz = src.showWithoutTime ? null : src.timeZone;
+          if (tz != null) d.timeZone = tz;
+          if (src.showWithoutTime != null) d.showWithoutTime = src.showWithoutTime;
+          if (src.status != null) d.status = src.status;
+          if (src.freeBusyStatus != null) d.freeBusyStatus = src.freeBusyStatus;
+          if (src.privacy != null) d.privacy = src.privacy;
+          if (src.color != null) d.color = src.color;
+          if (src.keywords != null) d.keywords = src.keywords;
+          if (src.categories != null) d.categories = src.categories;
+          if (src.locale != null) d.locale = src.locale;
+          const reply = src.replyTo || (src.organizerCalendarAddress ? { imip: src.organizerCalendarAddress } : undefined);
+          if (reply != null) d.replyTo = reply;
+          if (src.locations != null) d.locations = src.locations;
+          if (src.virtualLocations != null) d.virtualLocations = src.virtualLocations;
+          if (src.links != null) d.links = src.links;
+          if (src.recurrenceRules != null) d.recurrenceRules = src.recurrenceRules;
+          if (src.recurrenceOverrides != null) d.recurrenceOverrides = src.recurrenceOverrides;
+          if (src.excludedRecurrenceRules != null) d.excludedRecurrenceRules = src.excludedRecurrenceRules;
+          if (src.alerts != null) d.alerts = src.alerts;
+          if (cleanParticipants != null) d.participants = cleanParticipants;
           prepared.push(data);
         }
 
