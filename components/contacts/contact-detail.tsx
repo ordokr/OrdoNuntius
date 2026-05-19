@@ -117,7 +117,12 @@ function formatDate(dateInput: AnniversaryDate): string {
 
 export function ContactDetail({ contact, onEdit, onDelete, onAddToGroup, onDuplicate, isMobile, className }: ContactDetailProps) {
   const t = useTranslations("contacts");
-  const smimeStore = useSmimeStore();
+  // Subscribe only to publicCerts (read for the "already imported" check
+  // per render). The import action is stable and pulled via getState() at
+  // call time. Previously `useSmimeStore()` re-rendered the detail panel
+  // on every S/MIME mutation including unrelated keyRecord changes during
+  // composing.
+  const smimePublicCerts = useSmimeStore(s => s.publicCerts);
   const [parsedCerts, setParsedCerts] = useState<Map<number, CertificateInfo>>(new Map());
 
   const cryptoKeys = contact?.cryptoKeys ? Object.values(contact.cryptoKeys) : [];
@@ -223,7 +228,7 @@ export function ContactDetail({ contact, onEdit, onDelete, onAddToGroup, onDupli
       } else {
         return;
       }
-      await smimeStore.importPublicCert(derBytes, 'contact', contact.id);
+      await useSmimeStore.getState().importPublicCert(derBytes, 'contact', contact.id);
       toast.success(t("detail.cert_imported"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("detail.cert_import_failed"));
@@ -498,8 +503,12 @@ export function ContactDetail({ contact, onEdit, onDelete, onAddToGroup, onDupli
               {cryptoKeys.map((key, i) => {
                 const certInfo = parsedCerts.get(i);
                 const isExpired = certInfo ? new Date(certInfo.notAfter) < new Date() : false;
+                // smimePublicCerts in the subscription triggers re-render when
+                // imports complete; getState().getPublicCertForEmail reads the
+                // current cert table at render time.
+                void smimePublicCerts;
                 const alreadyImported = certInfo?.emailAddresses?.[0]
-                  ? !!smimeStore.getPublicCertForEmail(certInfo.emailAddresses[0])
+                  ? !!useSmimeStore.getState().getPublicCertForEmail(certInfo.emailAddresses[0])
                   : false;
 
                 return (

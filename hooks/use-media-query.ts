@@ -58,7 +58,14 @@ export function useMediaQuery(query: string): boolean {
  * Uses Tailwind breakpoints: mobile < 768px, tablet 768-1024px, desktop > 1024px
  */
 export function useDeviceDetection() {
-  const { setDeviceType, isMobile, isTablet, isDesktop } = useUIStore();
+  // Per-field selectors instead of whole-store subscription. The previous
+  // destructure re-rendered every consumer of useDeviceDetection() (the
+  // top-level app page + email viewer) on every UI-store mutation —
+  // sidebar resize, drag-drop transitions, etc. Now only re-renders when
+  // these 3 specific booleans change.
+  const isMobile = useUIStore(s => s.isMobile);
+  const isTablet = useUIStore(s => s.isTablet);
+  const isDesktop = useUIStore(s => s.isDesktop);
 
   const isMobileQuery = useMediaQuery(`(max-width: ${BREAKPOINTS.md - 1}px)`);
   const isTabletQuery = useMediaQuery(
@@ -67,8 +74,10 @@ export function useDeviceDetection() {
   const isDesktopQuery = useMediaQuery(`(min-width: ${BREAKPOINTS.lg}px)`);
 
   useEffect(() => {
-    setDeviceType(isMobileQuery, isTabletQuery, isDesktopQuery);
-  }, [isMobileQuery, isTabletQuery, isDesktopQuery, setDeviceType]);
+    // setDeviceType is a stable zustand action ref; reading it inside
+    // the effect avoids subscribing for the action ref alone.
+    useUIStore.getState().setDeviceType(isMobileQuery, isTabletQuery, isDesktopQuery);
+  }, [isMobileQuery, isTabletQuery, isDesktopQuery]);
 
   return { isMobile, isTablet, isDesktop };
 }
