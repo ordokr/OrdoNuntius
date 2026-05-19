@@ -524,14 +524,19 @@ export const useCalendarStore = create<CalendarStore>()(
             }
           }
 
-          // Batch-link existing events to the target calendar
-          for (const { eventId, calendarIds } of eventsToLink) {
-            try {
-              await client.updateCalendarEvent(eventId, { calendarIds } as Partial<CalendarEvent>, undefined, targetAccountId);
-              linked++;
-            } catch (err) {
-              debug.warn('calendar', `Import: failed to link event ${eventId} to target calendar:`, err);
-            }
+          // Batch-link existing events to the target calendar — was
+          // sequential N×RTT during an import. Each CalendarEvent/set is
+          // independent (unique event + unique target calendar), so fire
+          // in parallel. Per-event errors are logged individually.
+          const linkResults = await Promise.allSettled(
+            eventsToLink.map(({ eventId, calendarIds }) =>
+              client.updateCalendarEvent(eventId, { calendarIds } as Partial<CalendarEvent>, undefined, targetAccountId),
+            ),
+          );
+          for (let i = 0; i < linkResults.length; i++) {
+            const r = linkResults[i];
+            if (r.status === 'fulfilled') linked++;
+            else debug.warn('calendar', `Import: failed to link event ${eventsToLink[i].eventId} to target calendar:`, r.reason);
           }
 
           if (linked > 0) {
