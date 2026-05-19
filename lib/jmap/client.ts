@@ -2,7 +2,7 @@ import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, Emai
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
-import { debug } from "@/lib/debug";
+import { debug, isDebugEnabled } from "@/lib/debug";
 import { normalizeCalendarEventLike } from "@/lib/calendar-event-normalization";
 
 export class RateLimitError extends Error {
@@ -4069,18 +4069,35 @@ export class JMAPClient implements IJMAPClient {
         }
       }
 
-      const eventsWithParticipants = filtered.filter(e => e.participants && Object.keys(e.participants).length > 0);
-      debug.log('calendar', 'queryCalendarEvents participant summary', {
-        totalEvents: filtered.length,
-        eventsWithParticipants: eventsWithParticipants.length,
-        details: eventsWithParticipants.map(e => ({
-          id: e.id,
-          title: e.title,
-          participantCount: Object.keys(e.participants!).length,
-          participants: e.participants,
-          replyTo: e.replyTo,
-        })),
-      });
+      // Guard the debug payload behind isDebugEnabled. Was: .filter +
+      // Object.keys per event + .map for `details` ran on every
+      // queryCalendarEvents call regardless of whether debug.log would emit
+      // (JS evaluates argument expressions even when the function discards
+      // them). For a 500-event range, that's ~500 keys-arrays + filter +
+      // map allocations per navigation. Skip the whole computation when
+      // the calendar debug category is off.
+      if (isDebugEnabled('calendar')) {
+        const eventsWithParticipants = filtered.filter(e => {
+          if (!e.participants) return false;
+          for (const _ in e.participants) return true;
+          return false;
+        });
+        debug.log('calendar', 'queryCalendarEvents participant summary', {
+          totalEvents: filtered.length,
+          eventsWithParticipants: eventsWithParticipants.length,
+          details: eventsWithParticipants.map(e => {
+            let count = 0;
+            for (const _ in e.participants!) count++;
+            return {
+              id: e.id,
+              title: e.title,
+              participantCount: count,
+              participants: e.participants,
+              replyTo: e.replyTo,
+            };
+          }),
+        });
+      }
 
       return filtered;
     } catch (error) {

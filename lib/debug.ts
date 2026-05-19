@@ -13,6 +13,17 @@ function isEnabled(category?: DebugCategory): boolean {
 }
 
 /**
+ * Public guard for callers that need to short-circuit expensive
+ * debug-payload computation. The debug.log/warn methods short-circuit
+ * internally but JavaScript still evaluates the argument expression, so
+ * `debug.log('foo', heavyMap())` always pays for `heavyMap()` even when
+ * disabled. Wrap that work with `if (isDebugEnabled('foo')) ...`.
+ */
+export function isDebugEnabled(category?: DebugCategory): boolean {
+  return isEnabled(category);
+}
+
+/**
  * Debug logger that respects the debugMode setting and category filters.
  * Use this instead of console.log for conditional debug output.
  *
