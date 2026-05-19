@@ -42,7 +42,8 @@ export function CalendarAgendaView({
 
   const calendarMap = useMemo(() => {
     const map = new Map<string, Calendar>();
-    calendars.forEach((c) => map.set(c.id, c));
+    // for-of avoids the per-call .forEach closure allocation.
+    for (const c of calendars) map.set(c.id, c);
     return map;
   }, [calendars]);
 

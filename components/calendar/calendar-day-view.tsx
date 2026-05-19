@@ -54,8 +54,9 @@ export function CalendarDayView({
   const dayKey = format(selectedDate, "yyyy-MM-dd");
 
   const calendarMap = useMemo(() => {
+    // for-of avoids the per-call .forEach closure allocation.
     const map = new Map<string, Calendar>();
-    calendars.forEach((c) => map.set(c.id, c));
+    for (const c of calendars) map.set(c.id, c);
     return map;
   }, [calendars]);
 
