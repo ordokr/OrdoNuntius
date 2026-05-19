@@ -640,12 +640,22 @@ export default function SettingsPage() {
   const subResultsForTab = (tabId: Tab): SubResult[] => {
     if (!trimmedQuery) return [];
     const list = tabSubResults[tabId] ?? [];
-    return list
-      .filter((r) =>
+    // Single walk with early-exit at 6 matches. Was: full .filter()
+    // walk over every sub-result (each calling toLowerCase twice per
+    // entry) followed by .slice(0, 6) that threw the rest away. With
+    // many sub-results and a keystroke-driven re-render this paid for
+    // ~94% of the work just to discard it.
+    const out: SubResult[] = [];
+    for (const r of list) {
+      if (
         r.label.toLowerCase().includes(trimmedQuery) ||
         (r.description?.toLowerCase().includes(trimmedQuery) ?? false)
-      )
-      .slice(0, 6);
+      ) {
+        out.push(r);
+        if (out.length >= 6) break;
+      }
+    }
+    return out;
   };
 
   const filteredGroupedTabs = trimmedQuery
