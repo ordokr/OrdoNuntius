@@ -1220,8 +1220,13 @@ export class JMAPClient implements IJMAPClient {
 
     if (allIds.length === 0) return 0;
 
-    // Batch update: remove old keyword, add new keyword using per-property patches
+    // Batch update: remove old keyword, add new keyword using per-property
+    // patches. Each Email/set batch targets disjoint email IDs — no
+    // contention — so parallelize. For 5000 emails at batchSize 50 that's
+    // 100 batches: sequential is ~20s at JMAP baseline RTT, parallel is
+    // ~1 RTT (bounded by the slowest batch).
     const updateBatchSize = 50;
+    const requests: Promise<unknown>[] = [];
     for (let i = 0; i < allIds.length; i += updateBatchSize) {
       const batch = allIds.slice(i, i + updateBatchSize);
       const update: Record<string, Record<string, boolean | null>> = {};
@@ -1231,14 +1236,11 @@ export class JMAPClient implements IJMAPClient {
           [`keywords/${newKeyword}`]: true,
         };
       }
-
-      await this.request([
-        ["Email/set", {
-          accountId: this.accountId,
-          update,
-        }, "0"],
-      ]);
+      requests.push(this.request([
+        ["Email/set", { accountId: this.accountId, update }, "0"],
+      ]));
     }
+    await Promise.all(requests);
 
     return allIds.length;
   }
@@ -3461,20 +3463,23 @@ export class JMAPClient implements IJMAPClient {
 
     if (allIds.length === 0) return [];
 
-    // Batch ContactCard/get to respect maxObjectsInGet
-    const allContacts: ContactCard[] = [];
+    // Batch ContactCard/get to respect maxObjectsInGet. Each batch is
+    // independent — parallelize. For an account with 10k contacts and a
+    // server batch size of 500 that's 20 sequential RTTs → 1 RTT.
+    const batchPromises: Promise<ContactCard[]>[] = [];
     for (let i = 0; i < allIds.length; i += batchSize) {
       const chunk = allIds.slice(i, i + batchSize);
-      const response = await this.request([
-        ["ContactCard/get", { accountId, ids: chunk }, "g"],
-      ], this.contactUsing());
-
-      if (response.methodResponses?.[0]?.[0] === "ContactCard/get") {
-        const list = (response.methodResponses[0][1].list || []) as ContactCard[];
-        allContacts.push(...list);
-      }
+      batchPromises.push((async () => {
+        const response = await this.request([
+          ["ContactCard/get", { accountId, ids: chunk }, "g"],
+        ], this.contactUsing());
+        if (response.methodResponses?.[0]?.[0] !== "ContactCard/get") return [];
+        return (response.methodResponses[0][1].list || []) as ContactCard[];
+      })());
     }
-
+    const batches = await Promise.all(batchPromises);
+    const allContacts: ContactCard[] = [];
+    for (const batch of batches) allContacts.push(...batch);
     return allContacts;
   }
 
@@ -3854,27 +3859,33 @@ export class JMAPClient implements IJMAPClient {
     const ids: string[] = queryResponse.methodResponses?.[0]?.[1]?.ids || [];
     if (ids.length === 0) return [];
 
-    // Batch the /get calls to stay within server max-objects limit
-    const allEvents: CalendarEvent[] = [];
+    // Parallel batch /get. Same pattern as queryCalendarEvents below —
+    // each batch is independent so fire them all and Promise.all the
+    // settles. Fused filter+map at the end to skip an extra alloc.
+    const batchPromises: Promise<CalendarEvent[]>[] = [];
     for (let i = 0; i < ids.length; i += GET_BATCH_SIZE) {
       const batchIds = ids.slice(i, i + GET_BATCH_SIZE);
-      const getResponse = await this.request([
-        ["CalendarEvent/get", {
-          accountId,
-          properties: [...CALENDAR_EVENT_PROPERTIES],
-          ids: batchIds,
-        }, "0"]
-      ], this.calendarUsing());
+      batchPromises.push((async () => {
+        const getResponse = await this.request([
+          ["CalendarEvent/get", {
+            accountId,
+            properties: [...CALENDAR_EVENT_PROPERTIES],
+            ids: batchIds,
+          }, "0"]
+        ], this.calendarUsing());
+        if (getResponse.methodResponses?.[0]?.[0] !== "CalendarEvent/get") return [];
+        return (getResponse.methodResponses[0][1].list || []) as CalendarEvent[];
+      })());
+    }
+    const batches = await Promise.all(batchPromises);
 
-      if (getResponse.methodResponses?.[0]?.[0] === "CalendarEvent/get") {
-        const events = (getResponse.methodResponses[0][1].list || []) as CalendarEvent[];
-        allEvents.push(...events);
+    const filtered: CalendarEvent[] = [];
+    for (const batch of batches) {
+      for (const event of batch) {
+        if (!isTaskObject(event)) filtered.push(normalizeCalendarEventLike(event));
       }
     }
-
-    return allEvents
-      .filter((event) => !isTaskObject(event))
-      .map((event) => normalizeCalendarEventLike(event));
+    return filtered;
   }
 
   async queryAllCalendarEvents(
@@ -3956,27 +3967,37 @@ export class JMAPClient implements IJMAPClient {
       const ids: string[] = queryResponse.methodResponses?.[0]?.[1]?.ids || [];
       if (ids.length === 0) return [];
 
-      // Batch the /get calls to stay within server max-objects limit
-      const allEvents: CalendarEvent[] = [];
+      // Batch the /get calls to stay within server max-objects limit.
+      // Each batch is independent — parallelize. Was: N/B sequential
+      // RTTs (e.g. 20 sequential calls for 10k events with batch 500).
+      // Pre-compute slice indices, then fire all batch fetches in
+      // parallel. Server is the same connection — JMAP servers tolerate
+      // pipelined requests within one HTTP/2 stream.
+      const batchPromises: Promise<CalendarEvent[]>[] = [];
       for (let i = 0; i < ids.length; i += GET_BATCH_SIZE) {
         const batchIds = ids.slice(i, i + GET_BATCH_SIZE);
-        const getResponse = await this.request([
-          ["CalendarEvent/get", {
-            accountId,
-            properties: [...CALENDAR_EVENT_PROPERTIES],
-            ids: batchIds,
-          }, "0"]
-        ], this.calendarUsing());
+        batchPromises.push((async () => {
+          const getResponse = await this.request([
+            ["CalendarEvent/get", {
+              accountId,
+              properties: [...CALENDAR_EVENT_PROPERTIES],
+              ids: batchIds,
+            }, "0"]
+          ], this.calendarUsing());
+          if (getResponse.methodResponses?.[0]?.[0] !== "CalendarEvent/get") return [];
+          return (getResponse.methodResponses[0][1].list || []) as CalendarEvent[];
+        })());
+      }
+      const batches = await Promise.all(batchPromises);
 
-        if (getResponse.methodResponses?.[0]?.[0] === "CalendarEvent/get") {
-          const events = (getResponse.methodResponses[0][1].list || []) as CalendarEvent[];
-          allEvents.push(...events);
+      // Fused filter+map. Was two chained array allocations
+      // (`.filter(...).map(...)`) over a possibly-large allEvents array.
+      const filtered: CalendarEvent[] = [];
+      for (const batch of batches) {
+        for (const event of batch) {
+          if (!isTaskObject(event)) filtered.push(normalizeCalendarEventLike(event));
         }
       }
-
-      const filtered = allEvents
-        .filter((event) => !isTaskObject(event))
-        .map((event) => normalizeCalendarEventLike(event));
 
       const eventsWithParticipants = filtered.filter(e => e.participants && Object.keys(e.participants).length > 0);
       debug.log('calendar', 'queryCalendarEvents participant summary', {
