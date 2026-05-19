@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { CalendarTask } from '@/lib/jmap/types';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
-import { debug } from '@/lib/debug';
+import { debug, isDebugEnabled } from '@/lib/debug';
 
 export type TaskViewFilter = 'all' | 'pending' | 'completed' | 'overdue';
 
@@ -42,13 +42,20 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     try {
       const tasks = await client.getCalendarTasks(calendarIds);
       debug.log('tasks', 'TaskStore/fetchTasks received', tasks.length, 'tasks');
-      tasks.forEach((t, i) => {
-        debug.log('tasks', `TaskStore/fetchTasks [${i}]`, {
-          id: t.id, uid: t.uid, '@type': t['@type'],
-          title: t.title, due: t.due, progress: t.progress,
-          showWithoutTime: t.showWithoutTime, calendarIds: t.calendarIds,
-        });
-      });
+      // Guard per-task debug payload behind isDebugEnabled. The forEach
+      // and per-task object literal allocation ran regardless of whether
+      // the tasks-debug category was on. With a 1000-task fetch that's
+      // 1000 object literals per refetch.
+      if (isDebugEnabled('tasks')) {
+        for (let i = 0; i < tasks.length; i++) {
+          const t = tasks[i];
+          debug.log('tasks', `TaskStore/fetchTasks [${i}]`, {
+            id: t.id, uid: t.uid, '@type': t['@type'],
+            title: t.title, due: t.due, progress: t.progress,
+            showWithoutTime: t.showWithoutTime, calendarIds: t.calendarIds,
+          });
+        }
+      }
       set({ tasks, isLoading: false });
     } catch (error) {
       debug.error('TaskStore/fetchTasks failed', error);

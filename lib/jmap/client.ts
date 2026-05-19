@@ -4154,15 +4154,24 @@ export class JMAPClient implements IJMAPClient {
     cleanRecurrenceRules(cleanEvent as unknown as Record<string, unknown>);
 
     debug.group('CalendarEvent/create', 'calendar');
-    debug.log('calendar', 'CalendarEvent/create outgoing payload', {
-      accountId,
-      sendSchedulingMessages,
-      eventKeys: Object.keys(cleanEvent),
-      hasParticipants: !!cleanEvent.participants,
-      participantCount: cleanEvent.participants ? Object.keys(cleanEvent.participants).length : 0,
-      participants: cleanEvent.participants || null,
-      replyTo: cleanEvent.replyTo || null,
-    });
+    // Guard the payload computation behind isDebugEnabled — the
+    // Object.keys + participant count walks ran regardless of whether
+    // calendar-debug was on.
+    if (isDebugEnabled('calendar')) {
+      let participantCount = 0;
+      if (cleanEvent.participants) {
+        for (const _ in cleanEvent.participants) participantCount++;
+      }
+      debug.log('calendar', 'CalendarEvent/create outgoing payload', {
+        accountId,
+        sendSchedulingMessages,
+        eventKeys: Object.keys(cleanEvent),
+        hasParticipants: !!cleanEvent.participants,
+        participantCount,
+        participants: cleanEvent.participants || null,
+        replyTo: cleanEvent.replyTo || null,
+      });
+    }
 
     const setArgs: Record<string, unknown> = {
       accountId,
