@@ -146,8 +146,17 @@ export default function ContactsPage() {
     },
   });
 
-  const groups = useMemo(() => contacts.filter(c => c.kind === 'group'), [contacts]);
-  const individuals = useMemo(() => contacts.filter(c => c.kind !== 'group'), [contacts]);
+  // Single split walk instead of two separate filters. For a 5000-contact
+  // list that's one pass (5000 ops) instead of two (10000 ops).
+  const { groups, individuals } = useMemo(() => {
+    const groupsAcc: typeof contacts = [];
+    const individualsAcc: typeof contacts = [];
+    for (const c of contacts) {
+      if (c.kind === 'group') groupsAcc.push(c);
+      else individualsAcc.push(c);
+    }
+    return { groups: groupsAcc, individuals: individualsAcc };
+  }, [contacts]);
   // Memoize the find — the contacts page re-renders on every keystroke
   // in the search bar; without memo each typed character re-scans the
   // entire contact list twice.
