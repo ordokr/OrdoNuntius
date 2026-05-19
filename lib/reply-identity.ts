@@ -103,15 +103,18 @@ export function resolveReplyFrom(
     return null;
   }
 
-  const received: { email: string; name: string | undefined }[] = [
-    ...(recipients.to || []),
-    ...(recipients.cc || []),
-    ...(recipients.bcc || []),
-  ].flatMap((r) => {
-    const email = r.email?.trim();
-    if (!email) return [];
-    return [{ email, name: r.name?.trim() || undefined }];
-  });
+  // Was three spread copies + flatMap returning [] or [{...}] per recipient.
+  // Direct walk over to/cc/bcc lists with conditional push drops all three
+  // intermediate arrays + the per-recipient one-or-zero array.
+  const received: { email: string; name: string | undefined }[] = [];
+  for (const list of [recipients.to, recipients.cc, recipients.bcc]) {
+    if (!list) continue;
+    for (const r of list) {
+      const email = r.email?.trim();
+      if (!email) continue;
+      received.push({ email, name: r.name?.trim() || undefined });
+    }
+  }
 
   if (received.length === 0) {
     return null;

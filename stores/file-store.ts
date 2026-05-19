@@ -639,7 +639,13 @@ export const useFileStore = create<FileState>((set, get) => ({
           .then(() => ({ id: resource.id, from: { name: resource.serverName }, to: { name: newServerName } }));
       }),
     );
-    const entries: Entry[] = settled.flatMap(r => r.status === 'fulfilled' && r.value ? [r.value] : []);
+    // Was `.flatMap(r => fulfilled ? [r.value] : [])` — allocates a
+    // per-result one-or-zero array AND the outer flatMap array. Direct
+    // push: N saved sub-arrays for an N-item move.
+    const entries: Entry[] = [];
+    for (const r of settled) {
+      if (r.status === 'fulfilled' && r.value) entries.push(r.value);
+    }
     set({
       selectedResources: new Set(),
       lastAction: { type: 'move', entries, sourceParentId: null },
@@ -671,7 +677,11 @@ export const useFileStore = create<FileState>((set, get) => ({
           .then(() => ({ id: resource.id, from: { name: resource.serverName }, to: { name: newServerName } }));
       }),
     );
-    const entries: Entry[] = settled.flatMap(r => r.status === 'fulfilled' && r.value ? [r.value] : []);
+    // Same single-pass push fusion as moveToFolder.
+    const entries: Entry[] = [];
+    for (const r of settled) {
+      if (r.status === 'fulfilled' && r.value) entries.push(r.value);
+    }
     set({
       selectedResources: new Set(),
       lastAction: { type: 'move', entries, sourceParentId: null },
@@ -711,7 +721,11 @@ export const useFileStore = create<FileState>((set, get) => ({
           return client.updateFileNode(id, { name: newServerName }).then(() => entry);
         }),
       );
-      const entries: Entry[] = settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : []);
+      // Same fusion as moveToFolder.
+      const entries: Entry[] = [];
+      for (const r of settled) {
+        if (r.status === 'fulfilled') entries.push(r.value);
+      }
       set({
         clipboard: null,
         lastAction: { type: 'move', entries, sourceParentId: null },

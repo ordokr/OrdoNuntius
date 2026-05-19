@@ -567,9 +567,13 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
             })),
           ),
         );
-        const built: UnifiedAccountClient[] = settled.flatMap(r =>
-          r.status === 'fulfilled' ? [r.value] : [],
-        );
+        // Single-pass push avoids per-result one-or-zero array + the
+        // flatMap outer array. With N=2-5 accounts, savings are small but
+        // applied consistently across all settled-collecting code.
+        const built: UnifiedAccountClient[] = [];
+        for (const r of settled) {
+          if (r.status === 'fulfilled') built.push(r.value);
+        }
         const result = await fetchUnifiedEmails(built, unifiedRole, emailsPerPage, position);
         const currentEmails = get().emails;
         const existingIds = new Set(currentEmails.map(e => e.id));

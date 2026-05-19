@@ -392,7 +392,12 @@ export const useWebDAVStore = create<WebDAVState>((set, get) => ({
       const newPath = `${targetBase}/${name}`;
       return webdavClient.move(oldPath, newPath).then(() => ({ from: oldPath, to: newPath }));
     }));
-    const entries: Entry[] = settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : []);
+    // Single-pass push instead of `flatMap(r => fulfilled ? [r.value] : [])`
+    // — drops the per-result one-or-zero array and the outer flatMap array.
+    const entries: Entry[] = [];
+    for (const r of settled) {
+      if (r.status === 'fulfilled') entries.push(r.value);
+    }
     set({ selectedResources: new Set(), lastAction: { type: 'move', entries, sourcePath: currentPath } });
     await refresh();
   },
@@ -421,7 +426,11 @@ export const useWebDAVStore = create<WebDAVState>((set, get) => ({
         const destPath = currentPath === '/' ? `/${clipboard.names[i]}` : `${currentPath}/${clipboard.names[i]}`;
         return webdavClient.move(srcPath, destPath).then(() => ({ from: srcPath, to: destPath }));
       }));
-      const entries: Entry[] = settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : []);
+      // Same fusion as moveToFolder.
+      const entries: Entry[] = [];
+      for (const r of settled) {
+        if (r.status === 'fulfilled') entries.push(r.value);
+      }
       set({ clipboard: null, lastAction: { type: 'move', entries, sourcePath: currentPath } });
     } else {
       await Promise.allSettled(clipboard.paths.map((srcPath, i) => {
