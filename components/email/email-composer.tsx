@@ -616,7 +616,10 @@ export function EmailComposer({
       clearTimeout(autocompleteTimeoutRef.current);
     }
 
-    const lastPart = value.split(',').pop()?.trim() || '';
+    // lastIndexOf+slice avoids the split-into-array allocation just to
+    // read the final segment. Runs per keystroke in the recipient fields.
+    const lastSep = value.lastIndexOf(',');
+    const lastPart = (lastSep === -1 ? value : value.slice(lastSep + 1)).trim();
     if (lastPart.length < 1) {
       setAutocompleteResults([]);
       setActiveAutoField(null);
