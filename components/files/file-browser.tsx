@@ -80,11 +80,19 @@ interface FileBrowserProps {
   detailResource: FileResource | null;
 }
 
+// Shared extension extractor — lastIndexOf+slice avoids the throwaway
+// split-array per isXFile call. Twelve+ checks happen per visible file
+// (see getFileIconByName), so this matters during folder rendering.
+function fileExt(name: string): string {
+  const dot = name.lastIndexOf('.');
+  if (dot === -1 || dot === name.length - 1) return '';
+  return name.slice(dot + 1).toLowerCase();
+}
+
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "svg", "webp", "bmp", "ico", "avif"]);
 
 function isImageFile(name: string): boolean {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  return IMAGE_EXTENSIONS.has(ext);
+  return IMAGE_EXTENSIONS.has(fileExt(name));
 }
 
 const TEXT_EXTENSIONS = new Set([
@@ -95,34 +103,28 @@ const TEXT_EXTENSIONS = new Set([
   "swift", "kt", "scala", "r", "lua", "vim",
 ]);
 
+const TEXT_BASENAMES = new Set(["dockerfile", "makefile", "readme", "license", "changelog"]);
 function isTextFile(name: string): boolean {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  const baseName = name.toLowerCase();
-  return TEXT_EXTENSIONS.has(ext) || ["dockerfile", "makefile", "readme", "license", "changelog"].includes(baseName);
+  return TEXT_EXTENSIONS.has(fileExt(name)) || TEXT_BASENAMES.has(name.toLowerCase());
 }
 
 const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "flac", "aac", "m4a", "wma", "opus"]);
 function isAudioFile(name: string): boolean {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  return AUDIO_EXTENSIONS.has(ext);
+  return AUDIO_EXTENSIONS.has(fileExt(name));
 }
 
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "ogv", "mov", "avi", "mkv", "m4v"]);
 function isVideoFile(name: string): boolean {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  return VIDEO_EXTENSIONS.has(ext);
+  return VIDEO_EXTENSIONS.has(fileExt(name));
 }
 
-const PDF_EXTENSIONS = new Set(["pdf"]);
 function isPdfFile(name: string): boolean {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  return PDF_EXTENSIONS.has(ext);
+  return fileExt(name) === 'pdf';
 }
 
 const VECTOR_EXTENSIONS = new Set(["svg", "ai", "eps", "ps", "sketch", "fig", "xd", "gvdesign"]);
 function isVectorFile(name: string): boolean {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  return VECTOR_EXTENSIONS.has(ext);
+  return VECTOR_EXTENSIONS.has(fileExt(name));
 }
 
 const THREE_D_EXTENSIONS = new Set([
@@ -131,8 +133,7 @@ const THREE_D_EXTENSIONS = new Set([
   "c4d", "max", "ma", "mb", "dwg", "dxf",
 ]);
 function is3DFile(name: string): boolean {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  return THREE_D_EXTENSIONS.has(ext);
+  return THREE_D_EXTENSIONS.has(fileExt(name));
 }
 
 const EXECUTABLE_EXTENSIONS = new Set([
@@ -140,8 +141,7 @@ const EXECUTABLE_EXTENSIONS = new Set([
   "bat", "cmd", "com", "scr", "ps1", "apk", "ipa", "jar", "run",
 ]);
 function isExecutableFile(name: string): boolean {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  return EXECUTABLE_EXTENSIONS.has(ext);
+  return EXECUTABLE_EXTENSIONS.has(fileExt(name));
 }
 
 const ARCHIVE_EXTENSIONS = new Set([
@@ -149,32 +149,27 @@ const ARCHIVE_EXTENSIONS = new Set([
   "tgz", "tbz2", "txz", "cab", "iso", "img",
 ]);
 function isArchiveFile(name: string): boolean {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  return ARCHIVE_EXTENSIONS.has(ext);
+  return ARCHIVE_EXTENSIONS.has(fileExt(name));
 }
 
 const SPREADSHEET_EXTENSIONS = new Set(["xls", "xlsx", "ods", "numbers", "tsv"]);
 function isSpreadsheetFile(name: string): boolean {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  return SPREADSHEET_EXTENSIONS.has(ext);
+  return SPREADSHEET_EXTENSIONS.has(fileExt(name));
 }
 
 const PRESENTATION_EXTENSIONS = new Set(["ppt", "pptx", "odp", "key"]);
 function isPresentationFile(name: string): boolean {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  return PRESENTATION_EXTENSIONS.has(ext);
+  return PRESENTATION_EXTENSIONS.has(fileExt(name));
 }
 
 const FONT_EXTENSIONS = new Set(["ttf", "otf", "woff", "woff2", "eot"]);
 function isFontFile(name: string): boolean {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  return FONT_EXTENSIONS.has(ext);
+  return FONT_EXTENSIONS.has(fileExt(name));
 }
 
 const DATABASE_EXTENSIONS = new Set(["db", "sqlite", "sqlite3", "mdb", "accdb"]);
 function isDatabaseFile(name: string): boolean {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  return DATABASE_EXTENSIONS.has(ext);
+  return DATABASE_EXTENSIONS.has(fileExt(name));
 }
 
 function isPreviewable(name: string): boolean {
