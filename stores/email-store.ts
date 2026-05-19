@@ -930,17 +930,23 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
           // Counters: revert just the touched mailboxes. Other
           // mailboxes may have had unrelated mutations meanwhile, so
           // pull from `state.mailboxes` not the snapshot.
-          mailboxes: state.mailboxes.map(mailbox => {
-            const prevMb = prevMailboxes.find(pm => pm.id === mailbox.id);
-            if (!prevMb) return mailbox;
-            if (!email.mailboxIds || !email.mailboxIds[mailbox.id]) return mailbox;
-            const delta = read ? 1 : -1; // reverse of optimistic delta
-            return {
-              ...mailbox,
-              unreadEmails: Math.max(0, mailbox.unreadEmails + delta),
-              unreadThreads: Math.max(0, mailbox.unreadThreads + delta),
-            };
-          }),
+          // O(1) prev lookup by id — was `.find(pm => pm.id === ...)` per
+          // mailbox, i.e. O(N×M) for N current and M prev mailboxes.
+          mailboxes: (() => {
+            const prevById = new Map<string, typeof prevMailboxes[number]>();
+            for (const pm of prevMailboxes) prevById.set(pm.id, pm);
+            return state.mailboxes.map(mailbox => {
+              const prevMb = prevById.get(mailbox.id);
+              if (!prevMb) return mailbox;
+              if (!email.mailboxIds || !email.mailboxIds[mailbox.id]) return mailbox;
+              const delta = read ? 1 : -1; // reverse of optimistic delta
+              return {
+                ...mailbox,
+                unreadEmails: Math.max(0, mailbox.unreadEmails + delta),
+                unreadThreads: Math.max(0, mailbox.unreadThreads + delta),
+              };
+            });
+          })(),
           error: error instanceof Error ? error.message : "Failed to update email",
         };
       });

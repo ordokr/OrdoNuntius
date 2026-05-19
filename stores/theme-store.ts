@@ -350,8 +350,14 @@ export const useThemeStore = create<ThemeState>()(
             // race (the duplicate check at the install branch handles the
             // (rare) case where the same theme would be added twice).
             const snapshot = get().installedThemes;
+            // O(1) lookup by id. Was `.find(t => t.id === st.id)` per
+            // serverTheme — O(N×M). With N=50 servers and M=100 installed
+            // that's 5000 walks just for the local lookup. One Map build
+            // (O(M)) collapses the whole thing to O(N + M).
+            const snapshotById = new Map<string, typeof snapshot[number]>();
+            for (const t of snapshot) snapshotById.set(t.id, t);
             await Promise.all(serverThemes.map(async (st) => {
-              const local = snapshot.find(t => t.id === st.id);
+              const local = snapshotById.get(st.id);
 
               if (!local) {
                 const css = await downloadThemeCSS(st.id);
