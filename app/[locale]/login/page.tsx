@@ -290,8 +290,9 @@ export default function LoginPage() {
     }
 
     if (formData.username && savedUsernames.length > 0) {
+      const queryLower = formData.username.toLowerCase();
       const filtered = savedUsernames.filter(username =>
-        username.toLowerCase().includes(formData.username.toLowerCase())
+        username.toLowerCase().includes(queryLower)
       );
       setFilteredSuggestions(filtered);
       setShowSuggestions(filtered.length > 0);
@@ -473,9 +474,8 @@ export default function LoginPage() {
     const updated = savedUsernames.filter(u => u !== username);
     localStorage.setItem("webmail_usernames", JSON.stringify(updated));
     setSavedUsernames(updated);
-    setFilteredSuggestions(updated.filter(u =>
-      u.toLowerCase().includes(formData.username.toLowerCase())
-    ));
+    const queryLower = formData.username.toLowerCase();
+    setFilteredSuggestions(updated.filter(u => u.toLowerCase().includes(queryLower)));
   };
 
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
