@@ -317,15 +317,17 @@ function buildParticipantsForRsvp(
     return null;
   }
 
-  return Object.fromEntries(
-    Object.entries(event.participants).map(([id, participant]) => [
-      id,
-      {
-        ...participant,
-        participationStatus: id === participantId ? status : participant.participationStatus,
-      },
-    ]),
-  );
+  // Direct construction beats Object.entries+map+fromEntries: drops the
+  // tuples-array + per-tuple sub-array + final fromEntries allocation. Also
+  // skips the unnecessary shallow-copy on participants whose status isn't
+  // changing — only the target id needs a new object.
+  const participants = event.participants;
+  const result: Record<string, NonNullable<CalendarEvent['participants']>[string]> = {};
+  for (const id in participants) {
+    const p = participants[id];
+    result[id] = id === participantId ? { ...p, participationStatus: status } : p;
+  }
+  return result;
 }
 
 function getMethodIconTone(method: InvitationMethod, actorStatus?: string | null): string {

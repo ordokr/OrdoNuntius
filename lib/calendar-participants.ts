@@ -79,22 +79,25 @@ export function getUserStatus(
 
 export function getParticipantList(event: CalendarEvent): ParticipantInfo[] {
   if (!event.participants) return [];
-  return Object.entries(event.participants).map(([id, p]) => {
+  // for...in over the Record avoids the Object.entries tuples-array
+  // allocation. Hot enough — called from invitation banner + ICS export
+  // paths in addition to UI lists.
+  const list: ParticipantInfo[] = [];
+  const participants = event.participants;
+  for (const id in participants) {
+    const p = participants[id];
     let email = p.email || '';
-    if (!email && p.calendarAddress) {
-      email = p.calendarAddress.replace(/^mailto:/i, '');
-    }
-    if (!email && p.sendTo?.imip) {
-      email = p.sendTo.imip.replace(/^mailto:/i, '');
-    }
-    return {
+    if (!email && p.calendarAddress) email = p.calendarAddress.replace(/^mailto:/i, '');
+    if (!email && p.sendTo?.imip) email = p.sendTo.imip.replace(/^mailto:/i, '');
+    list.push({
       id,
       name: p.name || '',
       email,
       status: p.participationStatus || 'needs-action',
       isOrganizer: !!p.roles?.owner,
-    };
-  });
+    });
+  }
+  return list;
 }
 
 export function getStatusCounts(event: CalendarEvent): StatusCounts {
