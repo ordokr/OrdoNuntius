@@ -196,13 +196,19 @@ export const createPushSlice: StateCreator<
       // Merge the refreshed first page with the existing loaded emails so
       // already-loaded pages aren't discarded (would cause the virtual
       // list to shrink then rapidly re-load — visible "scroll bounce").
-      const merged: Email[] = [...result.emails];
-      const mergedIds = new Set(result.emails.map(e => e.id));
+      // Single-pass build: drops the `[...result.emails]` spread (one array
+      // allocation) and the `result.emails.map(e => e.id)` ids-array
+      // (another). Push + Set.add in lockstep.
+      const merged: Email[] = [];
+      const mergedIds = new Set<string>();
+      for (const e of result.emails) {
+        merged.push(e);
+        mergedIds.add(e.id);
+      }
       for (const email of currentEmails) {
-        if (!mergedIds.has(email.id)) {
-          merged.push(email);
-          mergedIds.add(email.id);
-        }
+        if (mergedIds.has(email.id)) continue;
+        merged.push(email);
+        mergedIds.add(email.id);
       }
 
       // Skip the state update entirely when nothing changed — avoids a

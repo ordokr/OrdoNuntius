@@ -110,7 +110,11 @@ export const createUnifiedSlice: StateCreator<
       const result = await fetchUnifiedEmailsLib(accounts, unifiedRole, emailsPerPage, position);
 
       const currentEmails = get().emails;
-      const existingIds = new Set(currentEmails.map(e => e.id));
+      // Direct Set build avoids the `.map(e => e.id)` ids-array allocation
+      // (drops one O(N) intermediate). filter still allocates newEmails as
+      // its callers need it as an array.
+      const existingIds = new Set<string>();
+      for (const e of currentEmails) existingIds.add(e.id);
       const newEmails = result.emails.filter(e => !existingIds.has(e.id));
 
       set({
