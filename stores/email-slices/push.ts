@@ -29,6 +29,7 @@ import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { SearchFilters, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useCalendarStore } from "@/stores/calendar-store";
+import { mailboxByIdLookup } from "@/stores/email-slices/_helpers";
 
 // Fast equality for `keywords: Record<string, boolean>`. Avoids the
 // JSON.stringify pair previously used in refreshCurrentMailbox — that
@@ -165,7 +166,7 @@ export const createPushSlice: StateCreator<
 
     try {
       const mailboxes = get().mailboxes;
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      const mailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
       const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
       const jmapMailboxId = mailbox?.originalId || selectedMailbox;
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;

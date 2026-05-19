@@ -21,6 +21,7 @@
 import { type StateCreator } from "zustand";
 import type { Email, Mailbox } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
+import { mailboxByIdLookup } from "@/stores/email-slices/_helpers";
 
 const MAX_THREAD_CACHE = 64;
 
@@ -76,7 +77,7 @@ export const createThreadSlice: StateCreator<
     set({ isLoadingThread: threadId });
 
     try {
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      const mailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
       const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
 
       const emails = await client.getThreadEmails(threadId, accountId);

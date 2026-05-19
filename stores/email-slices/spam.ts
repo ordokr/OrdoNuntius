@@ -21,7 +21,7 @@
 import { type StateCreator } from "zustand";
 import type { Email, Mailbox } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
-import { getNextSelectedEmail } from "./_helpers";
+import { getNextSelectedEmail, mailboxByIdLookup } from "./_helpers";
 
 interface SpamUndoEntry {
   emailId: string;
@@ -57,7 +57,7 @@ export const createSpamSlice: StateCreator<
     const email = emails.find(e => e.id === emailId);
     if (!email) return;
 
-    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+    const currentMailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
     if (!currentMailbox) return;
 
     // Stash the original location BEFORE the server call so a fast
@@ -105,7 +105,7 @@ export const createSpamSlice: StateCreator<
     } else {
       // Generic "not spam" gesture from the spam folder: no original
       // mailbox known, fall back to inbox in the same account.
-      const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+      const currentMailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
       accountId = currentMailbox?.accountId;
 
       const inboxMailbox = mailboxes.find(m =>
@@ -127,7 +127,7 @@ export const createSpamSlice: StateCreator<
 
   batchMarkAsSpam: async (client, emailIds) => {
     const { selectedMailbox, mailboxes } = get();
-    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+    const currentMailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
     if (!currentMailbox) return;
 
     // Was N sequential `client.markAsSpam(emailId)` calls — each one
@@ -162,7 +162,7 @@ export const createSpamSlice: StateCreator<
 
   batchUndoSpam: async (client, emailIds) => {
     const { mailboxes, selectedMailbox } = get();
-    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+    const currentMailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
     const accountId = currentMailbox?.accountId;
 
     const inboxMailbox = mailboxes.find(m =>

@@ -26,6 +26,7 @@ import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter } from "@/lib/jm
 import { emailHooks } from "@/lib/plugin-hooks";
 import type { ExternalSearchResult } from "@/lib/plugin-types";
 import { useSettingsStore } from "@/stores/settings-store";
+import { mailboxByIdLookup } from "@/stores/email-slices/_helpers";
 
 export interface SearchSlice {
   searchFilters: SearchFilters;
@@ -65,7 +66,7 @@ export const createSearchSlice: StateCreator<
     set({ isLoading: true, error: null, searchQuery: query, emails: [], hasMoreEmails: false, totalEmails: 0 });
     try {
       const { selectedMailbox, mailboxes, searchFilters } = get();
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      const mailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
       const jmapMailboxId = mailbox?.originalId || selectedMailbox;
       const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
@@ -119,7 +120,7 @@ export const createSearchSlice: StateCreator<
     });
 
     try {
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      const mailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
       const jmapMailboxId = mailbox?.originalId || selectedMailbox;
       const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
 
