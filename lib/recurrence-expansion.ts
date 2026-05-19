@@ -76,6 +76,8 @@ function expandEvent(
   const overrides = master.recurrenceOverrides || {};
   const occurrences: CalendarEvent[] = [];
   const seenDates = new Set<string>();
+  // Compute master UTC offset/duration once instead of per-occurrence.
+  const utcInfo = computeMasterUtcOffset(master);
 
   for (const rule of rules) {
     const dates = generateDates(eventStart, rule, rangeStart, rangeEnd);
@@ -94,7 +96,7 @@ function expandEvent(
       const override = overrides[recurrenceId] as (Partial<CalendarEvent> & { excluded?: boolean }) | undefined;
       if (override?.excluded) continue;
 
-      occurrences.push(createOccurrence(master, date, recurrenceId, override));
+      occurrences.push(createOccurrence(master, date, recurrenceId, override, utcInfo));
     }
   }
 
@@ -115,42 +117,48 @@ function expandEvent(
     if (seenDates.has(dateKey)) continue;
     seenDates.add(dateKey);
 
-    occurrences.push(createOccurrence(master, overrideDate, recurrenceId, override));
+    occurrences.push(createOccurrence(master, overrideDate, recurrenceId, override, utcInfo));
   }
 
   return occurrences;
+}
+
+// Precomputed UTC-offset data shared across createOccurrence calls for the
+// same master. Hoisting this out of createOccurrence saves 2-3 parseISO
+// calls per occurrence in expandEvent (which can produce hundreds for a
+// daily recurrence spanning a month view).
+interface UtcOffsetInfo {
+  offsetMs: number;
+  durationMs: number | null;
+}
+function computeMasterUtcOffset(master: CalendarEvent): UtcOffsetInfo | null {
+  if (master.showWithoutTime || !master.utcStart || !master.start) return null;
+  const masterLocal = parseISO(master.start);
+  const masterUtc = parseISO(master.utcStart);
+  const offsetMs = masterUtc.getTime() - masterLocal.getTime();
+  let durationMs: number | null = null;
+  if (master.utcEnd) {
+    const masterUtcEnd = parseISO(master.utcEnd);
+    durationMs = masterUtcEnd.getTime() - masterUtc.getTime();
+  }
+  return { offsetMs, durationMs };
 }
 
 function createOccurrence(
   master: CalendarEvent,
   date: Date,
   recurrenceId: string,
-  override?: Partial<CalendarEvent>,
+  override: Partial<CalendarEvent> | undefined,
+  utcInfo: UtcOffsetInfo | null,
 ): CalendarEvent {
   const startStr = master.showWithoutTime
     ? format(date, "yyyy-MM-dd'T'00:00:00")
     : format(date, "yyyy-MM-dd'T'HH:mm:ss");
 
-  // Compute utcStart/utcEnd for this occurrence so that getEventStartDate()
-  // and getEventEndDate() (which prefer utcStart/utcEnd for timed events)
-  // return the correct dates instead of the master's original UTC times.
-  let utcStart: string | undefined;
-  let utcEnd: string | undefined;
-  if (!master.showWithoutTime && master.utcStart && master.start) {
-    const masterLocal = parseISO(master.start);
-    const masterUtc = parseISO(master.utcStart);
-    const offsetMs = masterUtc.getTime() - masterLocal.getTime();
-    utcStart = new Date(date.getTime() + offsetMs).toISOString();
-
-    // Shift utcEnd by the same amount as utcStart
-    if (master.utcEnd) {
-      const masterUtcEnd = parseISO(master.utcEnd);
-      const durationMs = masterUtcEnd.getTime() - masterUtc.getTime();
-      utcEnd = new Date(date.getTime() + offsetMs + durationMs).toISOString();
-    }
-  }
-
-  return {
+  // Build the occurrence object once, then conditionally assign utcStart/
+  // utcEnd. Was: two `...(cond ? {utcStart} : {})` spreads per occurrence,
+  // each allocating an empty/single-field object literal.
+  const occ: CalendarEvent = {
     ...master,
     ...(override || {}),
     id: `${master.id}:${recurrenceId}`,
@@ -158,13 +166,22 @@ function createOccurrence(
     uid: master.uid,
     calendarIds: master.calendarIds,
     start: (override?.start) || startStr,
-    ...(utcStart && !override?.utcStart ? { utcStart } : {}),
-    ...(utcEnd && !override?.utcEnd ? { utcEnd } : {}),
     recurrenceId,
     recurrenceRules: master.recurrenceRules,
     recurrenceOverrides: master.recurrenceOverrides,
     excludedRecurrenceRules: master.excludedRecurrenceRules,
   };
+
+  if (utcInfo) {
+    if (!override?.utcStart) {
+      occ.utcStart = new Date(date.getTime() + utcInfo.offsetMs).toISOString();
+    }
+    if (utcInfo.durationMs !== null && !override?.utcEnd) {
+      occ.utcEnd = new Date(date.getTime() + utcInfo.offsetMs + utcInfo.durationMs).toISOString();
+    }
+  }
+
+  return occ;
 }
 
 // ---------------------------------------------------------------------------

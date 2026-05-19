@@ -117,6 +117,17 @@ export function normalizeCalendarEventLike<T extends Partial<CalendarEvent>>(eve
   // First normalize Stalwart's singular property names to RFC 8984 plural forms
   const normalized = normalizeStalwartPropertyNames(event);
 
+  // Fast path: events with showWithoutTime already set need at most a
+  // duration touch-up. Was: rebuild via {...normalized, showWithoutTime: true,
+  // duration: ...} on every per-event normalize — allocating a new object
+  // per event in the query response (hundreds per month view load) even
+  // when the spread literally added nothing new.
+  if (normalized.showWithoutTime) {
+    const fixedDuration = normalizeAllDayDurationValue(normalized.duration);
+    if (fixedDuration === normalized.duration) return normalized;
+    return { ...normalized, duration: fixedDuration } as T;
+  }
+
   if (!isAllDayEventLike(normalized)) {
     return normalized;
   }
