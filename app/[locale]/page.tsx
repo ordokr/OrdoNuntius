@@ -1366,12 +1366,13 @@ export default function Home() {
       const keywords = { ...email.keywords };
 
       if (color === null) {
-        // Remove all label/color tags
-        Object.keys(keywords).forEach(key => {
+        // Remove all label/color tags. for...in over the keywords Record
+        // avoids the Object.keys array allocation.
+        for (const key in keywords) {
           if (key.startsWith("$label:") || key.startsWith("$color:")) {
             keywords[key] = false;
           }
-        });
+        }
       } else {
         const jmapKey = `$label:${color}`;
         if (keywords[jmapKey] === true) {

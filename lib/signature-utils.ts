@@ -87,14 +87,17 @@ function htmlToPlainText(html: string): string {
       appendNewline();
     }
 
-    Array.from(element.childNodes).forEach(walk);
+    // NodeList is iterable; for-of avoids the Array.from allocation per
+    // element. Recursive walk on each child node.
+    for (const child of element.childNodes) walk(child);
 
     if (BLOCK_TAGS.has(tagName)) {
       appendNewline();
     }
   };
 
-  Array.from(document.body.childNodes).forEach(walk);
+  // Same Array.from drop at the top level.
+  for (const child of document.body.childNodes) walk(child);
   return normalizeSignatureLineBreaks(chunks.join(''));
 }
 

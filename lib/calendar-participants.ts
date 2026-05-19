@@ -200,7 +200,8 @@ export function buildParticipantMap(
     kind: 'individual',
   };
 
-  attendees.forEach((a) => {
+  // for-of over the attendees array drops the per-call .forEach closure.
+  for (const a of attendees) {
     participants[generateId()] = {
       '@type': 'Participant',
       name: a.name,
@@ -213,7 +214,7 @@ export function buildParticipantMap(
       expectReply: true,
       kind: 'individual',
     };
-  });
+  }
 
   return participants;
 }
