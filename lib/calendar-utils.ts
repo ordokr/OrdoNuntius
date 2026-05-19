@@ -138,28 +138,27 @@ export function buildWeekSegmentsRaw(events: CalendarEvent[], weekDays: Date[]):
   const weekStart = startOfDay(weekDays[0]);
   const weekEnd = startOfDay(weekDays[weekDays.length - 1]);
 
-  const rawSegments = events.flatMap((event) => {
+  // Direct loop + push. Was `.flatMap` returning `[]` or `[seg]` per
+  // event, which allocates a throwaway per-event array of size 0 or 1
+  // and a top-level array for the flatMap. For a month with 100+ events
+  // × 6 weeks that's hundreds of empty arrays per render.
+  const segments: CalendarWeekSegment[] = [];
+  for (const event of events) {
     const { startDay, endDay } = getEventDayBounds(event);
-    if (endDay < weekStart || startDay > weekEnd) {
-      return [];
-    }
+    if (endDay < weekStart || startDay > weekEnd) continue;
 
     const segmentStart = startDay < weekStart ? weekStart : startDay;
     const segmentEnd = endDay > weekEnd ? weekEnd : endDay;
-    const startIndex = differenceInCalendarDays(segmentStart, weekStart);
-    const span = differenceInCalendarDays(segmentEnd, segmentStart) + 1;
-
-    return [{
+    segments.push({
       event,
-      startIndex,
-      span,
+      startIndex: differenceInCalendarDays(segmentStart, weekStart),
+      span: differenceInCalendarDays(segmentEnd, segmentStart) + 1,
       row: -1,
       continuesBefore: startDay < weekStart,
       continuesAfter: endDay > weekEnd,
-    } satisfies CalendarWeekSegment];
-  });
-
-  return rawSegments;
+    });
+  }
+  return segments;
 }
 
 export function buildWeekSegments(events: CalendarEvent[], weekDays: Date[]): CalendarWeekSegment[] {
@@ -169,45 +168,37 @@ export function buildWeekSegments(events: CalendarEvent[], weekDays: Date[]): Ca
 export function buildTimedFullDayWeekSegments(events: CalendarEvent[], weekDays: Date[]): CalendarWeekSegment[] {
   if (weekDays.length === 0) return [];
 
-  const rawSegments = events.flatMap((event) => {
-    const fullDayIndices = weekDays
-      .map((day, index) => (isTimedEventFullDayOnDate(event, day) ? index : -1))
-      .filter((index) => index >= 0);
-
-    if (fullDayIndices.length === 0) {
-      return [];
-    }
-
-    const segments: CalendarWeekSegment[] = [];
-    let rangeStart = fullDayIndices[0];
-    let previousIndex = fullDayIndices[0];
-
+  // Direct loop + push. Was `events.flatMap(event => { ...; return segments; })`
+  // which allocated a per-event inner array AND the outer flatMap array.
+  // Also drops the per-event `weekDays.map(...).filter(...)` (2 throwaway
+  // arrays) — we scan weekDays in a single pass to detect runs of
+  // full-day indices and emit segments inline.
+  const rawSegments: CalendarWeekSegment[] = [];
+  for (const event of events) {
+    let rangeStart = -1;
+    let previousIndex = -1;
     const pushSegment = (startIndex: number, endIndex: number) => {
-      const startDay = weekDays[startIndex];
-      const endDay = weekDays[endIndex];
-      segments.push({
+      rawSegments.push({
         event,
         startIndex,
         span: endIndex - startIndex + 1,
         row: -1,
-        continuesBefore: isTimedEventFullDayOnDate(event, addDays(startDay, -1)),
-        continuesAfter: isTimedEventFullDayOnDate(event, addDays(endDay, 1)),
+        continuesBefore: isTimedEventFullDayOnDate(event, addDays(weekDays[startIndex], -1)),
+        continuesAfter: isTimedEventFullDayOnDate(event, addDays(weekDays[endIndex], 1)),
       });
     };
-
-    for (let index = 1; index < fullDayIndices.length; index++) {
-      const currentIndex = fullDayIndices[index];
-      if (currentIndex !== previousIndex + 1) {
+    for (let i = 0; i < weekDays.length; i++) {
+      if (!isTimedEventFullDayOnDate(event, weekDays[i])) continue;
+      if (rangeStart === -1) {
+        rangeStart = i;
+      } else if (i !== previousIndex + 1) {
         pushSegment(rangeStart, previousIndex);
-        rangeStart = currentIndex;
+        rangeStart = i;
       }
-      previousIndex = currentIndex;
+      previousIndex = i;
     }
-
-    pushSegment(rangeStart, previousIndex);
-    return segments;
-  });
-
+    if (rangeStart !== -1) pushSegment(rangeStart, previousIndex);
+  }
   return packWeekSegments(rawSegments);
 }
 
@@ -215,10 +206,14 @@ export function layoutOverlappingEvents(
   events: CalendarEvent[],
   day: Date,
 ): TimedEventLayout[] {
-  const layoutInputs = events.flatMap((event) => {
+  // Direct loop + push. Was `events.flatMap(...)` returning `[]` or
+  // `[{...}]` per event — one throwaway array per event.
+  type LayoutInput = { event: CalendarEvent } & NonNullable<ReturnType<typeof getTimedEventBoundsForDay>>;
+  const layoutInputs: LayoutInput[] = [];
+  for (const event of events) {
     const bounds = getTimedEventBoundsForDay(event, day);
-    return bounds ? [{ event, ...bounds }] : [];
-  });
+    if (bounds) layoutInputs.push({ event, ...bounds });
+  }
 
   const sorted = layoutInputs.sort((a, b) => {
     const diff = a.startMinutes - b.startMinutes;

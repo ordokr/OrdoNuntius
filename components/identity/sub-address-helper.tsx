@@ -38,14 +38,24 @@ export function SubAddressHelper({
   const { subAddress, addRecentTag, addTagSuggestion } = useIdentityStore();
   const subAddressDelimiter = useSettingsStore((state) => state.subAddressDelimiter);
 
-  // Get suggestions based on recipient (memoized for performance)
+  // Get suggestions based on recipient (memoized for performance). Was a
+  // chain that allocated 4 intermediate arrays AND used O(N²) `.filter(...
+  // self.indexOf(tag) === index)` dedup. Single-pass walk with a Set
+  // dedup + early break at 5.
   const suggestions = useMemo(() => {
-    return recipientEmails
-      .map(extractDomain)
-      .filter(Boolean)
-      .flatMap((domain) => suggestTagsForDomain(domain!))
-      .filter((tag, index, self) => self.indexOf(tag) === index)
-      .slice(0, 5);
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const email of recipientEmails) {
+      const domain = extractDomain(email);
+      if (!domain) continue;
+      for (const tag of suggestTagsForDomain(domain)) {
+        if (seen.has(tag)) continue;
+        seen.add(tag);
+        out.push(tag);
+        if (out.length >= 5) return out;
+      }
+    }
+    return out;
   }, [recipientEmails]);
 
   // Generate preview

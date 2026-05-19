@@ -854,9 +854,17 @@ export const useContactStore = create<ContactStore>()(
           debug.log('contacts', 'Trusted senders book id:', bookId);
           const contacts = await client.getContacts(bookId);
           debug.log('contacts', 'Loaded', contacts.length, 'trusted sender contacts');
-          const emails = contacts.flatMap(c =>
-            c.emails ? Object.values(c.emails).map(e => e.address.toLowerCase().trim()) : []
-          ).filter(Boolean);
+          // Single-pass walk. Was: per-contact `Object.values` + `.map`
+          // + outer `.filter(Boolean)` — three allocations per contact
+          // plus a top-level flatMap array. Now one output array.
+          const emails: string[] = [];
+          for (const c of contacts) {
+            if (!c.emails) continue;
+            for (const k in c.emails) {
+              const addr = c.emails[k]?.address;
+              if (addr) emails.push(addr.toLowerCase().trim());
+            }
+          }
           set({ trustedSendersBookId: bookId, trustedSenderEmails: emails, trustedSendersLoaded: true, trustedSendersLoading: false });
         } catch (error) {
           debug.error('Failed to load trusted senders address book:', error);

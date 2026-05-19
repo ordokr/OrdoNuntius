@@ -304,10 +304,15 @@ export const useAccountSecurityStore = create<AccountSecurityState>()((set, get)
       }>(responses, 'x:Account/get');
 
       const acc = result.list?.[0];
-      const aliasAddresses = acc?.aliases
-        ? Object.values(acc.aliases)
-            .flatMap((a) => (a && a.enabled !== false && a.name ? [a.name] : []))
-        : [];
+      // Single-pass walk. Was `Object.values(...).flatMap(...)` which
+      // allocated a values-array plus a `[]` or `[name]` per alias.
+      const aliasAddresses: string[] = [];
+      if (acc?.aliases) {
+        for (const k in acc.aliases) {
+          const a = acc.aliases[k];
+          if (a && a.enabled !== false && a.name) aliasAddresses.push(a.name);
+        }
+      }
       const primaryEmail = acc?.name ? [acc.name] : [];
       set({
         displayName: acc?.description ?? '',

@@ -672,28 +672,34 @@ export const useFileStore = create<FileState>((set, get) => ({
     if (!client || !clipboard) return;
 
     const prefix = getPathPrefix(currentPath);
-    const entries: UndoAction['entries'] = [];
 
-    for (let i = 0; i < clipboard.ids.length; i++) {
-      const id = clipboard.ids[i];
-      const displayName = clipboard.names[i];
-      const oldServerName = clipboard.serverNames?.[i];
-
-      if (clipboard.mode === 'cut') {
-        const newServerName = prefix + displayName;
-        await client.updateFileNode(id, { name: newServerName });
-        entries.push({ id, from: { name: oldServerName }, to: { name: newServerName } });
-      } else {
-        const fullName = prefix + displayName;
-        await client.copyFileNode(id, fullName, null);
-      }
-    }
-
+    // Each item paste hits a unique source id and unique destination name
+    // (no contention), so fire all in parallel. Was: N sequential RTT.
+    // Pasting 50 items at the JMAP baseline RTT is multi-second sequential
+    // vs ~1 RTT parallel. allSettled so one failure doesn't strand the
+    // rest — the refresh below will surface the partial result.
+    type Entry = UndoAction['entries'][number];
     if (clipboard.mode === 'cut') {
+      const settled = await Promise.allSettled(
+        clipboard.ids.map((id, i) => {
+          const newServerName = prefix + clipboard.names[i];
+          const entry: Entry = {
+            id,
+            from: { name: clipboard.serverNames?.[i] },
+            to: { name: newServerName },
+          };
+          return client.updateFileNode(id, { name: newServerName }).then(() => entry);
+        }),
+      );
+      const entries: Entry[] = settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : []);
       set({
         clipboard: null,
         lastAction: { type: 'move', entries, sourceParentId: null },
       });
+    } else {
+      await Promise.allSettled(
+        clipboard.ids.map((id, i) => client.copyFileNode(id, prefix + clipboard.names[i], null)),
+      );
     }
     await refresh();
   },
