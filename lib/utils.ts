@@ -2,7 +2,7 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { Mailbox, UNIFIED_MAILBOX_IDS } from "./jmap/types";
 import type { UnifiedMailboxRole } from "./jmap/types";
-import { debug } from "./debug";
+import { debug, isDebugEnabled } from "./debug";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -318,19 +318,23 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
   // Third pass: correctly calculate depths from the root down
   recalculateDepths(rootMailboxes, 0);
 
-  // Log tree depth statistics
-  const maxDepth = (nodes: MailboxNode[]): number => {
-    let max = 0;
-    for (const node of nodes) {
-      max = Math.max(max, node.depth);
-      if (node.children.length > 0) max = Math.max(max, maxDepth(node.children));
-    }
-    return max;
-  };
-  debug.log('jmap', `[Mailbox Tree] Built tree: ${rootMailboxes.length} root nodes, ` +
-    `max depth: ${maxDepth(rootMailboxes)}, ` +
-    `total own: ${ownMailboxes.length}, shared: ${sharedMailboxes.length}`
-  );
+  // Log tree depth statistics — gated behind isDebugEnabled because the
+  // maxDepth recursion walks every node, which we don't want to pay for
+  // when debug is off.
+  if (isDebugEnabled('jmap')) {
+    const maxDepth = (nodes: MailboxNode[]): number => {
+      let max = 0;
+      for (const node of nodes) {
+        max = Math.max(max, node.depth);
+        if (node.children.length > 0) max = Math.max(max, maxDepth(node.children));
+      }
+      return max;
+    };
+    debug.log('jmap', `[Mailbox Tree] Built tree: ${rootMailboxes.length} root nodes, ` +
+      `max depth: ${maxDepth(rootMailboxes)}, ` +
+      `total own: ${ownMailboxes.length}, shared: ${sharedMailboxes.length}`
+    );
+  }
 
   // For each shared account, create a virtual top-level account node
   // containing that account's mailboxes. This places shared accounts as

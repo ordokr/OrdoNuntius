@@ -43,18 +43,24 @@ const RESTRICTABLE_SETTINGS = [
   { key: 'debugMode', label: 'Debug Mode', category: 'Advanced', type: 'boolean' },
 ];
 
-// Computed once at module load — RESTRICTABLE_SETTINGS is a const so the
-// derived category list never changes. Was rebuilt on every render via
-// `[...new Set(RESTRICTABLE_SETTINGS.map(s => s.category))]`.
-const RESTRICTABLE_CATEGORIES = (() => {
-  const seen = new Set<string>();
-  const out: string[] = [];
+// Module-level grouping. Was: rebuilt categories on every render via
+// `[...new Set(...map(s => s.category))]` plus per-category filter over
+// RESTRICTABLE_SETTINGS inside the JSX render (O(C × N) per render).
+// Now: single walk groups settings by category and preserves insertion
+// order, so the render loop reads pre-bucketed arrays in O(1) per cat.
+const { RESTRICTABLE_CATEGORIES, SETTINGS_BY_CATEGORY } = (() => {
+  const categories: string[] = [];
+  const byCategory = new Map<string, typeof RESTRICTABLE_SETTINGS>();
   for (const s of RESTRICTABLE_SETTINGS) {
-    if (seen.has(s.category)) continue;
-    seen.add(s.category);
-    out.push(s.category);
+    let bucket = byCategory.get(s.category);
+    if (!bucket) {
+      bucket = [];
+      byCategory.set(s.category, bucket);
+      categories.push(s.category);
+    }
+    bucket.push(s);
   }
-  return out;
+  return { RESTRICTABLE_CATEGORIES: categories, SETTINGS_BY_CATEGORY: byCategory };
 })();
 
 export function PolicyTab() {
@@ -203,7 +209,7 @@ export function PolicyTab() {
             <h2 className="text-sm font-medium text-foreground">{category}</h2>
           </div>
           <div className="divide-y divide-border">
-            {RESTRICTABLE_SETTINGS.filter(s => s.category === category).map(setting => {
+            {(SETTINGS_BY_CATEGORY.get(category) ?? []).map(setting => {
               const restriction = policy.restrictions[setting.key] || {};
               return (
                 <div key={setting.key} className="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">

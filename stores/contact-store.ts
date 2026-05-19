@@ -674,8 +674,16 @@ export const useContactStore = create<ContactStore>()(
         const { lastSelectedContactId, selectedContactIds } = get();
         const anchorId = lastSelectedContactId || sortedIds[0];
         if (!anchorId) return;
-        const anchorIndex = sortedIds.indexOf(anchorId);
-        const targetIndex = sortedIds.indexOf(targetId);
+        // Single walk finds both indices; early-exits once both are known.
+        // Was two indexOf walks (worst case 2N).
+        let anchorIndex = -1;
+        let targetIndex = -1;
+        for (let i = 0; i < sortedIds.length; i++) {
+          const id = sortedIds[i];
+          if (id === anchorId) anchorIndex = i;
+          if (id === targetId) targetIndex = i;
+          if (anchorIndex !== -1 && targetIndex !== -1) break;
+        }
         if (anchorIndex === -1 || targetIndex === -1) return;
         const start = Math.min(anchorIndex, targetIndex);
         const end = Math.max(anchorIndex, targetIndex);
