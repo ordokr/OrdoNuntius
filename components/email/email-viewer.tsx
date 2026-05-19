@@ -99,7 +99,7 @@ type SmimeVerifyMod = typeof import("@/lib/smime/smime-verify");
 import { useSmimeStore } from "@/stores/smime-store";
 import type { SmimeStatus } from "@/lib/smime/types";
 import { parseTnef, isTnefAttachment } from "@/lib/tnef";
-import { debug } from "@/lib/debug";
+import { debug, isDebugEnabled } from "@/lib/debug";
 import type { TnefAttachment } from "@/lib/tnef";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { usePluginStore } from "@/stores/plugin-store";
@@ -1933,7 +1933,9 @@ export function EmailViewer({
         }
         if (parsed.attachments.length > 0) {
           setTnefAttachments(parsed.attachments);
-          debug.log('email', 'TNEF extracted attachments:', parsed.attachments.map(a => a.name + ' (' + a.mimeType + ', ' + a.data.byteLength + ' bytes)').join(', '));
+          if (isDebugEnabled('email')) {
+            debug.log('email', 'TNEF extracted attachments:', parsed.attachments.map(a => a.name + ' (' + a.mimeType + ', ' + a.data.byteLength + ' bytes)').join(', '));
+          }
         }
 
         if (!parsed.htmlBody && !parsed.body && parsed.attachments.length === 0) {
@@ -2012,9 +2014,11 @@ export function EmailViewer({
         }
         if (parsed.attachments && parsed.attachments.length > 0) {
           setEmbeddedEmailAttachments(parsed.attachments as PostalMimeAttachment[]);
-          debug.log('email', 'Embedded RFC822 attachments:', parsed.attachments.map(
-            a => (a.filename || 'unnamed') + ' (' + a.mimeType + ')'
-          ).join(', '));
+          if (isDebugEnabled('email')) {
+            debug.log('email', 'Embedded RFC822 attachments:', parsed.attachments.map(
+              a => (a.filename || 'unnamed') + ' (' + a.mimeType + ')'
+            ).join(', '));
+          }
         }
         setEmbeddedEmailUnwrapped(true);
         debug.groupEnd();

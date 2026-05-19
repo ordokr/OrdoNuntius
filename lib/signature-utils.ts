@@ -20,6 +20,15 @@ const BLOCK_TAGS = new Set([
   'tr',
 ]);
 
+// Hoisted to module scope — was rebuilt via `.join(', ')` over a 22-element
+// array on every hasMeaningfulHtmlBody() call (once per email viewer mount).
+const RICH_BODY_SELECTOR = [
+  'table', 'img', 'style', 'b', 'strong', 'i', 'em', 'u', 'font',
+  'a[href]', 'div[style]', 'span[style]', 'p[style]',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'ul', 'ol', 'blockquote', 'br',
+].join(', ');
+
 function normalizeSignatureLineBreaks(value: string): string {
   return value
     .replace(/\r\n?/g, '\n')
@@ -131,33 +140,8 @@ export function hasMeaningfulHtmlBody(html: string): boolean {
   if (!html.trim()) return false;
 
   const document = parseHtmlSafely(html);
-  const richSelector = [
-    'table',
-    'img',
-    'style',
-    'b',
-    'strong',
-    'i',
-    'em',
-    'u',
-    'font',
-    'a[href]',
-    'div[style]',
-    'span[style]',
-    'p[style]',
-    'h1',
-    'h2',
-    'h3',
-    'h4',
-    'h5',
-    'h6',
-    'ul',
-    'ol',
-    'blockquote',
-    'br',
-  ].join(', ');
 
-  if (document.querySelector(richSelector)) {
+  if (document.querySelector(RICH_BODY_SELECTOR)) {
     return true;
   }
 
