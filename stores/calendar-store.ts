@@ -229,13 +229,18 @@ export const useCalendarStore = create<CalendarStore>()(
       createEvent: async (client, event, sendSchedulingMessages) => {
         set({ error: null });
         try {
-          // Resolve shared calendar context from calendarIds
+          // Resolve shared calendar context from calendarIds. Single Map
+          // build for O(1) lookup; previously did `.find(c => c.id === calId)`
+          // per calendarId. Also drops the Object.keys allocation.
           let targetAccountId = event.accountId;
           const cleanEvent = sanitizeOutgoingCalendarEventData({ ...event });
           if (event.calendarIds) {
             const remapped: Record<string, boolean> = {};
-            for (const calId of Object.keys(event.calendarIds)) {
-              const cal = get().calendars.find(c => c.id === calId);
+            const calendars = get().calendars;
+            const calById = new Map<string, typeof calendars[number]>();
+            for (const c of calendars) calById.set(c.id, c);
+            for (const calId in event.calendarIds) {
+              const cal = calById.get(calId);
               if (cal?.isShared && cal.originalId) {
                 targetAccountId = cal.accountId;
                 remapped[cal.originalId] = true;
@@ -327,13 +332,17 @@ export const useCalendarStore = create<CalendarStore>()(
             targetAccountId,
             updateKeys: Object.keys(updates),
           });
-          // Remap namespaced calendarIds back to original IDs
+          // Remap namespaced calendarIds back to original IDs. Same Map
+          // + for...in pattern as createEvent above.
           const cleanUpdates = sanitizeOutgoingCalendarEventData({ ...updates });
           if (cleanUpdates.calendarIds) {
             const remapped: Record<string, boolean> = {};
-            for (const [calId, v] of Object.entries(cleanUpdates.calendarIds)) {
-              const cal = get().calendars.find(c => c.id === calId);
-              remapped[cal?.originalId || calId] = v;
+            const calendars = get().calendars;
+            const calById = new Map<string, typeof calendars[number]>();
+            for (const c of calendars) calById.set(c.id, c);
+            for (const calId in cleanUpdates.calendarIds) {
+              const cal = calById.get(calId);
+              remapped[cal?.originalId || calId] = cleanUpdates.calendarIds[calId];
             }
             cleanUpdates.calendarIds = remapped;
           }

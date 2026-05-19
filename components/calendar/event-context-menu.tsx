@@ -55,9 +55,14 @@ export function EventContextMenu({
     onClose();
   };
 
-  const hasMeetingLink = !!(
-    event.virtualLocations && Object.values(event.virtualLocations).some((v) => v.uri)
-  );
+  // for...in walk with early-break avoids the Object.values allocation +
+  // the .some() walk. Per-event context-menu open.
+  let hasMeetingLink = false;
+  if (event.virtualLocations) {
+    for (const k in event.virtualLocations) {
+      if (event.virtualLocations[k].uri) { hasMeetingLink = true; break; }
+    }
+  }
 
   return (
     <ContextMenu ref={menuRef} isOpen={isOpen} position={position} onClose={onClose}>
