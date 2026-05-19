@@ -50,7 +50,7 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
   // visible row on every keyword flip, new email arrival, or selection
   // change. The drag-start handler only needs these values AT THE MOMENT
   // OF DRAG START — read them via getState() then.
-  const { startDrag, endDrag, isDragging, draggedEmails } = useDragDropContext();
+  const { startDrag, endDrag, isDragging, draggedEmailIdSet } = useDragDropContext();
   const isMobile = useUIStore((state) => state.isMobile);
 
   const handleDragStart = useCallback((e: DragEvent<HTMLDivElement>) => {
@@ -92,8 +92,10 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
     endDrag();
   }, [endDrag]);
 
-  // Check if this specific email is being dragged
-  const isThisEmailDragging = isDragging && draggedEmails.some(em => em.id === email.id);
+  // Check if this specific email is being dragged. O(1) Set lookup — was
+  // `.some(em => em.id === email.id)` walking the whole dragged list per
+  // visible row (quadratic with many-selected drags).
+  const isThisEmailDragging = isDragging && draggedEmailIdSet.has(email.id);
 
   return {
     dragHandlers: isMobile

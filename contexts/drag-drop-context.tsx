@@ -6,6 +6,10 @@ import { Email } from "@/lib/jmap/types";
 interface DragDropState {
   isDragging: boolean;
   draggedEmails: Email[];
+  /** O(1) "is this email being dragged?" lookup. Avoids the per-row
+   * `.some(em => em.id === email.id)` scan inside useEmailDrag, which
+   * was O(D) per visible row — quadratic when dragging many selected. */
+  draggedEmailIdSet: ReadonlySet<string>;
   dragCount: number;
   sourceMailboxId: string | null;
 }
@@ -15,9 +19,11 @@ interface DragDropContextValue extends DragDropState {
   endDrag: () => void;
 }
 
+const EMPTY_DRAGGED_ID_SET: ReadonlySet<string> = new Set();
 const initialState: DragDropState = {
   isDragging: false,
   draggedEmails: [],
+  draggedEmailIdSet: EMPTY_DRAGGED_ID_SET,
   dragCount: 0,
   sourceMailboxId: null,
 };
@@ -28,9 +34,12 @@ export function DragDropProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<DragDropState>(initialState);
 
   const startDrag = useCallback((emails: Email[], sourceMailboxId: string) => {
+    const idSet = new Set<string>();
+    for (const e of emails) idSet.add(e.id);
     setState({
       isDragging: true,
       draggedEmails: emails,
+      draggedEmailIdSet: idSet,
       dragCount: emails.length,
       sourceMailboxId,
     });
