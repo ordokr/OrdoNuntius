@@ -72,17 +72,23 @@ export function useTagDrop({ tagId, onSuccess, onError }: UseTagDropOptions): Us
 
       const emailIds: string[] = JSON.parse(emailIdsJson);
 
-      for (const emailId of emailIds) {
-        // Read fresh state to avoid stale closures
-        const currentEmails = useEmailStore.getState().emails;
-        const email = currentEmails.find(em => em.id === emailId);
+      // Build id→email Map once instead of `currentEmails.find()` per
+      // dropped email (was O(D × E) — quadratic when dragging many
+      // emails through a large mailbox).
+      const currentEmails = useEmailStore.getState().emails;
+      const byId = new Map<string, typeof currentEmails[number]>();
+      for (const em of currentEmails) byId.set(em.id, em);
+      const labelKey = `$label:${tagId}`;
+
+      // Fire all keyword updates in parallel. Was sequential await in a
+      // loop — for N dropped emails that's N round trips. JMAP servers
+      // handle each Email/set independently so parallel is safe.
+      await Promise.all(emailIds.map(emailId => {
+        const email = byId.get(emailId);
         const keywords = { ...(email?.keywords || {}) };
-
-        // Add the tag without removing existing ones
-        keywords[`$label:${tagId}`] = true;
-
-        await client.updateEmailKeywords(emailId, keywords);
-      }
+        keywords[labelKey] = true;
+        return client.updateEmailKeywords(emailId, keywords);
+      }));
 
       // Refresh the email list
       await fetchEmails(client, selectedMailbox);
