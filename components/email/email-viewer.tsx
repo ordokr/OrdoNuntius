@@ -69,7 +69,7 @@ import { useTranslations } from "next-intl";
 import type { Attachment as PostalMimeAttachment } from 'postal-mime';
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
-import { useContactStore, getContactDisplayName, getContactPrimaryEmail } from "@/stores/contact-store";
+import { useContactStore, getContactDisplayName, getContactPrimaryEmail, findContactByEmail } from "@/stores/contact-store";
 import { toast } from "@/stores/toast-store";
 import { useDeviceDetection } from "@/hooks/use-media-query";
 import { useAuthStore } from "@/stores/auth-store";
@@ -1136,13 +1136,11 @@ export function EmailViewer({
     setContactSidebarEmail(recipientEmail);
   };
 
+  // O(1) via the shared contact-by-email index. Was a linear `contacts
+  // .find(c => Object.values(c.emails).some(...))` that walked every
+  // contact AND allocated a values-array per contact in the worst case.
   const sidebarContact = contactSidebarEmail
-    ? contacts.find((c) => {
-        if (!c.emails) return false;
-        return Object.values(c.emails).some(
-          (e) => e.address.toLowerCase() === contactSidebarEmail.toLowerCase()
-        );
-      }) ?? null
+    ? findContactByEmail(contacts, contactSidebarEmail) ?? null
     : null;
 
   // Close contact sidebar when email changes

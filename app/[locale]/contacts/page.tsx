@@ -232,18 +232,24 @@ export default function ContactsPage() {
   const handleDropContactsToCategory = useCallback(async (contactIds: string[], keyword: string) => {
     if (!client && supportsSync) return;
     try {
-      for (const contactId of contactIds) {
-        const contact = contacts.find(c => c.id === contactId);
-        if (!contact) continue;
+      // O(N + M) instead of O(N × M): build a by-id index once and use
+      // it for the per-id lookup. Plus: the per-contact `updateContact`
+      // calls are independent (different ids, disjoint server writes) —
+      // fire all in parallel via Promise.all. For a 50-item drag-drop
+      // batch this collapses 50 sequential JMAP RTTs to 1.
+      const byId = new Map(contacts.map(c => [c.id, c]));
+      await Promise.all(contactIds.map(async (contactId) => {
+        const contact = byId.get(contactId);
+        if (!contact) return;
         const existingKeywords = contact.keywords || {};
-        if (existingKeywords[keyword]) continue; // already has this keyword
+        if (existingKeywords[keyword]) return; // already has this keyword
         const updatedKeywords = { ...existingKeywords, [keyword]: true };
         if (supportsSync && client) {
           await updateContact(client, contactId, { keywords: updatedKeywords });
         } else {
           updateLocalContact(contactId, { keywords: updatedKeywords });
         }
-      }
+      }));
       const msg = contactIds.length === 1
         ? t("category_added", { name: keyword })
         : t("category_added_plural", { count: contactIds.length, name: keyword });

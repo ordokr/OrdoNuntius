@@ -505,12 +505,14 @@ export const useContactStore = create<ContactStore>()(
 
       createGroup: async (client, name, memberIds) => {
         const { contacts } = get();
+        // Was O(memberIds × contacts): per id, `.find(c => c.id === id)`
+        // walked the whole contacts array. Index once, lookup O(1).
+        const byId = new Map(contacts.map(c => [c.id, c]));
         const members: Record<string, boolean> = {};
-        memberIds.forEach(id => {
-          const contact = contacts.find(c => c.id === id);
-          const key = contact?.uid || id;
-          members[key] = true;
-        });
+        for (const id of memberIds) {
+          const contact = byId.get(id);
+          members[contact?.uid || id] = true;
+        }
 
         const groupData: Partial<ContactCard> = {
           kind: 'group',
@@ -553,12 +555,14 @@ export const useContactStore = create<ContactStore>()(
         const group = contacts.find(c => c.id === groupId);
         if (!group) return;
 
+        // Same O(memberIds × contacts) → O(memberIds + contacts) win as
+        // createGroup. Build a by-id index once.
+        const byId = new Map(contacts.map(c => [c.id, c]));
         const newMembers = { ...group.members };
-        memberIds.forEach(id => {
-          const contact = contacts.find(c => c.id === id);
-          const key = contact?.uid || contact?.originalId || id;
-          newMembers[key] = true;
-        });
+        for (const id of memberIds) {
+          const contact = byId.get(id);
+          newMembers[contact?.uid || contact?.originalId || id] = true;
+        }
 
         const updates: Partial<ContactCard> = { members: newMembers };
         if (client && get().supportsSync) {
@@ -578,29 +582,31 @@ export const useContactStore = create<ContactStore>()(
         const group = contacts.find(c => c.id === groupId);
         if (!group?.members) return;
 
+        // O(memberIds × contacts) → O(memberIds + contacts).
+        const byId = new Map(contacts.map(c => [c.id, c]));
         const newMembers = { ...group.members };
-        memberIds.forEach(id => {
+        for (const id of memberIds) {
           // Try direct id match first
           if (newMembers[id] !== undefined) {
             delete newMembers[id];
-            return;
+            continue;
           }
           // Try uid-based match
-          const contact = contacts.find(c => c.id === id);
+          const contact = byId.get(id);
           if (contact?.uid && newMembers[contact.uid] !== undefined) {
             delete newMembers[contact.uid];
-          } else {
-            // Try stripping urn:uuid: prefix matching
-            for (const key of Object.keys(newMembers)) {
-              const bareKey = key.startsWith('urn:uuid:') ? key.slice(9) : key;
-              const bareUid = contact?.uid?.startsWith('urn:uuid:') ? contact.uid.slice(9) : contact?.uid;
-              if (bareKey === id || bareKey === bareUid) {
-                delete newMembers[key];
-                break;
-              }
+            continue;
+          }
+          // Try stripping urn:uuid: prefix matching
+          const bareUid = contact?.uid?.startsWith('urn:uuid:') ? contact.uid.slice(9) : contact?.uid;
+          for (const key in newMembers) {
+            const bareKey = key.startsWith('urn:uuid:') ? key.slice(9) : key;
+            if (bareKey === id || bareKey === bareUid) {
+              delete newMembers[key];
+              break;
             }
           }
-        });
+        }
 
         const updates: Partial<ContactCard> = { members: newMembers };
         if (client && get().supportsSync) {
