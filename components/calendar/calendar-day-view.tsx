@@ -183,7 +183,14 @@ export function CalendarDayView({
               <div className="space-y-0.5">
                 {dayTasks.map((task) => {
                   const isCompleted = task.progress === "completed";
-                  const cal = calendars.find(c => task.calendarIds[c.id]);
+                  // Look up via calendarMap (O(1) per id) instead of scanning
+                  // the calendars array per task.
+                  let cal: Calendar | undefined;
+                  for (const k in task.calendarIds) {
+                    if (!task.calendarIds[k]) continue;
+                    const c = calendarMap.get(k);
+                    if (c) { cal = c; break; }
+                  }
                   const color = cal?.color || "#3b82f6";
                   return (
                     <div
@@ -362,7 +369,7 @@ export function CalendarDayView({
                 const startMin = pendingPreview.start.getHours() * 60 + pendingPreview.start.getMinutes();
                 const endMin = pendingPreview.end.getHours() * 60 + pendingPreview.end.getMinutes();
                 const durationMin = Math.max(15, endMin - startMin);
-                const cal = calendars.find(c => c.id === pendingPreview.calendarId);
+                const cal = calendarMap.get(pendingPreview.calendarId);
                 const color = cal?.color || "hsl(var(--primary))";
                 return (
                   <div

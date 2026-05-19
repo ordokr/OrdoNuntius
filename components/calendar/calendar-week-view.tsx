@@ -274,7 +274,12 @@ export function CalendarWeekView({
                   const dayTasks = tasksByDay.get(key) || [];
                   return dayTasks.map((task, taskIndex) => {
                     const isCompleted = task.progress === "completed";
-                    const cal = calendars.find(c => task.calendarIds[c.id]);
+                    let cal: typeof calendars[number] | undefined;
+                    for (const k in task.calendarIds) {
+                      if (!task.calendarIds[k]) continue;
+                      const c = calendarMap.get(k);
+                      if (c) { cal = c; break; }
+                    }
                     const color = cal?.color || "#3b82f6";
                     return (
                       <div
@@ -505,7 +510,7 @@ export function CalendarWeekView({
                       let endMin = pendingPreview.end.getHours() * 60 + pendingPreview.end.getMinutes();
                       if (endMin <= startMin) endMin = 1440;
                       const durationMin = Math.max(15, endMin - startMin);
-                      const cal = calendars.find(c => c.id === pendingPreview.calendarId);
+                      const cal = calendarMap.get(pendingPreview.calendarId);
                       const color = cal?.color || "hsl(var(--primary))";
                       return (
                         <div

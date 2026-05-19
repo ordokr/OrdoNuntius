@@ -139,6 +139,14 @@ export function TaskListView({
     return decorated.map(d => d.task);
   }, [tasks, selectedCalendarIds, filter, showCompleted]);
 
+  // O(1) calendar lookup by id — was `calendars.find(c => task.calendarIds[c.id])`
+  // per visible task on every render (O(T × C) per scroll/state change).
+  const calendarMap = useMemo(() => {
+    const m = new Map<string, typeof calendars[number]>();
+    for (const c of calendars) m.set(c.id, c);
+    return m;
+  }, [calendars]);
+
   const handleToggle = useCallback((e: React.MouseEvent, task: CalendarTask) => {
     e.stopPropagation();
     onToggleComplete(task);
@@ -199,7 +207,12 @@ export function TaskListView({
       )}
       <div className="divide-y divide-border">
         {filteredTasks.map(task => {
-          const cal = calendars.find(c => task.calendarIds[c.id]);
+          let cal: typeof calendars[number] | undefined;
+          for (const k in task.calendarIds) {
+            if (!task.calendarIds[k]) continue;
+            const c = calendarMap.get(k);
+            if (c) { cal = c; break; }
+          }
           const isCompleted = task.progress === "completed";
           const priorityIcon = getTaskPriorityIcon(task.priority);
           const dueDateInfo = task.due ? getDueDateLabel(task.due, task.showWithoutTime, t, timeFormat) : null;
