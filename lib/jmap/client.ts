@@ -2514,11 +2514,18 @@ export class JMAPClient implements IJMAPClient {
       throw new Error('No drafts mailbox found');
     }
 
-    // Find the organizer participant. for...in over the participants
-    // record drops the per-call Object.values allocation.
+    // Single walk: find organizer + collect attendees. Was two passes
+    // (for-in for owner; then Object.values(...).filter() which allocates
+    // a full array of values and a filtered array). One walk, one array.
     let organizerEntry: typeof event.participants[string] | undefined;
+    const attendees: typeof event.participants[string][] = [];
     for (const k in event.participants) {
-      if (event.participants[k].roles?.owner) { organizerEntry = event.participants[k]; break; }
+      const p = event.participants[k];
+      if (p.roles?.owner) {
+        if (organizerEntry === undefined) organizerEntry = p;
+      } else {
+        attendees.push(p);
+      }
     }
     const organizerEmail = organizerEntry?.email || organizerEntry?.sendTo?.imip?.replace('mailto:', '') || this.username;
     const organizerName = organizerEntry?.name || '';
@@ -2530,8 +2537,6 @@ export class JMAPClient implements IJMAPClient {
       identityId = match?.id || identities[0]?.id || this.accountId;
     }
 
-    // Collect attendee participants (non-organizer)
-    const attendees = Object.values(event.participants).filter(p => !p.roles?.owner);
     if (attendees.length === 0) return;
 
     const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
@@ -2694,9 +2699,17 @@ export class JMAPClient implements IJMAPClient {
       throw new Error('No drafts mailbox found');
     }
 
+    // Single walk: find organizer + collect attendees. Same fusion as
+    // sendImipInvitation — drops one Object.values + filter allocation pair.
     let organizerEntry: typeof event.participants[string] | undefined;
+    const attendees: typeof event.participants[string][] = [];
     for (const k in event.participants) {
-      if (event.participants[k].roles?.owner) { organizerEntry = event.participants[k]; break; }
+      const p = event.participants[k];
+      if (p.roles?.owner) {
+        if (organizerEntry === undefined) organizerEntry = p;
+      } else {
+        attendees.push(p);
+      }
     }
     const organizerEmail = organizerEntry?.email || organizerEntry?.sendTo?.imip?.replace('mailto:', '') || this.username;
     const organizerName = organizerEntry?.name || '';
@@ -2708,7 +2721,6 @@ export class JMAPClient implements IJMAPClient {
       identityId = match?.id || identities[0]?.id || this.accountId;
     }
 
-    const attendees = Object.values(event.participants).filter(p => !p.roles?.owner);
     if (attendees.length === 0) return;
 
     const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
