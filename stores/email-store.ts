@@ -901,7 +901,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
           ? { ...state.selectedEmail, keywords: { ...state.selectedEmail.keywords, $seen: read } }
           : state.selectedEmail,
         mailboxes: updatedMailboxes,
-        processingReadStatus: new Set([...state.processingReadStatus, processingKey]),
+        processingReadStatus: new Set(state.processingReadStatus).add(processingKey),
       };
     });
 
