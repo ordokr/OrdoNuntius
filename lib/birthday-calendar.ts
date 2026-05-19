@@ -123,6 +123,12 @@ export function generateBirthdayEvents(
   for (const contact of contacts) {
     if (!contact.anniversaries) continue;
 
+    // Lazy displayName per contact — was called per matching anniversary,
+    // doing the same name-resolution walk multiple times when a contact
+    // had more than one birth anniversary. Also defers the cost until we
+    // know we have a parseable birth date to render.
+    let displayName: string | undefined;
+
     // for...in over the anniversaries Record drops the tuples-array
     // allocation. Runs per contact in the birthday-scan pass — for 5000
     // contacts that's 5000 throwaway arrays.
@@ -134,7 +140,7 @@ export function generateBirthdayEvents(
       const parsed = parseBirthdayDate(anniversary.date);
       if (!parsed) continue;
 
-      const displayName = getContactDisplayName(contact);
+      if (displayName === undefined) displayName = getContactDisplayName(contact);
       if (!displayName) continue;
 
       for (const yearDate of years) {

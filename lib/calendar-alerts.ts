@@ -69,9 +69,16 @@ export function computeFireTime(
   return baseTime + offsetMs;
 }
 
+/**
+ * Resolve the alerts a given event should fire — either its own alerts or
+ * the calendar's defaults when `useDefaultAlerts` is set. The optional
+ * `calById` parameter lets bulk callers (getPendingAlerts) hand a
+ * pre-built Map down, dropping the per-event O(C) calendars.find() scan.
+ */
 export function getEffectiveAlerts(
   event: CalendarEvent,
-  calendars: Calendar[]
+  calendars: Calendar[],
+  calById?: ReadonlyMap<string, Calendar>,
 ): Record<string, CalendarEventAlert> | null {
   if (!event.useDefaultAlerts) {
     return event.alerts;
@@ -83,7 +90,9 @@ export function getEffectiveAlerts(
   for (const k in event.calendarIds) { calendarId = k; break; }
   if (!calendarId) return null;
 
-  const calendar = calendars.find(c => c.id === calendarId);
+  const calendar = calById
+    ? calById.get(calendarId)
+    : calendars.find(c => c.id === calendarId);
   if (!calendar) return null;
 
   if (event.showWithoutTime) {
@@ -108,7 +117,9 @@ export function getPendingAlerts(
   for (const c of calendars) calById.set(c.id, c);
 
   for (const event of events) {
-    const alerts = getEffectiveAlerts(event, calendars);
+    // Thread calById through so getEffectiveAlerts doesn't re-scan
+    // calendars[] per event (was O(E × C)).
+    const alerts = getEffectiveAlerts(event, calendars, calById);
     if (!alerts) continue;
 
     // First-key pick from event.calendarIds without allocating a keys

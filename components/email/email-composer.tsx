@@ -778,14 +778,17 @@ export function EmailComposer({
     });
     setAttachments(prev => [...prev, ...newAttachments]);
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    // Upload all files in parallel. Was sequential: a 5MB file blocked a
+    // 100KB file behind it for the duration of its upload. The blob
+    // endpoint accepts independent uploads, so user-visible attachment-
+    // ready time drops from sum(RTTs) to max(RTT).
+    await Promise.allSettled(files.map(async (file, i) => {
       const controller = newAttachments[i].abortController;
       try {
-        if (controller?.signal.aborted) continue;
+        if (controller?.signal.aborted) return;
         const { blobId } = await client.uploadBlob(file);
 
-        if (controller?.signal.aborted) continue;
+        if (controller?.signal.aborted) return;
         setAttachments(prev =>
           prev.map(att =>
             att.file === file
@@ -800,7 +803,7 @@ export function EmailComposer({
           blobId,
         });
       } catch (error) {
-        if (controller?.signal.aborted) continue;
+        if (controller?.signal.aborted) return;
         debug.error(`Failed to upload ${file.name}:`, error);
         toast.error(t('upload_failed', { filename: file.name }));
 
@@ -812,7 +815,7 @@ export function EmailComposer({
           )
         );
       }
-    }
+    }));
   }, [client, t]);
 
   const handleImageUpload = useCallback(async (
