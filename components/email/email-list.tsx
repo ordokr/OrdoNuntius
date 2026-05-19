@@ -208,10 +208,13 @@ export function EmailList({
   const currentMailboxRole = currentMailbox?.role;
   const isEmptyableFolder = currentMailboxRole === 'trash' || currentMailboxRole === 'junk';
   const emailKeywordsList = useSettingsStore((state) => state.emailKeywords);
-  const emailKeywordsById = useMemo(
-    () => new Map(emailKeywordsList.map(k => [k.id, k])),
-    [emailKeywordsList]
-  );
+  const emailKeywordsById = useMemo(() => {
+    // Direct build skips the .map(k => [k.id, k]) intermediate array +
+    // per-tuple sub-arrays.
+    const m = new Map<string, typeof emailKeywordsList[number]>();
+    for (const k of emailKeywordsList) m.set(k.id, k);
+    return m;
+  }, [emailKeywordsList]);
 
   // Stable callback wrappers so React.memo on ThreadListItem can skip
   // row renders when only unrelated state changed (selection, theme,

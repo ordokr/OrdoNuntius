@@ -1051,7 +1051,9 @@ export function EmailComposer({
       // O(M+N) with a cid→entry index built once instead of O(M·N)
       // doing `known.find()` per image. Most replies have a handful of
       // both, but quoted-replies-with-many-inline-images can hit dozens.
-      const byCid = new Map(known.map(e => [e.cid, e]));
+      // Direct Map build avoids the .map(e => [e.cid, e]) intermediate.
+      const byCid = new Map<string, typeof known[number]>();
+      for (const e of known) byCid.set(e.cid, e);
       doc.querySelectorAll('img[data-cid]').forEach((img) => {
         const cid = img.getAttribute('data-cid');
         if (!cid) return;

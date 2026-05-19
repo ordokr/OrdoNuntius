@@ -868,10 +868,11 @@ export function EmailViewer({
   // called three times per render in tag-pill rendering (header dots,
   // toolbar dropdown, single-tag label), each O(emailKeywords). Now built
   // once per emailKeywords change.
-  const emailKeywordsById = useMemo(
-    () => new Map(emailKeywords.map(k => [k.id, k])),
-    [emailKeywords],
-  );
+  const emailKeywordsById = useMemo(() => {
+    const m = new Map<string, typeof emailKeywords[number]>();
+    for (const k of emailKeywords) m.set(k.id, k);
+    return m;
+  }, [emailKeywords]);
   const toolbarPosition = useSettingsStore((state) => state.toolbarPosition);
   const showToolbarLabels = useSettingsStore((state) => state.showToolbarLabels);
   const mailLayout = useSettingsStore((state) => state.mailLayout);

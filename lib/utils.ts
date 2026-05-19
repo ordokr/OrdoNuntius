@@ -503,7 +503,12 @@ export function getMailboxPath(
   allMailboxes: Array<Pick<Mailbox, 'id' | 'name' | 'parentId'>>,
   separator = ' › ',
 ): string {
-  const byId = new Map(allMailboxes.map(m => [m.id, m]));
+  // Direct Map build skips the `allMailboxes.map(m => [m.id, m])`
+  // intermediate array + per-tuple sub-arrays. The path walk usually
+  // touches 0-3 ancestors so the Map's amortization is small, but the
+  // setup allocation isn't free.
+  const byId = new Map<string, Pick<Mailbox, 'id' | 'name' | 'parentId'>>();
+  for (const m of allMailboxes) byId.set(m.id, m);
   const names: string[] = [mailbox.name];
   const visited = new Set<string>([mailbox.id]);
   let parentId = mailbox.parentId;

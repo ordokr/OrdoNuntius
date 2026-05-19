@@ -481,8 +481,15 @@ export function FileBrowser({
   // each, plus the duplicate. Now O(|resources| + |sel|): build the name→
   // isDirectory map once, lookup is O(1).
   const selectedDownloadableNames = useMemo(() => {
-    const dirByName = new Map(resources.map(r => [r.name, r.isDirectory]));
-    return [...selectedResources].filter(n => !dirByName.get(n));
+    // Direct Map build + direct filter walk skip the .map() tuples-array
+    // and the spread of selectedResources.
+    const dirByName = new Map<string, boolean>();
+    for (const r of resources) dirByName.set(r.name, r.isDirectory);
+    const out: string[] = [];
+    for (const n of selectedResources) {
+      if (!dirByName.get(n)) out.push(n);
+    }
+    return out;
   }, [resources, selectedResources]);
 
   // `clipboard.names.includes(resource.name)` was called per resource row in
