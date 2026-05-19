@@ -34,17 +34,18 @@ export function computeReplyThreadingHeaders(
   const parentId = rawId ? stripMessageIdBrackets(rawId) : '';
   if (!parentId) return null;
 
-  const ancestors = (parent?.references ?? [])
-    .map(stripMessageIdBrackets)
-    .filter(Boolean);
-
   // De-dupe while preserving order; the parent's id closes the chain.
+  // Single walk: strip + filter + dedupe in one pass, no intermediate arrays.
   const seen = new Set<string>();
   const references: string[] = [];
-  for (const id of [...ancestors, parentId]) {
-    if (seen.has(id)) continue;
+  for (const raw of parent?.references ?? []) {
+    const id = stripMessageIdBrackets(raw);
+    if (!id || seen.has(id)) continue;
     seen.add(id);
     references.push(id);
+  }
+  if (!seen.has(parentId)) {
+    references.push(parentId);
   }
 
   return { inReplyTo: [parentId], references };

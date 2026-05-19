@@ -1389,23 +1389,33 @@ export class JMAPClient implements IJMAPClient {
     if (hasCreates) {
       const mailboxResult = response.methodResponses?.[0]?.[1];
       const notCreated = mailboxResult?.notCreated as Record<string, { type?: string; properties?: string[]; description?: string }> | undefined;
-      const failures = notCreated ? Object.entries(notCreated) : [];
-      if (failures.length > 0) {
-        const [cid, err] = failures[0];
-        const parts = [err.type || 'unknown'];
-        if (err.properties?.length) parts.push(`properties=[${err.properties.join(', ')}]`);
-        if (err.description) parts.push(err.description);
-        throw new Error(`Failed to create archive folder '${cid}': ${parts.join(' – ')}`);
+      if (notCreated) {
+        // First-failure short-circuit: no need to materialize an entries array.
+        for (const cid in notCreated) {
+          const err = notCreated[cid];
+          const parts = [err.type || 'unknown'];
+          if (err.properties?.length) parts.push(`properties=[${err.properties.join(', ')}]`);
+          if (err.description) parts.push(err.description);
+          throw new Error(`Failed to create archive folder '${cid}': ${parts.join(' – ')}`);
+        }
       }
     }
 
     const emailIdx = hasCreates ? 1 : 0;
     const emailResult = response.methodResponses?.[emailIdx]?.[1];
     const notUpdated = emailResult?.notUpdated as Record<string, { type?: string; description?: string }> | undefined;
-    const emailFailures = notUpdated ? Object.entries(notUpdated) : [];
-    if (emailFailures.length > 0) {
-      const [id, err] = emailFailures[0];
-      throw new Error(`Failed to move ${emailFailures.length} email(s), first: ${id} – ${err.type || 'unknown'}${err.description ? ` (${err.description})` : ''}`);
+    if (notUpdated) {
+      // Count + first-failure in a single walk; no entries allocation.
+      let failureCount = 0;
+      let firstId: string | undefined;
+      let firstErr: { type?: string; description?: string } | undefined;
+      for (const id in notUpdated) {
+        if (failureCount === 0) { firstId = id; firstErr = notUpdated[id]; }
+        failureCount++;
+      }
+      if (failureCount > 0) {
+        throw new Error(`Failed to move ${failureCount} email(s), first: ${firstId} – ${firstErr!.type || 'unknown'}${firstErr!.description ? ` (${firstErr!.description})` : ''}`);
+      }
     }
   }
 
@@ -2200,8 +2210,20 @@ export class JMAPClient implements IJMAPClient {
 
     // Per RFC 8621 §4.1.2.3 inReplyTo/references are arrays of bare msg-ids
     // (no angle brackets). Stalwart may return them either way, so normalize.
-    const normalizedInReplyTo = inReplyTo?.map(stripMessageIdBrackets).filter(Boolean);
-    const normalizedReferences = references?.map(stripMessageIdBrackets).filter(Boolean);
+    // Single walk strip+filter; both arrays are short but this drops two
+    // intermediate arrays per send and keeps the call site shape (undefined
+    // when source is undefined, possibly empty array otherwise).
+    const normalizeMsgIds = (ids: string[] | undefined): string[] | undefined => {
+      if (!ids) return undefined;
+      const out: string[] = [];
+      for (const raw of ids) {
+        const v = stripMessageIdBrackets(raw);
+        if (v) out.push(v);
+      }
+      return out;
+    };
+    const normalizedInReplyTo = normalizeMsgIds(inReplyTo);
+    const normalizedReferences = normalizeMsgIds(references);
 
     const sanitizedFromName = sanitizeIdentityDisplayName(fromName);
     // Always create a new email with the final body content
