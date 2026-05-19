@@ -3,6 +3,7 @@ import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
 import { debug, isDebugEnabled } from "@/lib/debug";
+import { firstValue } from "@/lib/utils";
 import { normalizeCalendarEventLike } from "@/lib/calendar-event-normalization";
 
 export class RateLimitError extends Error {
@@ -2172,8 +2173,9 @@ export class JMAPClient implements IJMAPClient {
       const result = response.methodResponses[0][1];
 
       if (result.notCreated) {
-        const errors = result.notCreated;
-        const firstError = Object.values(errors)[0] as { description?: string; type?: string };
+        // Zero-allocation first-value pick (was `Object.values(errors)[0]`
+        // which builds the full values-array just to read index 0).
+        const firstError = firstValue<{ description?: string; type?: string }>(result.notCreated);
         console.error('Draft save error:', firstError);
         throw new Error(firstError?.description || firstError?.type || 'Failed to save draft');
       }
@@ -2380,8 +2382,7 @@ export class JMAPClient implements IJMAPClient {
         }
 
         if (result.notCreated) {
-          const errors = result.notCreated;
-          const firstError = Object.values(errors)[0] as { description?: string; type?: string };
+          const firstError = firstValue<{ description?: string; type?: string }>(result.notCreated);
           console.error('Email send error:', firstError);
           throw new Error(firstError?.description || firstError?.type || 'Failed to send email');
         }
@@ -2574,7 +2575,7 @@ export class JMAPClient implements IJMAPClient {
           throw new Error(result.description || `iMIP reply failed: ${result.type}`);
         }
         if (result.notCreated) {
-          const firstError = Object.values(result.notCreated)[0] as { description?: string; type?: string };
+          const firstError = firstValue<{ description?: string; type?: string }>(result.notCreated);
           debug.error('[iMIP] create error:', JSON.stringify(result.notCreated, null, 2));
           throw new Error(firstError?.description || firstError?.type || 'Failed to send iMIP reply');
         }
@@ -2705,9 +2706,13 @@ export class JMAPClient implements IJMAPClient {
     const icsContent = lines.map(foldIcsLine).join('\r\n') + '\r\n';
 
     const subject = `Invitation: ${event.title || 'Event'}`;
-    const toAddresses = attendees
-      .map(a => ({ name: a.name || undefined, email: a.email || a.sendTo?.imip?.replace('mailto:', '') || '' }))
-      .filter(a => a.email);
+    // Single push loop replaces .map(...).filter(...) — drops a throwaway
+    // intermediate array of attendee shapes whose email failed the filter.
+    const toAddresses: { name?: string; email: string }[] = [];
+    for (const a of attendees) {
+      const email = a.email || a.sendTo?.imip?.replace('mailto:', '') || '';
+      if (email) toAddresses.push({ name: a.name || undefined, email });
+    }
 
     if (toAddresses.length === 0) return;
 
@@ -2758,7 +2763,7 @@ export class JMAPClient implements IJMAPClient {
           throw new Error(result.description || `iMIP invitation failed: ${result.type}`);
         }
         if (result.notCreated) {
-          const firstError = Object.values(result.notCreated)[0] as { description?: string; type?: string };
+          const firstError = firstValue<{ description?: string; type?: string }>(result.notCreated);
           throw new Error(firstError?.description || firstError?.type || 'Failed to send iMIP invitation');
         }
       }
@@ -2924,7 +2929,7 @@ export class JMAPClient implements IJMAPClient {
           throw new Error(result.description || `iMIP cancellation failed: ${result.type}`);
         }
         if (result.notCreated) {
-          const firstError = Object.values(result.notCreated)[0] as { description?: string; type?: string };
+          const firstError = firstValue<{ description?: string; type?: string }>(result.notCreated);
           throw new Error(firstError?.description || firstError?.type || 'Failed to send iMIP cancellation');
         }
       }
@@ -4591,16 +4596,20 @@ export class JMAPClient implements IJMAPClient {
       ["CalendarEvent/set", { accountId, destroy: eventIds }, "0"]
     ], this.calendarUsing());
 
-    const destroyed: string[] = [];
-    const notDestroyed: string[] = [];
-
+    // Pass result.destroyed through directly when present (server-owned
+    // array — safe to return). Walk notDestroyed with for...in instead of
+    // Object.keys+spread (drops a throwaway keys array + iterator push).
     if (response.methodResponses?.[0]?.[0] === "CalendarEvent/set") {
       const result = response.methodResponses[0][1];
-      if (result.destroyed) destroyed.push(...result.destroyed);
-      if (result.notDestroyed) notDestroyed.push(...Object.keys(result.notDestroyed));
+      const destroyed: string[] = result.destroyed || [];
+      const notDestroyed: string[] = [];
+      if (result.notDestroyed) {
+        for (const id in result.notDestroyed) notDestroyed.push(id);
+      }
+      return { destroyed, notDestroyed };
     }
 
-    return { destroyed, notDestroyed };
+    return { destroyed: [], notDestroyed: [] };
   }
 
   // ─── Calendar Tasks (JSCalendar Task objects via CalendarEvent endpoints) ───
@@ -5710,7 +5719,7 @@ export class JMAPClient implements IJMAPClient {
       }
       const r = result as { notCreated?: Record<string, { description?: string; type?: string }> };
       if (r.notCreated) {
-        const firstErr = Object.values(r.notCreated)[0];
+        const firstErr = firstValue(r.notCreated);
         throw new Error(firstErr?.description || firstErr?.type || 'Failed to send raw email');
       }
     }
