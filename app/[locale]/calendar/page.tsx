@@ -679,7 +679,7 @@ export default function CalendarPage() {
     const master = await findMasterEvent(event);
     if (!master) return null;
     const originalRules = master.recurrenceRules
-      ? JSON.parse(JSON.stringify(master.recurrenceRules))
+      ? structuredClone(master.recurrenceRules)
       : null;
     const occurrenceDate = event.recurrenceId || event.start;
     const untilDate = new Date(occurrenceDate);

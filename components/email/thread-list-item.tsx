@@ -427,11 +427,29 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
     // thread it through (back-compat for standalone consumers).
     const currentMailboxRole = currentMailboxRoleProp ?? mailboxes.find(mb => mb.id === selectedMailbox)?.role;
     const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
-    const displayNames = showRecipient
-      ? Array.from(new Set(
-          thread.emails.flatMap(e => (e.to ?? []).map(r => r.name || r.email.split('@')[0]))
-        )).slice(0, 4)
-      : participantNames;
+    // Collect up to 4 unique recipient display names. Was: flatMap (per
+    // email per recipient allocations) → new Set → Array.from → slice(4).
+    // Now: walk emails sequentially with a Set + early exit once we have
+    // 4 names. Common case (thread of 1-2 sent emails) short-circuits
+    // before touching the rest.
+    let displayNames: string[];
+    if (showRecipient) {
+      const seen = new Set<string>();
+      const out: string[] = [];
+      outer: for (const e of thread.emails) {
+        if (!e.to) continue;
+        for (const r of e.to) {
+          const name = r.name || r.email.split('@')[0];
+          if (seen.has(name)) continue;
+          seen.add(name);
+          out.push(name);
+          if (out.length >= 4) break outer;
+        }
+      }
+      displayNames = out;
+    } else {
+      displayNames = participantNames;
+    }
     const avatarPerson = showRecipient ? latestEmail.to?.[0] : latestEmail.from?.[0];
     const hideJunkAvatarImages = currentMailboxRole === 'junk' && !showAvatarsInJunk;
 

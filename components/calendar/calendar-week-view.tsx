@@ -94,15 +94,16 @@ export function CalendarWeekView({
   }, [events]);
 
   const allDaySegments = useMemo(() => {
-    const explicitAllDay = buildWeekSegmentsRaw(
-      events.filter((event) => event.showWithoutTime),
-      weekDays,
-    );
-    const timedFullDay = buildTimedFullDayWeekSegments(
-      events.filter((event) => !event.showWithoutTime),
-      weekDays,
-    );
-
+    // Single-pass partition. Was two `.filter()` walks of the same array
+    // — events with showWithoutTime + events without — each allocating
+    // its own intermediate array.
+    const explicit: CalendarEvent[] = [];
+    const timed: CalendarEvent[] = [];
+    for (const ev of events) {
+      (ev.showWithoutTime ? explicit : timed).push(ev);
+    }
+    const explicitAllDay = buildWeekSegmentsRaw(explicit, weekDays);
+    const timedFullDay = buildTimedFullDayWeekSegments(timed, weekDays);
     return packWeekSegments([...explicitAllDay, ...timedFullDay]);
   }, [events, weekDays]);
 

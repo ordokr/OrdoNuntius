@@ -20,27 +20,34 @@ export interface StatusCounts {
  * Check if a participant matches any of the given email addresses.
  * Checks p.email, p.calendarAddress (mailto:...), and p.sendTo values.
  */
-function participantMatchesEmail(p: CalendarParticipant, lowerEmails: string[]): boolean {
-  if (p.email && lowerEmails.includes(p.email.toLowerCase())) return true;
+// O(1) membership check against the user's emails. Takes a Set to avoid
+// per-call `userEmails.includes(...)` walks — the caller builds the Set
+// once per outer call (we typically have 1-3 user emails so the Set
+// build itself is cheap, but the savings compound per participant).
+function participantMatchesEmail(p: CalendarParticipant, lowerEmails: Set<string>): boolean {
+  if (p.email && lowerEmails.has(p.email.toLowerCase())) return true;
   if (p.calendarAddress) {
     const addr = p.calendarAddress.replace(/^mailto:/i, '').toLowerCase();
-    if (addr && lowerEmails.includes(addr)) return true;
+    if (addr && lowerEmails.has(addr)) return true;
   }
   if (p.sendTo) {
-    // `for...in` avoids the per-call `Object.values` array allocation —
-    // this function is called per participant per event in calendar
-    // rendering, so the alloc compounds.
     for (const k in p.sendTo) {
       const normalized = p.sendTo[k].replace(/^mailto:/i, '').toLowerCase();
-      if (normalized && lowerEmails.includes(normalized)) return true;
+      if (normalized && lowerEmails.has(normalized)) return true;
     }
   }
   return false;
 }
 
+function lowerSet(emails: string[]): Set<string> {
+  const s = new Set<string>();
+  for (const e of emails) s.add(e.toLowerCase());
+  return s;
+}
+
 export function isOrganizer(event: CalendarEvent, userEmails: string[]): boolean {
   if (!event.participants) return false;
-  const lower = userEmails.map(e => e.toLowerCase());
+  const lower = lowerSet(userEmails);
   for (const k in event.participants) {
     const p = event.participants[k];
     if (p.roles?.owner && participantMatchesEmail(p, lower)) return true;
@@ -50,7 +57,7 @@ export function isOrganizer(event: CalendarEvent, userEmails: string[]): boolean
 
 export function getUserParticipantId(event: CalendarEvent, userEmails: string[]): string | null {
   if (!event.participants) return null;
-  const lower = userEmails.map(e => e.toLowerCase());
+  const lower = lowerSet(userEmails);
   for (const id in event.participants) {
     if (participantMatchesEmail(event.participants[id], lower)) return id;
   }
@@ -62,7 +69,7 @@ export function getUserStatus(
   userEmails: string[]
 ): CalendarParticipant['participationStatus'] | null {
   if (!event.participants) return null;
-  const lower = userEmails.map(e => e.toLowerCase());
+  const lower = lowerSet(userEmails);
   for (const k in event.participants) {
     const p = event.participants[k];
     if (participantMatchesEmail(p, lower)) return p.participationStatus;

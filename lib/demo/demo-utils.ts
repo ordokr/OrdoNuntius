@@ -31,5 +31,9 @@ export function demoISODate(daysOffset: number, hours: number = 0, minutes: numb
 
 /** Deep clone fixture data so in-memory mutations don't corrupt originals. */
 export function cloneFixtures<T>(data: T): T {
-  return JSON.parse(JSON.stringify(data));
+  // structuredClone — skips the intermediate string allocation that
+  // JSON.parse(JSON.stringify(...)) needs, and handles Date/Map/Set
+  // correctly. Demo fixtures don't currently use those but the habit
+  // is right.
+  return structuredClone(data);
 }
