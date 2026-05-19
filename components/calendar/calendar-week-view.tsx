@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
 import { EventCard } from "./event-card";
 import { QuickEventInput } from "./quick-event-input";
-import { buildTimedFullDayWeekSegments, buildWeekSegmentsRaw, formatSnapTime, getEventDayBounds, getPrimaryCalendarId, isTimedEventFullDayOnDate, layoutOverlappingEvents, packWeekSegments } from "@/lib/calendar-utils";
+import { buildTimedFullDayWeekSegments, buildWeekSegmentsRaw, formatSnapTime, getEventDayBounds, getPrimaryCalendarId, isTimedEventFullDayOnDate, layoutOverlappingEvents, packWeekSegments, type CalendarWeekSegment } from "@/lib/calendar-utils";
 import type { CalendarEvent, Calendar, CalendarTask } from "@/lib/jmap/types";
 import { useTimeGridInteractions } from "@/hooks/use-time-grid-interactions";
 import type { PendingEventPreview } from "./event-modal";
@@ -111,11 +111,22 @@ export function CalendarWeekView({
     }
     const explicitAllDay = buildWeekSegmentsRaw(explicit, weekDays);
     const timedFullDay = buildTimedFullDayWeekSegments(timed, weekDays);
-    return packWeekSegments([...explicitAllDay, ...timedFullDay]);
+    // Pre-sized concat replaces `[...explicitAllDay, ...timedFullDay]` —
+    // drops the temporary spread-array allocation per week-view render.
+    const combined: CalendarWeekSegment[] = new Array(explicitAllDay.length + timedFullDay.length);
+    for (let i = 0; i < explicitAllDay.length; i++) combined[i] = explicitAllDay[i];
+    for (let i = 0; i < timedFullDay.length; i++) combined[explicitAllDay.length + i] = timedFullDay[i];
+    return packWeekSegments(combined);
   }, [events, weekDays]);
 
   const allDayRowCount = useMemo(() => {
-    return allDaySegments.reduce((maxRows, segment) => Math.max(maxRows, segment.row + 1), 0);
+    // Plain loop instead of `.reduce((maxRows, segment) => Math.max(...), 0)`
+    // — drops the per-render reduce-closure allocation.
+    let max = 0;
+    for (const segment of allDaySegments) {
+      if (segment.row + 1 > max) max = segment.row + 1;
+    }
+    return max;
   }, [allDaySegments]);
 
   // Tasks grouped by day for the week
@@ -126,9 +137,14 @@ export function CalendarWeekView({
       if (!task.due) continue;
       try {
         const key = format(parseISO(task.due), "yyyy-MM-dd");
-        const existing = map.get(key) || [];
-        existing.push(task);
-        map.set(key, existing);
+        // Lazy-allocate per key — was `map.get(key) || []` which created
+        // a throwaway empty array on every cache miss before `.set`.
+        let arr = map.get(key);
+        if (!arr) {
+          arr = [];
+          map.set(key, arr);
+        }
+        arr.push(task);
       } catch { /* skip */ }
     }
     return map;

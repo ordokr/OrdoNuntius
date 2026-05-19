@@ -101,7 +101,12 @@ export function CalendarMonthView({
   const weekSegments = useMemo(() => {
     return weeks.map((week) => {
       const segments = buildWeekSegments(events, week);
-      const rowCount = segments.reduce((maxRows, segment) => Math.max(maxRows, segment.row + 1), 0);
+      // Plain loop replaces `.reduce(... Math.max ...)` — drops the closure
+      // allocation. Runs per week per month-view render (5-6 calls).
+      let rowCount = 0;
+      for (const segment of segments) {
+        if (segment.row + 1 > rowCount) rowCount = segment.row + 1;
+      }
       return { week, segments, rowCount };
     });
   }, [events, weeks]);
