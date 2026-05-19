@@ -3549,52 +3549,78 @@ export class JMAPClient implements IJMAPClient {
     filter?: Record<string, unknown>,
   ): Promise<ContactCard[]> {
     const batchSize = this.getMaxObjectsInGet();
-    const allIds: string[] = [];
-    let position = 0;
+    const using = this.contactUsing();
 
-    // Paginate ContactCard/query to collect all IDs
+    // First request: query first page AND fetch its results in a single
+    // RTT via JMAP back-reference. For the common case of a small address
+    // book (< batchSize contacts), this is the only RTT.
+    const firstQueryArgs: Record<string, unknown> = { accountId, position: 0, limit: batchSize };
+    if (filter) firstQueryArgs.filter = filter;
+
+    const firstResp = await this.request([
+      ["ContactCard/query", firstQueryArgs, "q0"],
+      ["ContactCard/get", {
+        accountId,
+        "#ids": { resultOf: "q0", name: "ContactCard/query", path: "/ids" },
+      }, "g0"],
+    ], using);
+
+    const firstQuery = firstResp.methodResponses?.[0];
+    if (firstQuery?.[0] !== "ContactCard/query") return [];
+    const firstIds: string[] = firstQuery[1].ids || [];
+    if (firstIds.length === 0) return [];
+
+    const total: number = firstQuery[1].total ?? -1;
+    const firstGet = firstResp.methodResponses?.[1];
+    const allContacts: ContactCard[] = firstGet?.[0] === "ContactCard/get"
+      ? ((firstGet[1].list || []) as ContactCard[]).slice()
+      : [];
+
+    // If the first page held everything, we're done.
+    if (firstIds.length < batchSize || (total > 0 && firstIds.length >= total)) {
+      return allContacts;
+    }
+
+    // Paginate the rest of the IDs (sequential — each query depends on the
+    // previous position). Collect the IDs first, then fan out the gets in
+    // parallel: contiguous slices of `allIds` need maxObjectsInGet-sized
+    // batches so we respect the server-advertised limit.
+    const extraIds: string[] = [];
+    let position = firstIds.length;
     for (;;) {
       const queryArgs: Record<string, unknown> = { accountId, position, limit: batchSize };
-      if (filter) {
-        queryArgs.filter = filter;
-      }
+      if (filter) queryArgs.filter = filter;
 
-      const response = await this.request([
+      const resp = await this.request([
         ["ContactCard/query", queryArgs, "q"],
-      ], this.contactUsing());
-
-      const queryResult = response.methodResponses?.[0];
-      if (queryResult?.[0] !== "ContactCard/query") break;
-
-      const ids: string[] = queryResult[1].ids || [];
-      allIds.push(...ids);
-
-      const total: number = queryResult[1].total ?? -1;
-      if (ids.length < batchSize || (total > 0 && allIds.length >= total)) {
-        break;
-      }
+      ], using);
+      const qr = resp.methodResponses?.[0];
+      if (qr?.[0] !== "ContactCard/query") break;
+      const ids: string[] = qr[1].ids || [];
+      for (const id of ids) extraIds.push(id);
+      const t: number = qr[1].total ?? -1;
+      if (ids.length < batchSize || (t > 0 && firstIds.length + extraIds.length >= t)) break;
       position += ids.length;
     }
 
-    if (allIds.length === 0) return [];
+    if (extraIds.length === 0) return allContacts;
 
-    // Batch ContactCard/get to respect maxObjectsInGet. Each batch is
-    // independent — parallelize. For an account with 10k contacts and a
-    // server batch size of 500 that's 20 sequential RTTs → 1 RTT.
+    // Parallel gets for remaining IDs.
     const batchPromises: Promise<ContactCard[]>[] = [];
-    for (let i = 0; i < allIds.length; i += batchSize) {
-      const chunk = allIds.slice(i, i + batchSize);
+    for (let i = 0; i < extraIds.length; i += batchSize) {
+      const chunk = extraIds.slice(i, i + batchSize);
       batchPromises.push((async () => {
-        const response = await this.request([
+        const resp = await this.request([
           ["ContactCard/get", { accountId, ids: chunk }, "g"],
-        ], this.contactUsing());
-        if (response.methodResponses?.[0]?.[0] !== "ContactCard/get") return [];
-        return (response.methodResponses[0][1].list || []) as ContactCard[];
+        ], using);
+        if (resp.methodResponses?.[0]?.[0] !== "ContactCard/get") return [];
+        return (resp.methodResponses[0][1].list || []) as ContactCard[];
       })());
     }
     const batches = await Promise.all(batchPromises);
-    const allContacts: ContactCard[] = [];
-    for (const batch of batches) allContacts.push(...batch);
+    for (const batch of batches) {
+      for (const c of batch) allContacts.push(c);
+    }
     return allContacts;
   }
 
@@ -4086,10 +4112,14 @@ export class JMAPClient implements IJMAPClient {
     try {
       const accountId = targetAccountId || this.getCalendarsAccountId();
 
+      const using = this.calendarUsing();
+      const GET_BATCH_SIZE = this.getMaxObjectsInGet();
+      const effectiveLimit = limit || 1000;
+
       const queryArgs: Record<string, unknown> = {
         accountId,
         filter,
-        limit: limit || 1000,
+        limit: effectiveLimit,
       };
       // NOTE: We do NOT use expandRecurrences because Stalwart returns synthetic
       // IDs that cannot be used for CalendarEvent/set (update/destroy).
@@ -4098,30 +4128,46 @@ export class JMAPClient implements IJMAPClient {
         queryArgs.sort = sort;
       }
 
-      const GET_BATCH_SIZE = this.getMaxObjectsInGet();
+      // Pipeline query + first-batch get via JMAP back-reference (#ids):
+      // saves 1 RTT in the common case where all matched IDs fit in one
+      // server batch (< GET_BATCH_SIZE events in the date range — typical
+      // for a month view). Was: query RTT + parallel get RTTs (so 2 RTTs
+      // minimum). Now: 1 RTT for query+first-get, then any remaining
+      // batches fire in parallel.
+      const firstResponse = await this.request([
+        ["CalendarEvent/query", queryArgs, "q"],
+        ["CalendarEvent/get", {
+          accountId,
+          properties: [...CALENDAR_EVENT_PROPERTIES],
+          "#ids": { resultOf: "q", name: "CalendarEvent/query", path: "/ids" },
+        }, "g0"]
+      ], using);
 
-      // First, query to get IDs
-      const queryResponse = await this.request([
-        ["CalendarEvent/query", queryArgs, "0"],
-      ], this.calendarUsing());
-
-      if (queryResponse.methodResponses?.[0]?.[0] === "error") {
-        const error = queryResponse.methodResponses[0][1];
+      const queryResp = firstResponse.methodResponses?.[0];
+      if (queryResp?.[0] === "error") {
+        const error = queryResp[1];
         throw new Error(error?.description || error?.type || "CalendarEvent/query failed");
       }
 
-      const ids: string[] = queryResponse.methodResponses?.[0]?.[1]?.ids || [];
+      const ids: string[] = queryResp?.[1]?.ids || [];
       if (ids.length === 0) return [];
 
-      // Batch the /get calls to stay within server max-objects limit.
-      // Each batch is independent — parallelize. Was: N/B sequential
-      // RTTs (e.g. 20 sequential calls for 10k events with batch 500).
-      // Pre-compute slice indices, then fire all batch fetches in
-      // parallel. Server is the same connection — JMAP servers tolerate
-      // pipelined requests within one HTTP/2 stream.
+      const firstGet = firstResponse.methodResponses?.[1];
+      const firstBatch: CalendarEvent[] = firstGet?.[0] === "CalendarEvent/get"
+        ? ((firstGet[1].list || []) as CalendarEvent[])
+        : [];
+
+      // Any remaining IDs the server didn't return in the first get (it
+      // capped at maxObjectsInGet, or the caller asked for more than fits
+      // in one batch) are fetched in parallel chunks now.
+      const fetched = new Set<string>();
+      for (const e of firstBatch) fetched.add(e.id);
+      const remaining: string[] = [];
+      for (const id of ids) if (!fetched.has(id)) remaining.push(id);
+
       const batchPromises: Promise<CalendarEvent[]>[] = [];
-      for (let i = 0; i < ids.length; i += GET_BATCH_SIZE) {
-        const batchIds = ids.slice(i, i + GET_BATCH_SIZE);
+      for (let i = 0; i < remaining.length; i += GET_BATCH_SIZE) {
+        const batchIds = remaining.slice(i, i + GET_BATCH_SIZE);
         batchPromises.push((async () => {
           const getResponse = await this.request([
             ["CalendarEvent/get", {
@@ -4129,12 +4175,13 @@ export class JMAPClient implements IJMAPClient {
               properties: [...CALENDAR_EVENT_PROPERTIES],
               ids: batchIds,
             }, "0"]
-          ], this.calendarUsing());
+          ], using);
           if (getResponse.methodResponses?.[0]?.[0] !== "CalendarEvent/get") return [];
           return (getResponse.methodResponses[0][1].list || []) as CalendarEvent[];
         })());
       }
-      const batches = await Promise.all(batchPromises);
+      const restBatches = await Promise.all(batchPromises);
+      const batches: CalendarEvent[][] = [firstBatch, ...restBatches];
 
       // Fused filter+map. Was two chained array allocations
       // (`.filter(...).map(...)`) over a possibly-large allEvents array.
