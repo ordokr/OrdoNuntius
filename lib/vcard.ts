@@ -838,7 +838,8 @@ function generateSingleVCard(contact: ContactCard): string {
 
   // GEO and TZ from addresses
   if (contact.addresses) {
-    for (const addr of Object.values(contact.addresses)) {
+    for (const k in contact.addresses) {
+      const addr = contact.addresses[k];
       if (addr.coordinates) {
         lines.push(`GEO:${addr.coordinates}`);
       }
@@ -853,7 +854,12 @@ function generateSingleVCard(contact: ContactCard): string {
       ? grammaticalGenderToVcardSex(contact.speakToAs.grammaticalGender)
       : "";
     const pronouns = contact.speakToAs.pronouns;
-    const identity = pronouns ? Object.values(pronouns)[0]?.pronouns || "" : "";
+    // Zero-alloc first-key pick — was `Object.values(...)[0]` which builds
+    // the values-array just to read index 0.
+    let identity = "";
+    if (pronouns) {
+      for (const k in pronouns) { identity = pronouns[k]?.pronouns || ""; break; }
+    }
     if (sex || identity) {
       lines.push(`GENDER:${sex}${identity ? `;${identity}` : ""}`);
     }
@@ -886,18 +892,24 @@ export function detectDuplicates(
   const dupes = new Map<number, string>();
   const existingEmails = new Map<string, string>();
 
+  // for...in over the emails Record drops the Object.values allocation
+  // per contact. detectDuplicates runs once per import, walking both sides:
+  // (existing × emails) + (incoming × emails). For a 5000-contact import
+  // this saves ~10k throwaway arrays.
   for (const c of existing) {
     if (c.emails) {
-      for (const e of Object.values(c.emails)) {
-        existingEmails.set(e.address.toLowerCase(), c.id);
+      const emails = c.emails;
+      for (const k in emails) {
+        existingEmails.set(emails[k].address.toLowerCase(), c.id);
       }
     }
   }
 
   incoming.forEach((card, idx) => {
     if (card.emails) {
-      for (const e of Object.values(card.emails)) {
-        const match = existingEmails.get(e.address.toLowerCase());
+      const emails = card.emails;
+      for (const k in emails) {
+        const match = existingEmails.get(emails[k].address.toLowerCase());
         if (match) {
           dupes.set(idx, match);
           return;

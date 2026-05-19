@@ -106,9 +106,12 @@ export function ContactsSidebar({
   }, [showMenu]);
 
   const sortedGroups = useMemo(() => {
-    return [...groups].sort((a, b) =>
-      getContactDisplayName(a).localeCompare(getContactDisplayName(b))
-    );
+    // Schwartzian: was `.sort((a, b) => getContactDisplayName(a).localeCompare(
+    // getContactDisplayName(b)))` which calls getContactDisplayName twice
+    // per comparison (so O(N log N) total). Decorate once → O(N).
+    const decorated = groups.map(g => ({ g, name: getContactDisplayName(g) }));
+    decorated.sort((a, b) => a.name.localeCompare(b.name));
+    return decorated.map(d => d.g);
   }, [groups]);
 
   const isAllActive = activeCategory === "all";
