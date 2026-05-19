@@ -335,10 +335,22 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
         // is functionally the inbox. Without this, fetchMailboxes would
         // leave selectedMailbox='' and the follow-up fetchEmails would
         // query without a mailbox constraint, returning empty.
-        const primary = mailboxes.filter(m => !m.isShared);
-        const inboxMailbox =
-          primary.find(m => m.role === 'inbox') ||
-          primary.find(m => (m.name || '').trim().toLowerCase() === 'inbox');
+        // Single-pass scan: find the role match if any, otherwise fall
+        // back to a name match. Was: filter to primary + two `.find()`
+        // walks over that filtered array.
+        let inboxMailbox: Mailbox | undefined;
+        let inboxByName: Mailbox | undefined;
+        for (const m of mailboxes) {
+          if (m.isShared) continue;
+          if (m.role === 'inbox') {
+            inboxMailbox = m;
+            break;
+          }
+          if (!inboxByName && (m.name || '').trim().toLowerCase() === 'inbox') {
+            inboxByName = m;
+          }
+        }
+        inboxMailbox ||= inboxByName;
         if (inboxMailbox) {
           set({ mailboxes, selectedMailbox: inboxMailbox.id, ...loadingPatch });
           // Cache for next cold-load so prefetchInitialData can fire Email/query
