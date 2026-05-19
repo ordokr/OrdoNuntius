@@ -466,7 +466,9 @@ export const useThemeStore = create<ThemeState>()(
         return (state) => {
           if (state) {
             // Ensure built-in themes are always present after rehydration
-            const builtInIds = new Set(BUILTIN_THEMES.map(t => t.id));
+            // Direct Set build skips the .map(t => t.id) intermediate.
+            const builtInIds = new Set<string>();
+            for (const t of BUILTIN_THEMES) builtInIds.add(t.id);
             const userThemes = state.installedThemes.filter(t => !builtInIds.has(t.id));
             state.installedThemes = [...BUILTIN_THEMES, ...userThemes];
 

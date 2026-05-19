@@ -43,25 +43,31 @@ export function findReplyIdentityId(
     return null;
   }
 
-  const receivedAddresses = [
-    ...(recipients.to || []),
-    ...(recipients.cc || []),
-    ...(recipients.bcc || []),
-  ]
-    .map((recipient) => recipient.email?.trim())
-    .filter((email): email is string => Boolean(email));
+  // Single-pass build: drops three spread copies (to/cc/bcc), the
+  // .map() trim array, the .filter() result, AND the two Set constructor
+  // intermediates. Walk each recipient list once, collecting trimmed
+  // emails directly into both Sets.
+  const exactMatches = new Set<string>();
+  const baseMatches = new Set<string>();
+  for (const list of [recipients.to, recipients.cc, recipients.bcc]) {
+    if (!list) continue;
+    for (const r of list) {
+      const email = r.email?.trim();
+      if (!email) continue;
+      exactMatches.add(normalizeEmailAddress(email));
+      baseMatches.add(normalizeBaseEmailAddress(email));
+    }
+  }
 
-  if (receivedAddresses.length === 0) {
+  if (exactMatches.size === 0) {
     return null;
   }
 
-  const exactMatches = new Set(receivedAddresses.map(normalizeEmailAddress));
   const exactIdentity = identities.find((identity) => exactMatches.has(normalizeEmailAddress(identity.email)));
   if (exactIdentity) {
     return exactIdentity.id;
   }
 
-  const baseMatches = new Set(receivedAddresses.map(normalizeBaseEmailAddress));
   const baseIdentity = identities.find((identity) => baseMatches.has(normalizeBaseEmailAddress(identity.email)));
 
   return baseIdentity?.id ?? null;

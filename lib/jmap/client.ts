@@ -820,8 +820,10 @@ export class JMAPClient implements IJMAPClient {
           );
         }
 
-        // Log parentId references to detect potential orphans
-        const returnedIds = new Set(rawMailboxes.map(mb => mb.id));
+        // Log parentId references to detect potential orphans.
+        // Direct Set build skips the .map(mb => mb.id) intermediate.
+        const returnedIds = new Set<string>();
+        for (const mb of rawMailboxes) returnedIds.add(mb.id);
         const missingParents = rawMailboxes.filter(mb => mb.parentId && !returnedIds.has(mb.parentId));
         if (missingParents.length > 0) {
           debug.warn('jmap', 
