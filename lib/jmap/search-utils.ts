@@ -28,12 +28,14 @@ export const DEFAULT_SEARCH_FILTERS: SearchFilters = {
  * which matches "prime", "primary", etc.
  */
 export function toWildcardQuery(query: string): string {
-  return query
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((word) => (word.endsWith('*') || word.endsWith('"') ? word : word + '*'))
-    .join(' ');
+  // Single push loop replaces .filter(Boolean).map(...) chain — drops two
+  // intermediate arrays per call. Runs on every (debounced) search keystroke.
+  const parts: string[] = [];
+  for (const word of query.trim().split(/\s+/)) {
+    if (!word) continue;
+    parts.push(word.endsWith('*') || word.endsWith('"') ? word : word + '*');
+  }
+  return parts.join(' ');
 }
 
 export function buildJMAPFilter(
