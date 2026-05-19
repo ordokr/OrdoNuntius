@@ -8,6 +8,7 @@ import { X, Trash2, CalendarDays, Bell, Flag } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 import type { CalendarTask, Calendar, CalendarEventAlert } from "@/lib/jmap/types";
+import { firstValue } from "@/lib/utils";
 
 interface TaskModalProps {
   task?: CalendarTask | null;
@@ -68,7 +69,7 @@ export function TaskModal({
   });
   const [alertOption, setAlertOption] = useState<AlertOption>(() => {
     if (!task?.alerts) return "none";
-    const first = Object.values(task.alerts)[0];
+    const first = firstValue(task.alerts);
     if (!first || first.trigger["@type"] !== "OffsetTrigger") return "none";
     const offset = first.trigger.offset;
     if (offset === "PT0S") return "at_time";

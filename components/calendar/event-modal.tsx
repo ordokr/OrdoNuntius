@@ -17,7 +17,7 @@ import {
 } from "@/lib/calendar-participants";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { useSettingsStore } from "@/stores/settings-store";
-import { generateUUID } from "@/lib/utils";
+import { firstValue, generateUUID } from "@/lib/utils";
 import { useFormatEventDate } from "@/hooks/use-format-event-date";
 import { calendarHooks } from "@/lib/plugin-hooks";
 import type { ConflictWarning } from "@/lib/plugin-types";
@@ -85,7 +85,7 @@ function formatDurationDisplay(minutes: number): string {
 
 function getAlertLabel(event: CalendarEvent, t: ReturnType<typeof useTranslations>): string | null {
   if (!event.alerts) return null;
-  const first = Object.values(event.alerts)[0];
+  const first = firstValue(event.alerts);
   if (!first || first.trigger["@type"] !== "OffsetTrigger") return null;
   const offset = first.trigger.offset;
   if (offset === "PT0S") return t("alerts.at_time");
@@ -187,12 +187,8 @@ export function EventModal({
 
   const [title, setTitle] = useState(event?.title || "");
   const [description, setDescription] = useState(event?.description || "");
-  const [location, setLocation] = useState(
-    event?.locations ? Object.values(event.locations)[0]?.name || "" : ""
-  );
-  const [virtualLocation, setVirtualLocation] = useState(
-    event?.virtualLocations ? Object.values(event.virtualLocations)[0]?.uri || "" : ""
-  );
+  const [location, setLocation] = useState(firstValue(event?.locations)?.name || "");
+  const [virtualLocation, setVirtualLocation] = useState(firstValue(event?.virtualLocations)?.uri || "");
   const [startDate, setStartDate] = useState(formatDateInput(getInitialStart()));
   const [startTime, setStartTime] = useState(formatTimeInput(getInitialStart()));
   const [endDate, setEndDate] = useState(formatDateInput(getInitialEnd()));
@@ -210,7 +206,7 @@ export function EventModal({
   });
   const [alert, setAlert] = useState<AlertOption>(() => {
     if (!event?.alerts) return "none";
-    const first = Object.values(event.alerts)[0];
+    const first = firstValue(event.alerts);
     if (!first) return "none";
     if (first.trigger["@type"] === "OffsetTrigger") {
       const offset = first.trigger.offset;
@@ -516,7 +512,7 @@ export function EventModal({
   if (isAttendeeMode && event) {
     const startD = getEventStartDate(event);
     const endD = getEventEndDate(event);
-    const locationName = event.locations ? Object.values(event.locations)[0]?.name : null;
+    const locationName = firstValue(event.locations)?.name ?? null;
     const participants = existingParticipants;
 
     return (
@@ -627,8 +623,8 @@ export function EventModal({
     const startD = getEventStartDate(event);
     const durMin = parseDuration(event.duration);
     const endD = getEventEndDate(event);
-    const locationName = event.locations ? Object.values(event.locations)[0]?.name || null : null;
-    const virtualLoc = event.virtualLocations ? Object.values(event.virtualLocations)[0]?.uri || null : null;
+    const locationName = firstValue(event.locations)?.name ?? null;
+    const virtualLoc = firstValue(event.virtualLocations)?.uri ?? null;
     const viewParticipants = existingParticipants;
     const recurrenceLabel = getRecurrenceLabel(event, t);
     const alertLabel = getAlertLabel(event, t);

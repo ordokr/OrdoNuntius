@@ -8,6 +8,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Zero-allocation "first value" picker for Record-shaped maps. Replaces
+ * `Object.values(rec)[0]` which builds the full values-array just to read
+ * index 0. Returns undefined on empty/null/undefined input.
+ *
+ * Useful for "pick the primary alert/location/etc." style code that
+ * doesn't care which entry it gets, only that there is one.
+ */
+export function firstValue<T>(rec: Record<string, T> | null | undefined): T | undefined {
+  if (!rec) return undefined;
+  for (const k in rec) return rec[k];
+  return undefined;
+}
+
 export function generateUUID(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();

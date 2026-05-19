@@ -4,7 +4,7 @@ import { useMemo, useRef, useEffect, useCallback } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { format, isToday, isTomorrow, startOfDay } from "date-fns";
 import { MapPin, Users } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, firstValue } from "@/lib/utils";
 import { getEventColor } from "./event-card";
 import { getEventDayBounds, getEventEndDate, getEventStartDate, getPrimaryCalendarId } from "@/lib/calendar-utils";
 import { getParticipantCount } from "@/lib/calendar-participants";
@@ -151,9 +151,7 @@ export function CalendarAgendaView({
               const color = getEventColor(ev, calendar);
               const start = getEventStartDate(ev);
               const end = getEventEndDate(ev);
-              const locationName = ev.locations
-                ? Object.values(ev.locations)[0]?.name
-                : null;
+              const locationName = firstValue(ev.locations)?.name ?? null;
 
               return (
                 <button
