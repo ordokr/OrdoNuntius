@@ -45,6 +45,7 @@ const KeyboardShortcutsModal = dynamic(
   { ssr: false, loading: () => null }
 );
 import { useEmailStore } from "@/stores/email-store";
+import { mailboxByIdLookup } from "@/stores/email-slices/_helpers";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "@/stores/toast-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
@@ -540,7 +541,7 @@ export default function Home() {
           // Email isn't in the current list (e.g. mailbox just changed).
           // Fetch it directly.
           try {
-            const mailbox = ctx.mailboxes.find(mb => mb.id === state.mailboxId);
+            const mailbox = state.mailboxId ? mailboxByIdLookup(ctx.mailboxes).get(state.mailboxId) : undefined;
             const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
             const fullEmail = await ctx.client.getEmail(state.emailId, accountId);
             if (fullEmail) selectEmail(fullEmail);
@@ -618,7 +619,7 @@ export default function Home() {
     },
     onDelete: async () => {
       if (selectedEmailIds.size > 0 && client) {
-        const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+        const currentMailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
         const isInTrash = currentMailbox?.role === 'trash';
         const isInJunk = currentMailbox?.role === 'junk';
         const permanentlyDeleteJunk = useSettingsStore.getState().permanentlyDeleteJunk;
@@ -662,7 +663,7 @@ export default function Home() {
       }
     },
     onToggleSpam: async () => {
-      const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+      const currentMailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
       const isInJunk = currentMailbox?.role === 'junk';
       if (selectedEmailIds.size > 0 && client) {
         const ids = Array.from(selectedEmailIds);
@@ -754,7 +755,7 @@ export default function Home() {
       title = `${subject} - ${appName}`;
     } else if (selectedMailbox && mailboxes.length > 0) {
       // Mailbox view
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      const mailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
       if (mailbox) {
         const mailboxName = mailbox.name;
         const unreadCount = mailbox.unreadEmails || 0;
@@ -1163,7 +1164,7 @@ export default function Home() {
     // The email list only fetches limited properties (no bodyValues/htmlBody/bcc).
     // Fetch the full email so the composer gets all draft content.
     if (!draft.bodyValues) {
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      const mailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
       const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
       const fullDraft = await client.getEmail(draft.id, accountId);
       if (!fullDraft) return;
@@ -1236,7 +1237,7 @@ export default function Home() {
     if (!client || !emailToDelete) return;
 
     // Check if we're currently in the trash or junk folder
-    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+    const currentMailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
     const isInTrash = currentMailbox?.role === 'trash';
     const isInJunk = currentMailbox?.role === 'junk';
     const permanentlyDeleteJunk = useSettingsStore.getState().permanentlyDeleteJunk;
@@ -1621,7 +1622,7 @@ export default function Home() {
 
   const handleEmptyFolderFromContextMenu = async (mailboxId: string) => {
     if (!client) return;
-    const mailbox = mailboxes.find(mb => mb.id === mailboxId);
+    const mailbox = mailboxByIdLookup(mailboxes).get(mailboxId);
     if (!mailbox) return;
 
     const confirmed = await confirmDialog({
@@ -1676,7 +1677,7 @@ export default function Home() {
 
   const handleRenameFolderFromContextMenu = async (mailboxId: string) => {
     if (!client) return;
-    const mailbox = mailboxes.find(mb => mb.id === mailboxId);
+    const mailbox = mailboxByIdLookup(mailboxes).get(mailboxId);
     if (!mailbox) return;
     const name = await promptDialog({
       title: tCtxMenu('mailbox_context_menu.rename'),
@@ -1696,7 +1697,7 @@ export default function Home() {
 
   const handleDeleteFolderFromContextMenu = async (mailboxId: string) => {
     if (!client) return;
-    const mailbox = mailboxes.find(mb => mb.id === mailboxId);
+    const mailbox = mailboxByIdLookup(mailboxes).get(mailboxId);
     if (!mailbox) return;
 
     const confirmed = await confirmDialog({
@@ -1724,7 +1725,7 @@ export default function Home() {
 
   const handleImportEmailFromContextMenu = (mailboxId: string) => {
     if (!client) return;
-    const mailbox = mailboxes.find(mb => mb.id === mailboxId);
+    const mailbox = mailboxByIdLookup(mailboxes).get(mailboxId);
     if (!mailbox) return;
     const targetMailboxId = mailbox.originalId || mailbox.id;
 
@@ -1935,7 +1936,7 @@ export default function Home() {
   }
 
   // Get current mailbox name for mobile header
-  const currentMailboxName = mailboxes.find(m => m.id === selectedMailbox)?.name || "Inbox";
+  const currentMailboxName = mailboxByIdLookup(mailboxes).get(selectedMailbox)?.name || "Inbox";
   const isFocusedMailLayout = mailLayout === 'focus';
   const isHorizontalMailLayout = mailLayout === 'horizontal' && !isMobile && !isTablet;
   const hasViewerContent = showComposer || Boolean(conversationThread) || Boolean(selectedEmail);
@@ -1984,7 +1985,7 @@ export default function Home() {
       // For shared folders on the primary client, we still need to pass the
       // shared account's id. In unified view we use the per-account client
       // directly, so no explicit accountId is needed.
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      const mailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
       const accountId = perAccountClient
         ? undefined
         : mailbox?.isShared ? mailbox.accountId : undefined;
@@ -2704,7 +2705,7 @@ export default function Home() {
                     }}
                     currentUserEmail={client?.getUsername()}
                     currentUserName={client?.getUsername()?.split("@")[0]}
-                    currentMailboxRole={mailboxes.find(m => m.id === selectedMailbox)?.role}
+                    currentMailboxRole={mailboxByIdLookup(mailboxes).get(selectedMailbox)?.role}
                     mailboxes={mailboxes}
                     selectedMailbox={selectedMailbox}
                     onMoveToMailbox={async (mailboxId) => {
