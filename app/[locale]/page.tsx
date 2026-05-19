@@ -139,11 +139,27 @@ export default function Home() {
   const [pendingMailtoAccountChoice, setPendingMailtoAccountChoice] = useState<ParsedMailto | null>(null);
   const [isProtocolAccountSwitching, setIsProtocolAccountSwitching] = useState(false);
   const markAsReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { isAuthenticated, client, logout, checkAuth, switchAccount, activeAccountId, isLoading: authLoading, connectionLost, isRateLimited, rateLimitUntil } = useAuthStore();
-  const { identities } = useIdentityStore();
+  // useShallow narrows from "any auth-store mutation" to "any of these
+  // 10 fields changed". Without it, every set() on the auth store —
+  // even ones we don't read (e.g., serverUrl, username, primary identity
+  // updates) — re-rendered the whole inbox tree.
+  const { isAuthenticated, client, logout, checkAuth, switchAccount, activeAccountId, isLoading: authLoading, connectionLost, isRateLimited, rateLimitUntil } = useAuthStore(useShallow(s => ({
+    isAuthenticated: s.isAuthenticated,
+    client: s.client,
+    logout: s.logout,
+    checkAuth: s.checkAuth,
+    switchAccount: s.switchAccount,
+    activeAccountId: s.activeAccountId,
+    isLoading: s.isLoading,
+    connectionLost: s.connectionLost,
+    isRateLimited: s.isRateLimited,
+    rateLimitUntil: s.rateLimitUntil,
+  })));
+  const identities = useIdentityStore(s => s.identities);
   useIdentitySync();
   const trustedSendersAddressBook = useSettingsStore((state) => state.trustedSendersAddressBook);
-  const { loadTrustedSendersBook, trustedSendersLoaded } = useContactStore();
+  const loadTrustedSendersBook = useContactStore(s => s.loadTrustedSendersBook);
+  const trustedSendersLoaded = useContactStore(s => s.trustedSendersLoaded);
 
   // Load trusted senders address book when feature is enabled
   useEffect(() => {
@@ -252,7 +268,28 @@ export default function Home() {
 
   // Mobile/tablet responsive hooks
   const { isMobile, isTablet } = useDeviceDetection();
-  const { activeView, sidebarOpen, setSidebarOpen, setActiveView, tabletListVisible, setTabletListVisible, sidebarWidth, emailListWidth, emailListHeight, setSidebarWidth, setEmailListWidth, setEmailListHeight, persistColumnWidths, sidebarCollapsed, resetSidebarWidth, resetEmailListWidth, resetEmailListHeight } = useUIStore();
+  // Same useShallow rationale: prevents every UI store mutation
+  // (device-type change, mobile flag, drag-drop transitions) from
+  // re-rendering this page and its child email tree.
+  const { activeView, sidebarOpen, setSidebarOpen, setActiveView, tabletListVisible, setTabletListVisible, sidebarWidth, emailListWidth, emailListHeight, setSidebarWidth, setEmailListWidth, setEmailListHeight, persistColumnWidths, sidebarCollapsed, resetSidebarWidth, resetEmailListWidth, resetEmailListHeight } = useUIStore(useShallow(s => ({
+    activeView: s.activeView,
+    sidebarOpen: s.sidebarOpen,
+    setSidebarOpen: s.setSidebarOpen,
+    setActiveView: s.setActiveView,
+    tabletListVisible: s.tabletListVisible,
+    setTabletListVisible: s.setTabletListVisible,
+    sidebarWidth: s.sidebarWidth,
+    emailListWidth: s.emailListWidth,
+    emailListHeight: s.emailListHeight,
+    setSidebarWidth: s.setSidebarWidth,
+    setEmailListWidth: s.setEmailListWidth,
+    setEmailListHeight: s.setEmailListHeight,
+    persistColumnWidths: s.persistColumnWidths,
+    sidebarCollapsed: s.sidebarCollapsed,
+    resetSidebarWidth: s.resetSidebarWidth,
+    resetEmailListWidth: s.resetEmailListWidth,
+    resetEmailListHeight: s.resetEmailListHeight,
+  })));
   // useShallow narrows the subscription from "any store mutation" to "any of
   // these listed fields changed (shallow equal)". Without it, zustand returns
   // a fresh state object on every set(), so this page re-rendered on every

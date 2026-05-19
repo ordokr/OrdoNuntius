@@ -533,6 +533,11 @@ export function EmailComposer({
       }
     }
     if (allRecipients.length === 0) return false;
+    // smimePublicCerts is in deps so the memo recomputes when the cert table
+    // changes; reading via getState() inside keeps the body lint-clean. The
+    // `void` reference below is needed because eslint can't see the indirect
+    // use and would otherwise flag the dep as unnecessary.
+    void smimePublicCerts;
     const { missing } = useSmimeStore.getState().getRecipientCerts(allRecipients);
     return missing.length === 0;
   }, [smimeKeyRecord, to, cc, bcc, smimePublicCerts]);
