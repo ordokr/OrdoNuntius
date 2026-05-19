@@ -138,10 +138,14 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
 
   addRule: (rule) => {
     // Insert new ordoNuntius rules before external/opaque rules so OrdoNuntius's
-    // managed section stays contiguous.
+    // managed section stays contiguous. Single-pass partition — was 2 filter
+    // walks over the same rules array.
     set((state) => {
-      const ordoNuntius = state.rules.filter(r => !r.origin || r.origin === 'ordo-nuntius');
-      const external = state.rules.filter(r => r.origin === 'external' || r.origin === 'opaque');
+      const ordoNuntius: FilterRule[] = [];
+      const external: FilterRule[] = [];
+      for (const r of state.rules) {
+        (r.origin === 'external' || r.origin === 'opaque' ? external : ordoNuntius).push(r);
+      }
       return { rules: [...ordoNuntius, rule, ...external] };
     });
   },
@@ -167,13 +171,20 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
 
   reorderRules: (ruleIds) => {
     // Only reorder ordoNuntius rules; external rules always stay at the end in
-    // their original order.
+    // their original order. Single-pass partition + Map build avoids the
+    // 3 separate `.filter()/.map()` allocations the old version did.
     set((state) => {
-      const ordoNuntiusMap = new Map(
-        state.rules.filter(r => !r.origin || r.origin === 'ordo-nuntius').map(r => [r.id, r]),
-      );
-      const external = state.rules.filter(r => r.origin === 'external' || r.origin === 'opaque');
-      const reordered = ruleIds.map(id => ordoNuntiusMap.get(id)).filter(Boolean) as FilterRule[];
+      const ordoNuntiusMap = new Map<string, FilterRule>();
+      const external: FilterRule[] = [];
+      for (const r of state.rules) {
+        if (r.origin === 'external' || r.origin === 'opaque') external.push(r);
+        else ordoNuntiusMap.set(r.id, r);
+      }
+      const reordered: FilterRule[] = [];
+      for (const id of ruleIds) {
+        const r = ordoNuntiusMap.get(id);
+        if (r) reordered.push(r);
+      }
       return { rules: [...reordered, ...external] };
     });
   },
