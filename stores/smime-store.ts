@@ -47,7 +47,10 @@ function readRememberedUnlocks(): RememberedUnlocks {
     }
 
     const rememberedUnlocks: RememberedUnlocks = {};
-    for (const [keyId, passphrase] of Object.entries(parsed)) {
+    // for...in over the parsed Record skips the Object.entries tuples-array.
+    const src = parsed as Record<string, unknown>;
+    for (const keyId in src) {
+      const passphrase = src[keyId];
       if (typeof passphrase === 'string') {
         rememberedUnlocks[keyId] = passphrase;
       }
@@ -359,10 +362,12 @@ export const useSmimeStore = create<SmimeStore>()(
           unlockedDecryptionKeys.delete(id);
           const unlockedLegacyDecryptionKeys = new Map(state.unlockedLegacyDecryptionKeys);
           unlockedLegacyDecryptionKeys.delete(id);
-          // Remove any identity bindings pointing to this key
+          // Remove any identity bindings pointing to this key.
+          // for...in over the cloned Record skips the Object.entries
+          // tuples-array.
           const bindings = { ...state.identityKeyBindings };
-          for (const [identityId, keyId] of Object.entries(bindings)) {
-            if (keyId === id) delete bindings[identityId];
+          for (const identityId in bindings) {
+            if (bindings[identityId] === id) delete bindings[identityId];
           }
           const accountPreferences = { ...state.accountPreferences };
           const acctId = state.currentAccountId;

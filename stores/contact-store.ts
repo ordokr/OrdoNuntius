@@ -299,13 +299,19 @@ export const useContactStore = create<ContactStore>()(
           let accountId = contact.isShared ? contact.accountId : undefined;
           let cleanedContact = contact;
 
-          // De-namespace addressBookIds if they reference a shared address book
+          // De-namespace addressBookIds if they reference a shared address book.
+          // O(1) book lookup via Map; was .find per bookId. for...in over the
+          // Record skips the Object.entries tuples-array.
           if (contact.addressBookIds) {
             const books = get().addressBooks;
+            const bookById = new Map<string, typeof books[number]>();
+            for (const b of books) bookById.set(b.id, b);
             const deNamespaced: Record<string, boolean> = {};
             let sharedAccountId: string | undefined;
-            for (const [bookId, value] of Object.entries(contact.addressBookIds)) {
-              const book = books.find(b => b.id === bookId);
+            const ids = contact.addressBookIds;
+            for (const bookId in ids) {
+              const value = ids[bookId];
+              const book = bookById.get(bookId);
               if (book?.isShared && book.originalId) {
                 deNamespaced[book.originalId] = value;
                 sharedAccountId = book.accountId;
@@ -352,12 +358,13 @@ export const useContactStore = create<ContactStore>()(
           let cleanedUpdates = updates;
           if (contact?.isShared && contact?.accountId && updates.addressBookIds) {
             const prefix = `${contact.accountId}:`;
-            const deNamespaced = Object.fromEntries(
-              Object.entries(updates.addressBookIds).map(([k, v]) => [
-                k.startsWith(prefix) ? k.slice(prefix.length) : k,
-                v
-              ])
-            );
+            // Direct build skips Object.fromEntries + entries.map sub-arrays.
+            const deNamespaced: Record<string, boolean> = {};
+            const src = updates.addressBookIds;
+            for (const k in src) {
+              const stripped = k.startsWith(prefix) ? k.slice(prefix.length) : k;
+              deNamespaced[stripped] = src[k];
+            }
             cleanedUpdates = { ...updates, addressBookIds: deNamespaced };
           }
 

@@ -28,10 +28,17 @@ export const useCalendarNotificationStore = create<CalendarNotificationStore>()(
 
       cleanupStaleAlerts: () => {
         const now = Date.now();
-        const cleaned = Object.fromEntries(
-          Object.entries(get().acknowledgedAlerts)
-            .filter(([, fireTimeMs]) => now - fireTimeMs < RETENTION_THRESHOLD_MS)
-        );
+        // Direct for...in build instead of Object.fromEntries(entries.filter):
+        // drops the entries-array, filter-array, and the fromEntries object
+        // re-allocation. Runs periodically via setInterval to prune old
+        // acknowledgements; small N typically but skipping three allocations
+        // costs nothing.
+        const src = get().acknowledgedAlerts;
+        const cleaned: Record<string, number> = {};
+        for (const key in src) {
+          const fireTimeMs = src[key];
+          if (now - fireTimeMs < RETENTION_THRESHOLD_MS) cleaned[key] = fireTimeMs;
+        }
         set({ acknowledgedAlerts: cleaned });
       },
 
