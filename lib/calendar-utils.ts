@@ -196,11 +196,26 @@ export function buildTimedFullDayWeekSegments(events: CalendarEvent[], weekDays:
 
   // Direct loop + push. Was `events.flatMap(event => { ...; return segments; })`
   // which allocated a per-event inner array AND the outer flatMap array.
-  // Also drops the per-event `weekDays.map(...).filter(...)` (2 throwaway
-  // arrays) — we scan weekDays in a single pass to detect runs of
-  // full-day indices and emit segments inline.
+  // Per-event hoist: parseISO eventStart/eventEnd ONCE per event (was
+  // re-parsed inside every `isTimedEventFullDayOnDate(event, day)` call —
+  // up to 9 times per event for 7-day weeks + 2 boundary probes).
+  // Inline the bounds check via a closure capturing the pre-parsed dates.
+  // For 100 events × 9 probes that's ~1800 parseISO calls dropped per render.
   const rawSegments: CalendarWeekSegment[] = [];
   for (const event of events) {
+    if (event.showWithoutTime) continue;
+    const eventStart = getEventStartDate(event);
+    const eventEnd = getEventEndDate(event);
+    const isFullDay = (day: Date): boolean => {
+      const dayStart = startOfDay(day);
+      const nextDayStart = addDays(dayStart, 1);
+      if (eventEnd <= dayStart || eventStart >= nextDayStart) return false;
+      const clippedStart = eventStart > dayStart ? eventStart : dayStart;
+      const clippedEnd = eventEnd < nextDayStart ? eventEnd : nextDayStart;
+      const startMinutes = Math.max(0, Math.floor((clippedStart.getTime() - dayStart.getTime()) / 60000));
+      const endMinutes = Math.min(1440, Math.ceil((clippedEnd.getTime() - dayStart.getTime()) / 60000));
+      return startMinutes === 0 && endMinutes === 1440;
+    };
     let rangeStart = -1;
     let previousIndex = -1;
     const pushSegment = (startIndex: number, endIndex: number) => {
@@ -209,12 +224,12 @@ export function buildTimedFullDayWeekSegments(events: CalendarEvent[], weekDays:
         startIndex,
         span: endIndex - startIndex + 1,
         row: -1,
-        continuesBefore: isTimedEventFullDayOnDate(event, addDays(weekDays[startIndex], -1)),
-        continuesAfter: isTimedEventFullDayOnDate(event, addDays(weekDays[endIndex], 1)),
+        continuesBefore: isFullDay(addDays(weekDays[startIndex], -1)),
+        continuesAfter: isFullDay(addDays(weekDays[endIndex], 1)),
       });
     };
     for (let i = 0; i < weekDays.length; i++) {
-      if (!isTimedEventFullDayOnDate(event, weekDays[i])) continue;
+      if (!isFullDay(weekDays[i])) continue;
       if (rangeStart === -1) {
         rangeStart = i;
       } else if (i !== previousIndex + 1) {
