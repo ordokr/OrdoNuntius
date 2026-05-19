@@ -149,10 +149,17 @@ export function ContactActivity({ contact }: ContactActivityProps) {
       )
       .then((all) => {
         if (cancelled) return;
-        const matching = all
-          .filter((e) => eventInvolvesContact(e, addrSet))
-          .sort((a, b) => a.start.localeCompare(b.start))
-          .slice(0, EVENT_LIMIT);
+        // The JMAP query already returns events sorted by start ASC
+        // (sort param above). Filter preserves order, so the explicit
+        // .sort() was redundant. Fuse filter+slice with early-break at
+        // EVENT_LIMIT — three intermediate arrays collapse to one,
+        // and we stop walking once we have enough matches.
+        const matching: typeof all = [];
+        for (const e of all) {
+          if (!eventInvolvesContact(e, addrSet)) continue;
+          matching.push(e);
+          if (matching.length >= EVENT_LIMIT) break;
+        }
         setEvents(matching);
       })
       .catch(() => {

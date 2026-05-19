@@ -45,18 +45,17 @@ export function FolderTreeSidebar({ currentPath, onNavigate, listByParentId, wid
     setLoadingIds(prev => new Set(prev).add(cacheKey));
     try {
       const resources = await listByParentId(parentId);
-      const folders = resources
-        .filter(r => r.isDirectory)
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(r => {
-          const folderPath = parentPath === "/" ? `/${r.name}` : `${parentPath}/${r.name}`;
-          pathToIdRef.current.set(folderPath, r.id);
-          return {
-            id: r.id,
-            name: r.name,
-            path: folderPath,
-          };
-        });
+      // Was `.filter(...).sort(...).map(...)` — three array allocations.
+      // Fuse filter+map into one pass; sort in place. Saves the filter
+      // intermediate and the `.map(...)` allocation.
+      const folders: FolderNode[] = [];
+      for (const r of resources) {
+        if (!r.isDirectory) continue;
+        const folderPath = parentPath === "/" ? `/${r.name}` : `${parentPath}/${r.name}`;
+        pathToIdRef.current.set(folderPath, r.id);
+        folders.push({ id: r.id, name: r.name, path: folderPath });
+      }
+      folders.sort((a, b) => a.name.localeCompare(b.name));
 
       // Don't cache empty root results - empty root likely means client wasn't ready yet
       if (folders.length > 0 || parentId !== null) {
