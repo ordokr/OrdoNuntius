@@ -227,8 +227,9 @@ export function CalendarManagementSettings() {
       .then((payload) => {
         setWellKnownCalDavUrl(payload.wellKnownUrl || null);
         const next: Record<string, string | null> = {};
-        for (const [key, value] of Object.entries(payload.accounts || {})) {
-          next[key] = value?.url || null;
+        const accounts = payload.accounts || {};
+        for (const key in accounts) {
+          next[key] = accounts[key]?.url || null;
         }
         setDiscoveredCalDavUrls(next);
       })

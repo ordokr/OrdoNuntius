@@ -340,7 +340,10 @@ export function ContactForm({ contact, addressBooks, allKeywords, defaultAddress
 
   const initialPhotoEntry = useMemo(() => {
     if (!contact?.media) return null;
-    for (const [key, m] of Object.entries(contact.media)) {
+    // for...in over the media Record skips the Object.entries tuples-array.
+    const media = contact.media;
+    for (const key in media) {
+      const m = media[key];
       if (m.kind === "photo" && m.uri) return { key, uri: m.uri, mediaType: m.mediaType };
     }
     return null;
@@ -492,14 +495,20 @@ export function ContactForm({ contact, addressBooks, allKeywords, defaultAddress
 
     const keywordsMap: Record<string, boolean> = {};
     if (keywordsStr.trim()) {
-      keywordsStr.split(",").map(k => k.trim()).filter(Boolean).forEach(k => {
-        keywordsMap[k] = true;
-      });
+      // Was split.map.filter.forEach (three intermediate arrays). Walk
+      // the split result once with inline trim/check.
+      for (const part of keywordsStr.split(",")) {
+        const k = part.trim();
+        if (k) keywordsMap[k] = true;
+      }
     }
 
     const mediaMap: Record<string, ContactMedia> = {};
     if (contact?.media) {
-      for (const [key, m] of Object.entries(contact.media)) {
+      // for...in over the media Record skips the Object.entries tuples-array.
+      const media = contact.media;
+      for (const key in media) {
+        const m = media[key];
         if (m.kind !== "photo") mediaMap[key] = m;
       }
     }

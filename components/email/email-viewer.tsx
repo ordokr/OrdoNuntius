@@ -2222,11 +2222,14 @@ export function EmailViewer({
     // Additional headers
     if (email.headers) {
       source += '\n--- Additional Headers ---\n';
-      // Headers should now always be a Record after client processing
-      Object.entries(email.headers).forEach(([key, value]) => {
+      // Headers should now always be a Record after client processing.
+      // for...in over the Record skips the Object.entries tuples-array.
+      const headers = email.headers;
+      for (const key in headers) {
+        const value = headers[key];
         const val = Array.isArray(value) ? value.join('\n    ') : String(value);
         source += `${key}: ${val}\n`;
-      });
+      }
     }
 
     // Authentication results
@@ -2262,11 +2265,12 @@ export function EmailViewer({
     source += `Size: ${formatFileSize(email.size)}\n`;
     source += `Has Attachment: ${email.hasAttachment ? 'Yes' : 'No'}\n`;
     if (email.keywords) {
-      const keywords = Object.entries(email.keywords)
-        .filter(([_, v]) => v)
-        .map(([k]) => k)
-        .join(', ');
-      if (keywords) source += `Keywords: ${keywords}\n`;
+      // Was Object.entries.filter.map.join — three array allocations.
+      // Single-pass push into a list, then join. Skips two intermediates.
+      const kw = email.keywords;
+      const active: string[] = [];
+      for (const k in kw) if (kw[k]) active.push(k);
+      if (active.length > 0) source += `Keywords: ${active.join(', ')}\n`;
     }
 
     // Attachments
