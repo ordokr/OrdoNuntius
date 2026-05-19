@@ -3285,37 +3285,39 @@ export class JMAPClient implements IJMAPClient {
   }
 
   private getCalendarCapableAccountIds(): string[] {
+    // Seed the array with primaryId so we don't allocate a second one for
+    // the `[primaryId, ...accountIds]` spread at return.
     const primaryId = this.getCalendarsAccountId();
-    const accountIds: string[] = [];
+    const out: string[] = [primaryId];
     for (const id in this.accounts) {
-      const account = this.accounts[id];
       if (id === primaryId) continue;
+      const account = this.accounts[id];
       // Include accounts that either advertise calendar capability
       // or are non-personal (shared/group) accounts - Stalwart doesn't
       // always advertise capabilities on group accounts even when they
       // have calendar resources.
       if (account.accountCapabilities?.["urn:ietf:params:jmap:calendars"] || !account.isPersonal) {
-        accountIds.push(id);
+        out.push(id);
       }
     }
-    return [primaryId, ...accountIds];
+    return out;
   }
 
   private getContactCapableAccountIds(): string[] {
     const primaryId = this.getContactsAccountId();
-    const accountIds: string[] = [];
+    const out: string[] = [primaryId];
     for (const id in this.accounts) {
-      const account = this.accounts[id];
       if (id === primaryId) continue;
+      const account = this.accounts[id];
       // Include accounts that either advertise contacts capability
       // or are non-personal (shared/group) accounts - Stalwart doesn't
       // always advertise capabilities on group accounts even when they
       // have contact resources.
       if (account.accountCapabilities?.["urn:ietf:params:jmap:contacts"] || !account.isPersonal) {
-        accountIds.push(id);
+        out.push(id);
       }
     }
-    return [primaryId, ...accountIds];
+    return out;
   }
 
   async getAddressBooks(): Promise<AddressBook[]> {
@@ -5001,12 +5003,17 @@ export class JMAPClient implements IJMAPClient {
       throw new Error(result?.[1]?.description || "FileNode/set destroy failed");
     }
 
+    // Count + first-failure capture in a single for...in walk; no
+    // Object.keys allocation.
     const notDestroyedMap: Record<string, { type?: string; description?: string }> = result[1].notDestroyed || {};
-    const notDestroyedIds = Object.keys(notDestroyedMap);
-
-    if (notDestroyedIds.length > 0) {
-      const firstError = notDestroyedMap[notDestroyedIds[0]];
-      throw new Error(firstError?.description || `Failed to delete ${notDestroyedIds.length} file(s)`);
+    let notDestroyedCount = 0;
+    let firstError: { type?: string; description?: string } | undefined;
+    for (const k in notDestroyedMap) {
+      if (notDestroyedCount === 0) firstError = notDestroyedMap[k];
+      notDestroyedCount++;
+    }
+    if (notDestroyedCount > 0) {
+      throw new Error(firstError?.description || `Failed to delete ${notDestroyedCount} file(s)`);
     }
 
     return {
