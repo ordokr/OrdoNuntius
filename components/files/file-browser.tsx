@@ -494,6 +494,16 @@ export function FileBrowser({
     [clipboard],
   );
 
+  // Resources by name — O(1) lookup for the context-menu's per-button
+  // `resources.find(r => r.name === contextMenu.name)?.isDirectory`
+  // checks. Was called 3-4 times per menu render, each walking the
+  // full resources array.
+  const resourcesByName = useMemo(() => {
+    const map = new Map<string, FileResource>();
+    for (const r of resources) map.set(r.name, r);
+    return map;
+  }, [resources]);
+
   // Build breadcrumb segments
   const breadcrumbs = currentPath === '/'
     ? [{ name: t("breadcrumb_root"), path: '/' }]
@@ -860,7 +870,7 @@ export function FileBrowser({
       // Enter: open selected directory or download selected file
       if (e.key === 'Enter' && selectedResources.size === 1) {
         const name = [...selectedResources][0];
-        const resource = resources.find(r => r.name === name);
+        const resource = resourcesByName.get(name);
         if (resource?.isDirectory) {
           const newPath = currentPath === '/'
             ? `/${resource.name}`
@@ -1550,7 +1560,7 @@ export function FileBrowser({
             style={{ left: contextMenu.x, top: contextMenu.y }}
             onClick={(e) => e.stopPropagation()}
           >
-            {!resources.find(r => r.name === contextMenu.name)?.isDirectory && isPreviewable(contextMenu.name) && (
+            {!resourcesByName.get(contextMenu.name)?.isDirectory && isPreviewable(contextMenu.name) && (
               <button
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
                 onClick={() => {
@@ -1566,7 +1576,7 @@ export function FileBrowser({
                 {t("preview")}
               </button>
             )}
-            {!resources.find(r => r.name === contextMenu.name)?.isDirectory && (
+            {!resourcesByName.get(contextMenu.name)?.isDirectory && (
               <button
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
                 onClick={() => {
@@ -1610,7 +1620,7 @@ export function FileBrowser({
                 {t("paste")}
               </button>
             )}
-            {!resources.find(r => r.name === contextMenu.name)?.isDirectory && (
+            {!resourcesByName.get(contextMenu.name)?.isDirectory && (
               <button
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
                 onClick={() => {

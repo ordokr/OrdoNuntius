@@ -203,8 +203,17 @@ export function getEmailColorTags(keywords: Record<string, boolean> | undefined)
  * @deprecated Use getEmailColorTags for multi-tag support.
  */
 export function getEmailColorTag(keywords: Record<string, boolean> | undefined): string | null {
-  const tags = getEmailColorTags(keywords);
-  return tags.length > 0 ? tags[0] : null;
+  // Short-circuit at the first tag instead of building the full tags
+  // array via getEmailColorTags. Used by getThreadColorTag which checks
+  // emails in a thread for the first color tag — early-exit means we
+  // stop both at the first tag AND at the first email with one.
+  if (!keywords) return null;
+  for (const key in keywords) {
+    if (keywords[key] !== true) continue;
+    if (key.startsWith(KEYWORD_PREFIX)) return key.slice(KEYWORD_PREFIX.length);
+    if (key.startsWith(KEYWORD_PREFIX_LEGACY)) return key.slice(KEYWORD_PREFIX_LEGACY.length);
+  }
+  return null;
 }
 
 /**
