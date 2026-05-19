@@ -743,14 +743,17 @@ export function Sidebar({
   // re-walking the mailbox list when only an unrelated piece of state
   // changed (selection, expanded set, etc.).
   const mailboxTree = useMemo(() => buildMailboxTree(mailboxes), [mailboxes]);
-  const ownTree = useMemo(
-    () => mailboxTree.filter(n => !n.id.startsWith('shared-account-')),
-    [mailboxTree],
-  );
-  const sharedAccounts = useMemo(
-    () => mailboxTree.filter(n => n.id.startsWith('shared-account-')),
-    [mailboxTree],
-  );
+  // Single-pass partition. Was two `.filter()` walks over the same
+  // mailboxTree — each allocating its own array. Now one walk, two
+  // output arrays.
+  const { ownTree, sharedAccounts } = useMemo(() => {
+    const own: MailboxNode[] = [];
+    const shared: MailboxNode[] = [];
+    for (const n of mailboxTree) {
+      (n.id.startsWith('shared-account-') ? shared : own).push(n);
+    }
+    return { ownTree: own, sharedAccounts: shared };
+  }, [mailboxTree]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

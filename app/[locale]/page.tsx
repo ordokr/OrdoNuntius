@@ -380,10 +380,14 @@ export default function Home() {
 
   const enableUnifiedMailbox = useSettingsStore((s) => s.enableUnifiedMailbox);
   const accounts = useAccountStore((s) => s.accounts);
-  const connectedAccountsSignature = useMemo(
-    () => accounts.filter((a) => a.isConnected).map((a) => a.id).sort().join(","),
-    [accounts],
-  );
+  const connectedAccountsSignature = useMemo(() => {
+    // Was `.filter(...).map(...).sort().join(...)` — 3 intermediate
+    // arrays. Single-pass collect + in-place sort.
+    const ids: string[] = [];
+    for (const a of accounts) if (a.isConnected) ids.push(a.id);
+    ids.sort();
+    return ids.join(",");
+  }, [accounts]);
 
   const buildUnifiedAccounts = useCallback((): UnifiedAccountClient[] => {
     const connected = useAccountStore.getState().accounts.filter((a) => a.isConnected);

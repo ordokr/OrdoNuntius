@@ -207,42 +207,6 @@ const getAttachmentDisplayName = (name: string | null | undefined, mimeType?: st
 // `KEYWORD_PREFIX_LEGACY` constants. Consolidated.
 const getCurrentColors = getEmailColorTags;
 
-// Helper function to format recipients with contextual display
-const _formatRecipients = (
-  recipients: Array<{ name?: string; email: string }> | undefined,
-  currentUserEmail: string | undefined,
-  t: (key: string, params?: Record<string, string | number>) => string
-): string => {
-  if (!recipients || recipients.length === 0) return '';
-
-  // Check if the first recipient is the current user
-  const firstRecipient = recipients[0];
-  const isFirstRecipientMe = currentUserEmail &&
-    (firstRecipient.email.toLowerCase() === currentUserEmail.toLowerCase() ||
-     firstRecipient.email.toLowerCase().startsWith(currentUserEmail.toLowerCase().split('@')[0] + '+'));
-
-  // If only one recipient and it's the current user, show "me"
-  if (recipients.length === 1 && isFirstRecipientMe) {
-    return t('recipient_me');
-  }
-
-  // Format up to 2 recipients by name (or email if no name)
-  const displayRecipients = recipients.slice(0, 2).map((r, index) => {
-    if (index === 0 && isFirstRecipientMe) {
-      return t('recipient_me');
-    }
-    return r.name || r.email;
-  });
-
-  // If more than 2 recipients, add count
-  if (recipients.length > 2) {
-    const displayName = displayRecipients[0];
-    return t('recipient_and_others', { name: displayName, count: recipients.length - 1 });
-  }
-
-  return displayRecipients.join(', ');
-};
-
 function parseMimeHeaders(headerText: string): Map<string, string> {
   const headers = new Map<string, string>();
   const lines = headerText.split(/\r?\n/);
@@ -579,10 +543,15 @@ function renderClickableRecipients(
   maxVisible: number = 2
 ) {
   const visible = recipients.slice(0, maxVisible);
+  // Hoist the currentUserEmail derivations outside the per-recipient
+  // loop. Was: `.toLowerCase()` + `.split('@')[0] + '+'` per recipient
+  // — all values are stable for the whole list.
+  const meLower = currentUserEmail?.toLowerCase();
+  const mePlusPrefix = meLower ? meLower.split('@')[0] + '+' : null;
   return visible.map((r, index) => {
-    const isMe = currentUserEmail &&
-      (r.email.toLowerCase() === currentUserEmail.toLowerCase() ||
-       r.email.toLowerCase().startsWith(currentUserEmail.toLowerCase().split('@')[0] + '+'));
+    const emailLower = r.email.toLowerCase();
+    const isMe = meLower != null &&
+      (emailLower === meLower || (mePlusPrefix != null && emailLower.startsWith(mePlusPrefix)));
 
     return (
       <span key={r.email + index} className="inline-flex items-center">
