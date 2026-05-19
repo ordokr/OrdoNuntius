@@ -333,8 +333,14 @@ export function ContactDetail({ contact, onEdit, onDelete, onAddToGroup, onDupli
                 if (a.full || a.fullAddress) {
                   lines.push((a.full || a.fullAddress) as string);
                 } else if (a.components && a.components.length > 0) {
-                  const joined = a.components.filter(c => c.kind !== 'separator').map(c => c.value).filter(Boolean).join(", ");
-                  if (joined) lines.push(joined);
+                  // Single-pass collect instead of filter.map.filter.join
+                  // (three intermediate arrays per address).
+                  const parts: string[] = [];
+                  for (const c of a.components) {
+                    if (c.kind === 'separator') continue;
+                    if (c.value) parts.push(c.value);
+                  }
+                  if (parts.length > 0) lines.push(parts.join(", "));
                 } else {
                   const parts = [a.street, [a.postcode, a.locality].filter(Boolean).join(" "), a.region, a.country]
                     .map(s => (typeof s === "string" ? s.trim() : ""))

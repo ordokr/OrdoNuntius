@@ -120,8 +120,13 @@ export function getContactPrimaryEmail(contact: ContactCard): string {
 
 export function getContactPhotoUri(contact: ContactCard): string | undefined {
   if (!contact.media) return undefined;
-  for (const media of Object.values(contact.media)) {
-    if (media.kind === 'photo' && media.uri) return media.uri;
+  // for...in over the media Record skips the Object.values array
+  // allocation. Called per contact row in list renders + per-contact
+  // photo filter — hot enough to matter on large contact books.
+  const media = contact.media;
+  for (const k in media) {
+    const m = media[k];
+    if (m.kind === 'photo' && m.uri) return m.uri;
   }
   return undefined;
 }
@@ -911,9 +916,16 @@ export const useContactStore = create<ContactStore>()(
 
         debug.log('contacts', 'Removing trusted sender:', normalizedEmail);
         const contacts = await client.getContacts(trustedSendersBookId);
-        const match = contacts.find(c =>
-          c.emails && Object.values(c.emails).some(e => e.address.toLowerCase().trim() === normalizedEmail)
-        );
+        const match = contacts.find(c => {
+          if (!c.emails) return false;
+          const emails = c.emails;
+          // for...in walk drops the Object.values allocation per contact
+          // probed during the trusted-sender lookup.
+          for (const k in emails) {
+            if (emails[k].address.toLowerCase().trim() === normalizedEmail) return true;
+          }
+          return false;
+        });
         if (match) {
           await client.deleteContact(match.id);
           debug.log('contacts', 'Trusted sender removed');
