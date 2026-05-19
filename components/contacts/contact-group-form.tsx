@@ -48,6 +48,15 @@ export function ContactGroupForm({
     });
   }, [individuals, memberSearch]);
 
+  // Direct id→contact map: the selected-chips loop below was doing
+  // `individuals.find(c => c.id === id)` per selected id, i.e. O(S × N).
+  // One Map build per render flips this to O(N + S).
+  const individualsById = useMemo(() => {
+    const m = new Map<string, ContactCard>();
+    for (const c of individuals) m.set(c.id, c);
+    return m;
+  }, [individuals]);
+
   const toggleMember = (id: string) => {
     const next = new Set(selectedIds);
     if (next.has(id)) {
@@ -164,7 +173,7 @@ export function ContactGroupForm({
         {selectedIds.size > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {Array.from(selectedIds).map((id) => {
-              const contact = individuals.find((c) => c.id === id);
+              const contact = individualsById.get(id);
               if (!contact) return null;
               return (
                 <span
