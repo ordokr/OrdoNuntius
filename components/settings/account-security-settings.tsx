@@ -189,7 +189,7 @@ function generateTotp(accountLabel: string): { totp: OTPAuth.TOTP; url: string }
 function TotpSection() {
   const t = useTranslations('settings.security');
   const { otpEnabled, enableTotp, disableTotp, isSaving, isLoadingAuth } = useAccountSecurityStore();
-  const { client } = useAuthStore();
+  const client = useAuthStore(s => s.client);
 
   const [setupUrl, setSetupUrl] = useState<string | null>(null);
   const [setupTotp, setSetupTotp] = useState<OTPAuth.TOTP | null>(null);
@@ -590,7 +590,7 @@ function EncryptionSection() {
 
 function EmailClientSection() {
   const t = useTranslations('settings.security');
-  const { client } = useAuthStore();
+  const client = useAuthStore(s => s.client);
   const [copied, setCopied] = useState(false);
 
   const jmapUsername = useMemo(() => client?.getUsername() || '', [client]);

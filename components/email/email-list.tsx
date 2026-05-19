@@ -91,7 +91,7 @@ export function EmailList({
   // calls were silently resolving to the literal key path. Scope a
   // separate translator to `email_viewer.spam`.
   const tSpam = useTranslations('email_viewer.spam');
-  const { client } = useAuthStore();
+  const client = useAuthStore(s => s.client);
   // Granular selectors instead of whole-store destructure. The destructure
   // form subscribes the component to *every* store mutation (zustand returns
   // a new state object on every set()), which would invalidate the virtual

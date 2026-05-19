@@ -184,8 +184,8 @@ export function KeywordSettings() {
   const t = useTranslations("settings.keywords");
   const { emailKeywords, addKeyword, updateKeyword, renameKeyword, removeKeyword, reorderKeywords } =
     useSettingsStore();
-  const { client } = useAuthStore();
-  const { fetchTagCounts } = useEmailStore();
+  const client = useAuthStore(s => s.client);
+  const fetchTagCounts = useEmailStore(s => s.fetchTagCounts);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);

@@ -70,7 +70,7 @@ export function AddressBookManagementSettings() {
   const t = useTranslations("contacts.address_books");
   const tContacts = useTranslations("contacts");
   const tSettings = useTranslations("settings.contacts");
-  const { client } = useAuthStore();
+  const client = useAuthStore(s => s.client);
   const { addressBooks, contacts, supportsSync, fetchAddressBooks, renameAddressBook, shareAddressBook, renameKeyword } = useContactStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingKeyword, setEditingKeyword] = useState<string | null>(null);

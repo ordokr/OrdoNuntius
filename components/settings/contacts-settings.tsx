@@ -15,7 +15,7 @@ import { toast } from "@/stores/toast-store";
 export function ContactsSettings() {
   const t = useTranslations("contacts");
   const tSettings = useTranslations("settings.contacts");
-  const { client } = useAuthStore();
+  const client = useAuthStore(s => s.client);
   const {
     contacts,
     supportsSync,

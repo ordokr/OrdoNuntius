@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { SettingsSection, SettingItem, ToggleSwitch } from './settings-section';
 import { Button } from '@/components/ui/button';
+import { useShallow } from 'zustand/react/shallow';
 import { useVacationStore } from '@/stores/vacation-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { Loader2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
@@ -18,7 +19,7 @@ function utcToLocalDatetime(utcIso: string): string {
 export function VacationSettings() {
   const t = useTranslations('settings.vacation');
   const tNotifications = useTranslations('notifications');
-  const { client } = useAuthStore();
+  const client = useAuthStore(s => s.client);
   const {
     isEnabled,
     fromDate,
@@ -31,7 +32,19 @@ export function VacationSettings() {
     isSupported,
     fetchVacationResponse,
     updateVacationResponse,
-  } = useVacationStore();
+  } = useVacationStore(useShallow(s => ({
+    isEnabled: s.isEnabled,
+    fromDate: s.fromDate,
+    toDate: s.toDate,
+    subject: s.subject,
+    textBody: s.textBody,
+    isLoading: s.isLoading,
+    isSaving: s.isSaving,
+    error: s.error,
+    isSupported: s.isSupported,
+    fetchVacationResponse: s.fetchVacationResponse,
+    updateVacationResponse: s.updateVacationResponse,
+  })));
 
   const [localEnabled, setLocalEnabled] = useState(isEnabled);
   const [localFromDate, setLocalFromDate] = useState(fromDate || '');

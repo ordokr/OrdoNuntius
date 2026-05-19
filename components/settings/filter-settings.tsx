@@ -131,7 +131,7 @@ function VisualRuleSummary({ rule }: { rule: FilterRule }) {
 export function FilterSettings() {
   const t = useTranslations("settings.filters");
   const tNotifications = useTranslations("notifications");
-  const { client } = useAuthStore();
+  const client = useAuthStore(s => s.client);
   const mailboxes = useEmailStore((s) => s.mailboxes);
   const expandedFilterView = useSettingsStore((s) => s.expandedFilterView);
   const updateSetting = useSettingsStore((s) => s.updateSetting);

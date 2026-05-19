@@ -98,10 +98,19 @@ function IconPicker({ currentIcon, onSelect, onClose }: {
 
 export function FolderSettings() {
   const t = useTranslations('settings.folders');
-  const { client } = useAuthStore();
-  const { mailboxes, fetchMailboxes, createMailbox, renameMailbox, deleteMailbox, setMailboxRole } = useEmailStore();
-  const { folderIcons, setFolderIcon } = useSettingsStore();
-  const { isFeatureEnabled } = usePolicyStore();
+  // Per-field selectors instead of whole-store destructures — folder
+  // settings re-rendered on every unrelated mutation across 4 stores.
+  const client = useAuthStore(s => s.client);
+  const mailboxes = useEmailStore(s => s.mailboxes);
+  const folderIcons = useSettingsStore(s => s.folderIcons);
+  const setFolderIcon = useSettingsStore(s => s.setFolderIcon);
+  const isFeatureEnabled = usePolicyStore(s => s.isFeatureEnabled);
+  // Email-store actions are stable refs — pulled via getState() at call time below.
+  const fetchMailboxes = useEmailStore(s => s.fetchMailboxes);
+  const createMailbox = useEmailStore(s => s.createMailbox);
+  const renameMailbox = useEmailStore(s => s.renameMailbox);
+  const deleteMailbox = useEmailStore(s => s.deleteMailbox);
+  const setMailboxRole = useEmailStore(s => s.setMailboxRole);
   const folderIconsAllowed = isFeatureEnabled('folderIconsEnabled');
 
   useEffect(() => {
