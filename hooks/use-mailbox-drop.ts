@@ -31,8 +31,13 @@ interface UseMailboxDropReturn {
 export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: UseMailboxDropOptions): UseMailboxDropReturn {
   const [isOver, setIsOver] = useState(false);
   const { client } = useAuthStore();
-  const { moveEmailsToMailbox, selectedEmailIds, clearSelection, refreshCurrentMailbox, mailboxes } = useEmailStore();
-  const { isDragging, sourceMailboxId, draggedEmails, endDrag } = useDragDropContext();
+  // Subscribe ONLY to drag-related context values that affect render
+  // output (isValidTarget memo, isDropTarget flags). selectedEmailIds,
+  // refreshCurrentMailbox, moveEmailsToMailbox, mailboxes, clearSelection
+  // are only used inside the drop callback — read via getState() then so
+  // the sidebar's ~30 drop hooks don't re-render on every email-store
+  // mutation (selection change, new email, keyword flip, etc).
+  const { isDragging, sourceMailboxId, dragCount, endDrag } = useDragDropContext();
 
   // Determine if this is a valid drop target
   const isValidTarget = useCallback(() => {
@@ -48,7 +53,7 @@ export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: 
     if (mailbox.id.startsWith("shared-")) return false;
 
     // For shared mailboxes, check account compatibility
-    if (mailbox.isShared && draggedEmails[0]) {
+    if (mailbox.isShared && dragCount > 0) {
       // Get the source mailbox's account ID from the store
       const mailboxes = useEmailStore.getState().mailboxes;
       const sourceMb = mailboxes.find(mb => mb.id === sourceMailboxId);
@@ -60,7 +65,7 @@ export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: 
     }
 
     return true;
-  }, [isDragging, mailbox, sourceMailboxId, draggedEmails]);
+  }, [isDragging, mailbox, sourceMailboxId, dragCount]);
 
   const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -107,18 +112,23 @@ export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: 
 
       const emailIds: string[] = JSON.parse(emailIdsJson);
 
+      // Read non-render-affecting state via getState() at the moment of
+      // drop so the hook isn't subscribed to these slices.
+      const emailState = useEmailStore.getState();
+
       // Move in a single bulk JMAP request (store handles counter updates).
-      await moveEmailsToMailbox(client, emailIds, mailbox.id);
+      await emailState.moveEmailsToMailbox(client, emailIds, mailbox.id);
 
       // Clear selection if any selected emails were moved
+      const selectedEmailIds = useEmailStore.getState().selectedEmailIds;
       if (emailIds.some(id => selectedEmailIds.has(id))) {
-        clearSelection();
+        useEmailStore.getState().clearSelection();
       }
 
       // Refresh the current mailbox view (honors active search/filters)
-      await refreshCurrentMailbox(client);
+      await useEmailStore.getState().refreshCurrentMailbox(client);
 
-      const mailboxPath = getMailboxPath(mailbox, mailboxes);
+      const mailboxPath = getMailboxPath(mailbox, useEmailStore.getState().mailboxes);
 
       if (onSuccess) {
         onSuccess(emailIds.length, mailboxPath);
@@ -144,7 +154,7 @@ export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: 
     } finally {
       endDrag();
     }
-  }, [client, mailbox, mailboxes, isValidTarget, moveEmailsToMailbox, selectedEmailIds, clearSelection, refreshCurrentMailbox, endDrag, onDropComplete, onSuccess, onError]);
+  }, [client, mailbox, isValidTarget, endDrag, onDropComplete, onSuccess, onError]);
 
   const valid = isValidTarget();
 
