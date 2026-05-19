@@ -8,7 +8,7 @@ import { hasMeaningfulHtmlBody } from "@/lib/signature-utils";
 import { getEmailColorTags } from "@/lib/thread-utils";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
-import { formatFileSize, cn, buildMailboxTree, MailboxNode, formatDateTime, generateUUID } from "@/lib/utils";
+import { formatFileSize, cn, buildMailboxTree, MailboxNode, formatDateTime, generateUUID, localPart } from "@/lib/utils";
 import { getSecurityStatus, extractListHeaders } from "@/lib/email-headers";
 import { emailToReadView } from "@/lib/plugin-projection";
 import {
@@ -547,7 +547,7 @@ function renderClickableRecipients(
   // loop. Was: `.toLowerCase()` + `.split('@')[0] + '+'` per recipient
   // — all values are stable for the whole list.
   const meLower = currentUserEmail?.toLowerCase();
-  const mePlusPrefix = meLower ? meLower.split('@')[0] + '+' : null;
+  const mePlusPrefix = meLower ? localPart(meLower) + '+' : null;
   return visible.map((r, index) => {
     const emailLower = r.email.toLowerCase();
     const isMe = meLower != null &&

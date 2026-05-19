@@ -1,4 +1,5 @@
 import type { Email, ThreadGroup } from "./jmap/types";
+import { localPart } from "./utils";
 
 /**
  * Groups emails by their threadId and creates ThreadGroup objects for UI display.
@@ -95,7 +96,7 @@ export function getThreadParticipants(emails: Email[], maxNames: number = 4): st
     // Add sender
     if (email.from && email.from.length > 0) {
       const sender = email.from[0];
-      const senderName = sender.name || sender.email.split('@')[0];
+      const senderName = sender.name || localPart(sender.email);
       const key = sender.email.toLowerCase();
 
       if (!seen.has(key)) {

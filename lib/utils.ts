@@ -39,6 +39,17 @@ export function splitTrimmed(s: string, separator: string = ','): string[] {
   return out;
 }
 
+/**
+ * Return the local part of an email address (everything before the first
+ * `@`), or the whole string when there is no `@`. Replaces `email.split('@')[0]`
+ * which allocates an array just to read its first slot — wasteful in
+ * per-row render paths like the thread list and email viewer.
+ */
+export function localPart(email: string): string {
+  const at = email.indexOf('@');
+  return at === -1 ? email : email.slice(0, at);
+}
+
 export function generateUUID(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();

@@ -2,7 +2,7 @@
 
 import { memo, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { formatDate } from "@/lib/utils";
+import { formatDate, localPart } from "@/lib/utils";
 import { Email } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
@@ -152,7 +152,7 @@ function ThreadEmailItemImpl({
                 ? "font-semibold text-foreground"
                 : "font-medium text-muted-foreground"
             )}>
-              {sender?.name || sender?.email?.split('@')[0] || t('unknown_sender')}
+              {sender?.name || (sender?.email && localPart(sender.email)) || t('unknown_sender')}
             </span>
 
             {/* Indicators */}

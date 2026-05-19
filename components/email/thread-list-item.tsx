@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback } from "react";
-import { formatDate, stripInvisibleLeading } from "@/lib/utils";
+import { formatDate, localPart, stripInvisibleLeading } from "@/lib/utils";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
@@ -439,7 +439,7 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
       outer: for (const e of thread.emails) {
         if (!e.to) continue;
         for (const r of e.to) {
-          const name = r.name || r.email.split('@')[0];
+          const name = r.name || localPart(r.email);
           if (seen.has(name)) continue;
           seen.add(name);
           out.push(name);
