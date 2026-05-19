@@ -147,11 +147,9 @@ function getParticipantEmail(participant: CalendarParticipant): string | null {
     return null;
   }
 
-  for (const address of Object.values(participant.sendTo)) {
-    const normalized = normalizeEmailAddress(address);
-    if (normalized) {
-      return normalized;
-    }
+  for (const k in participant.sendTo) {
+    const normalized = normalizeEmailAddress(participant.sendTo[k]);
+    if (normalized) return normalized;
   }
 
   return null;
@@ -185,10 +183,9 @@ function getParticipantSignalScore(participant: CalendarParticipant): number {
 
 function getOrganizerEmail(event: Partial<CalendarEvent>): string | null {
   if (event.participants) {
-    for (const participant of Object.values(event.participants)) {
-      if (isOrganizerParticipant(participant)) {
-        return getParticipantEmail(participant);
-      }
+    for (const k in event.participants) {
+      const p = event.participants[k];
+      if (isOrganizerParticipant(p)) return getParticipantEmail(p);
     }
   }
 
@@ -251,16 +248,19 @@ function findCalendarBodyPart(parts?: EmailBodyPart[]): Attachment | null {
 function looksLikeReply(event: Partial<CalendarEvent>): boolean {
   if (!event.participants) return false;
 
-  const participants = Object.values(event.participants);
-  return participants.some((participant) =>
-    participant.roles?.attendee
-    && !isOrganizerParticipant(participant)
-    && (
-      participant.participationStatus !== 'needs-action'
-      || !!participant.participationComment
-      || !!participant.scheduleStatus?.length
-    )
-  );
+  for (const k in event.participants) {
+    const p = event.participants[k];
+    if (
+      p.roles?.attendee
+      && !isOrganizerParticipant(p)
+      && (
+        p.participationStatus !== 'needs-action'
+        || !!p.participationComment
+        || !!p.scheduleStatus?.length
+      )
+    ) return true;
+  }
+  return false;
 }
 
 export function getInvitationActorSummary(
@@ -271,20 +271,31 @@ export function getInvitationActorSummary(
     return null;
   }
 
-  const participants = Object.values(event.participants);
-  let organizer = participants.find((participant) => isOrganizerParticipant(participant)) ?? null;
-
-  // Stalwart uses organizerCalendarAddress instead of roles.owner/chair
-  if (!organizer && event.organizerCalendarAddress) {
-    organizer = participants.find(
-      (p) => p.calendarAddress === event.organizerCalendarAddress
-    ) ?? null;
+  // Single pass to find both the organizer and the highest-signal
+  // responding attendee. Was: Object.values + 2 finds + filter + sort + [0]
+  // — 4 walks and 3 throwaway arrays. The "responding attendee" only
+  // needs the argmax of the score, so no sort is required.
+  let organizer: CalendarParticipant | null = null;
+  let organizerByCalendarAddress: CalendarParticipant | null = null;
+  let respondingAttendee: CalendarParticipant | null = null;
+  let respondingScore = -Infinity;
+  for (const k in event.participants) {
+    const p = event.participants[k];
+    if (isOrganizerParticipant(p)) {
+      if (!organizer) organizer = p;
+    } else if (event.organizerCalendarAddress
+      && !organizerByCalendarAddress
+      && p.calendarAddress === event.organizerCalendarAddress) {
+      organizerByCalendarAddress = p;
+    } else {
+      const score = getParticipantSignalScore(p);
+      if (score > respondingScore) {
+        respondingScore = score;
+        respondingAttendee = p;
+      }
+    }
   }
-
-  const attendees = participants.filter((participant) => participant !== organizer && !isOrganizerParticipant(participant));
-  const respondingAttendee = [...attendees].sort((left, right) => (
-    getParticipantSignalScore(right) - getParticipantSignalScore(left)
-  ))[0] ?? null;
+  if (!organizer) organizer = organizerByCalendarAddress;
 
   const sourceParticipant = (() => {
     switch (method) {
@@ -457,9 +468,11 @@ export function formatEventSummary(event: Partial<CalendarEvent>): EventSummary 
   const normalizedEvent = normalizeCalendarEventLike(event);
   let location: string | null = null;
   if (normalizedEvent.locations) {
-    const firstLocation = Object.values(normalizedEvent.locations)[0];
-    if (firstLocation?.name) {
-      location = firstLocation.name;
+    // First-value pick without allocation.
+    for (const k in normalizedEvent.locations) {
+      const first = normalizedEvent.locations[k];
+      if (first?.name) location = first.name;
+      break;
     }
   }
 
@@ -468,7 +481,8 @@ export function formatEventSummary(event: Partial<CalendarEvent>): EventSummary 
   let attendeeCount = 0;
 
   if (normalizedEvent.participants) {
-    for (const p of Object.values(normalizedEvent.participants)) {
+    for (const k in normalizedEvent.participants) {
+      const p = normalizedEvent.participants[k];
       if (p.roles?.owner || p.roles?.chair) {
         organizer = p.name || getParticipantEmail(p) || null;
         organizerEmail = getParticipantEmail(p);
@@ -484,7 +498,8 @@ export function formatEventSummary(event: Partial<CalendarEvent>): EventSummary 
     organizerEmail = normalizeEmailAddress(normalizedEvent.organizerCalendarAddress);
     if (!organizer && normalizedEvent.participants) {
       // Find the participant matching the organizer address for their name
-      for (const p of Object.values(normalizedEvent.participants)) {
+      for (const k in normalizedEvent.participants) {
+        const p = normalizedEvent.participants[k];
         if (p.calendarAddress === normalizedEvent.organizerCalendarAddress) {
           organizer = p.name || organizerEmail;
           break;
@@ -577,8 +592,8 @@ export function findParticipantByEmail(
       }
     }
     if (p.sendTo) {
-      for (const addr of Object.values(p.sendTo)) {
-        if (addr.replace('mailto:', '').toLowerCase() === lowerEmail) {
+      for (const k in p.sendTo) {
+        if (p.sendTo[k].replace('mailto:', '').toLowerCase() === lowerEmail) {
           return { id, participant: p };
         }
       }
