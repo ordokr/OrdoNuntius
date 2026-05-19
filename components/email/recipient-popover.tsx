@@ -35,9 +35,13 @@ export function RecipientPopover({ name, email, displayLabel, onViewContact, cla
   const contact = findContactByEmail(contacts, email);
 
   const contactName = contact ? getContactDisplayName(contact) : name;
-  const emails = contact?.emails ? Object.values(contact.emails) : [];
-  const phones = contact?.phones ? Object.values(contact.phones) : [];
-  const orgs = contact?.organizations ? Object.values(contact.organizations) : [];
+  // Lazy: only compute the values arrays when the popover is actually
+  // open. This component renders per recipient (multiplied by the number
+  // of visible emails) — without the gate, every parent render alloc'd
+  // 3 throwaway arrays per RecipientPopover instance.
+  const emails = isOpen && contact?.emails ? Object.values(contact.emails) : [];
+  const phones = isOpen && contact?.phones ? Object.values(contact.phones) : [];
+  const orgs = isOpen && contact?.organizations ? Object.values(contact.organizations) : [];
 
   const handleOpen = () => {
     if (!triggerRef.current) return;

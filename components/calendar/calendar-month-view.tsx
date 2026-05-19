@@ -66,20 +66,22 @@ export function CalendarMonthView({
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
-    events.forEach((e) => {
+    for (const e of events) {
       try {
         const { startDay, endDay } = getEventDayBounds(e);
-
         const cursor = new Date(startDay);
         while (cursor <= endDay) {
           const key = format(cursor, "yyyy-MM-dd");
-          const arr = map.get(key) || [];
+          let arr = map.get(key);
+          if (!arr) {
+            arr = [];
+            map.set(key, arr);
+          }
           arr.push(e);
-          map.set(key, arr);
           cursor.setDate(cursor.getDate() + 1);
         }
       } catch { /* skip invalid dates */ }
-    });
+    }
     return map;
   }, [events]);
 

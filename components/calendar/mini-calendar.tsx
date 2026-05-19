@@ -57,7 +57,7 @@ export function MiniCalendar({
 
   const eventDates = useMemo(() => {
     const set = new Set<string>();
-    events.forEach(e => {
+    for (const e of events) {
       try {
         const { startDay, endDay } = getEventDayBounds(e);
         const cursor = new Date(startDay);
@@ -66,7 +66,7 @@ export function MiniCalendar({
           cursor.setDate(cursor.getDate() + 1);
         }
       } catch { /* skip */ }
-    });
+    }
     return set;
   }, [events]);
 

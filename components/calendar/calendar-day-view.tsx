@@ -62,18 +62,19 @@ export function CalendarDayView({
   const { timedEvents, allDayEvents } = useMemo(() => {
     const timed: CalendarEvent[] = [];
     const allDay: CalendarEvent[] = [];
-    events.forEach((ev) => {
+    // Hoist selDay outside the loop — was being re-allocated + zeroed
+    // per event. Cache as a number for direct comparison.
+    const selDay = new Date(selectedDate);
+    selDay.setHours(0, 0, 0, 0);
+    const selDayMs = selDay.getTime();
+    for (const ev of events) {
       try {
         const { startDay, endDay } = getEventDayBounds(ev);
-        const selDay = new Date(selectedDate); selDay.setHours(0, 0, 0, 0);
-
-        const spansThisDay = startDay.getTime() <= selDay.getTime() && endDay.getTime() >= selDay.getTime();
-        if (!spansThisDay) return;
-
+        if (startDay.getTime() > selDayMs || endDay.getTime() < selDayMs) continue;
         if (ev.showWithoutTime || isTimedEventFullDayOnDate(ev, selectedDate)) allDay.push(ev);
         else timed.push(ev);
       } catch { /* skip invalid dates */ }
-    });
+    }
     return { timedEvents: timed, allDayEvents: allDay };
   }, [events, selectedDate]);
 

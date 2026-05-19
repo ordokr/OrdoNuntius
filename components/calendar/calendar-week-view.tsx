@@ -74,22 +74,28 @@ export function CalendarWeekView({
   const timedEvents = useMemo(() => {
     const timed: Map<string, CalendarEvent[]> = new Map();
 
-    events.forEach((ev) => {
+    // Was `events.forEach(...)` with `timed.get(key) || []` per insert
+    // (allocates an empty fallback per get-miss-then-set). `for...of`
+    // and direct get-or-create avoids the throwaway empty array.
+    for (const ev of events) {
+      if (ev.showWithoutTime) continue; // all-day handled elsewhere
       try {
         const { startDay, endDay } = getEventDayBounds(ev);
-
         const cursor = new Date(startDay);
         while (cursor <= endDay) {
-          const key = format(cursor, "yyyy-MM-dd");
-          if (!ev.showWithoutTime && !isTimedEventFullDayOnDate(ev, cursor)) {
-            const arr = timed.get(key) || [];
+          if (!isTimedEventFullDayOnDate(ev, cursor)) {
+            const key = format(cursor, "yyyy-MM-dd");
+            let arr = timed.get(key);
+            if (!arr) {
+              arr = [];
+              timed.set(key, arr);
+            }
             arr.push(ev);
-            timed.set(key, arr);
           }
           cursor.setDate(cursor.getDate() + 1);
         }
       } catch { /* skip invalid dates */ }
-    });
+    }
     return timed;
   }, [events]);
 
