@@ -72,11 +72,20 @@ export function getEventEndDate(event: CalendarEvent): Date {
 }
 
 export function getEventDisplayEndDate(event: CalendarEvent): Date {
-  const end = getEventEndDate(event);
+  // Was: getEventEndDate(event) (1-2 parseISO inside) + getEventStartDate
+  // (another parseISO). Inline the end computation so we compute start
+  // exactly once and reuse it for both the duration-end fallback AND
+  // the all-day clip comparison. Drops 1-2 parseISO per call.
   const start = getEventStartDate(event);
-  if (!event.showWithoutTime || end.getTime() <= start.getTime()) {
-    return end;
+  let end: Date;
+  if (!event.showWithoutTime && event.utcEnd) {
+    end = parseISO(event.utcEnd);
+  } else if (event.duration) {
+    end = new Date(start.getTime() + parseDuration(event.duration) * 60000);
+  } else {
+    end = start;
   }
+  if (!event.showWithoutTime || end.getTime() <= start.getTime()) return end;
   return subMilliseconds(end, 1);
 }
 

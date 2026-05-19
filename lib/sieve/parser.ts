@@ -353,8 +353,14 @@ function parseAtom(raw: string): FilterCondition | null {
     } else if (tag === 'is') {
       comparator = negated ? 'not_is' : 'is';
     } else {
-      // :matches - distinguish starts_with / ends_with / matches
-      const starPositions = [...value].reduce<number[]>((acc, ch, idx) => (ch === '*' ? [...acc, idx] : acc), []);
+      // :matches - distinguish starts_with / ends_with / matches.
+      // Was `[...value].reduce((acc, ch, idx) => ch === '*' ? [...acc, idx] : acc, [])`
+      // which clones the accumulator on every match (O(K²) on the `*` count)
+      // plus spreads `value` into a char array. Direct indexed loop is O(N).
+      const starPositions: number[] = [];
+      for (let idx = 0; idx < value.length; idx++) {
+        if (value[idx] === '*') starPositions.push(idx);
+      }
       if (starPositions.length === 1 && starPositions[0] === value.length - 1) {
         comparator = 'starts_with';
         const cond: FilterCondition = { field, comparator, value: value.slice(0, -1) };
