@@ -15,8 +15,14 @@ export function isValidEmail(email: string): boolean {
 
   if (!emailRegex.test(email)) return false;
 
-  // Additional checks
-  const [localPart, domain] = email.split('@');
+  // Additional checks. indexOf+slice avoids the throwaway 2-element array
+  // that `.split('@')` allocates per call — this function runs per
+  // recipient input in the composer (every keystroke).
+  const at = email.indexOf('@');
+  // emailRegex guarantees a single `@`; this is a safety check, not a parse.
+  if (at === -1) return false;
+  const localPart = email.slice(0, at);
+  const domain = email.slice(at + 1);
 
   // Local part max 64 chars
   if (localPart.length > 64) return false;

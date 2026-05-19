@@ -12,6 +12,7 @@
  */
 
 import type { Identity } from "@/lib/jmap/types";
+import { localPart } from "@/lib/utils";
 
 /**
  * Whether an identity's email "matches" the user's login. Handles both
@@ -20,7 +21,7 @@ import type { Identity } from "@/lib/jmap/types";
  */
 export function emailMatchesUsername(email: string, username: string): boolean {
   if (email === username) return true;
-  if (!username.includes('@') && email.split('@')[0] === username) return true;
+  if (!username.includes('@') && localPart(email) === username) return true;
   return false;
 }
 

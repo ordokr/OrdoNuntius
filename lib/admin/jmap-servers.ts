@@ -136,8 +136,12 @@ export function findServerByUrl(servers: JmapServerEntry[], url: string | null |
 
 /** Find the server whose `domains` array matches the given email's domain (case-insensitive). */
 export function findServerByEmailDomain(servers: JmapServerEntry[], email: string | null | undefined): JmapServerEntry | undefined {
-  if (!email || !email.includes('@')) return undefined;
-  const domain = email.split('@')[1]?.trim().toLowerCase();
+  if (!email) return undefined;
+  // Single indexOf walk — was `.includes('@')` followed by `.split('@')[1]`
+  // (two walks + a throwaway 2-element array) just to read the domain.
+  const at = email.indexOf('@');
+  if (at === -1) return undefined;
+  const domain = email.slice(at + 1).trim().toLowerCase();
   if (!domain) return undefined;
   return servers.find((s) => (s.domains ?? []).some((d) => d.toLowerCase() === domain));
 }

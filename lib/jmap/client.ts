@@ -2197,7 +2197,10 @@ export class JMAPClient implements IJMAPClient {
           if (!identityId) {
             const target = fromEmail || this.username;
             const matchingIdentity = identities.find((id) => id.email === target)
-              || (!target.includes('@') ? identities.find((id) => id.email.split('@')[0] === target) : undefined);
+              || (!target.includes('@') ? identities.find((id) => {
+                const at = id.email.indexOf('@');
+                return (at === -1 ? id.email : id.email.slice(0, at)) === target;
+              }) : undefined);
             finalIdentityId = matchingIdentity?.id || identities[0].id;
             identityReplyTo = matchingIdentity?.replyTo || identities[0].replyTo;
           } else {
