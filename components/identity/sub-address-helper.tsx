@@ -35,7 +35,12 @@ export function SubAddressHelper({
   const [error, setError] = useState<string | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  const { subAddress, addRecentTag, addTagSuggestion } = useIdentityStore();
+  // Per-field selectors instead of whole-store destructure — the sub-address
+  // popover mounts inside the composer recipient row, and the previous
+  // form re-ran the suggestions memo on every identity-store mutation.
+  const subAddress = useIdentityStore(s => s.subAddress);
+  const addRecentTag = useIdentityStore(s => s.addRecentTag);
+  const addTagSuggestion = useIdentityStore(s => s.addTagSuggestion);
   const subAddressDelimiter = useSettingsStore((state) => state.subAddressDelimiter);
 
   // Get suggestions based on recipient (memoized for performance). Was a

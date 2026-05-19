@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TemplateForm } from './template-form';
+import { useShallow } from 'zustand/react/shallow';
 import { useTemplateStore } from '@/stores/template-store';
 import { useFocusTrap } from '@/hooks/use-focus-trap';
 import type { EmailTemplate } from '@/lib/template-types';
@@ -20,6 +21,9 @@ export function TemplateManagerModal({ isOpen, onClose }: TemplateManagerModalPr
   const t = useTranslations('templates');
   const tSettings = useTranslations('settings.templates');
 
+  // useShallow narrows from "any template-store mutation" to "any of these
+  // 7 fields changed". Modal mounts inside the composer + settings page;
+  // unrelated template-list reorders elsewhere shouldn't re-render this.
   const {
     templates,
     addTemplate,
@@ -28,7 +32,15 @@ export function TemplateManagerModal({ isOpen, onClose }: TemplateManagerModalPr
     duplicateTemplate,
     toggleFavorite,
     searchTemplates,
-  } = useTemplateStore();
+  } = useTemplateStore(useShallow(s => ({
+    templates: s.templates,
+    addTemplate: s.addTemplate,
+    updateTemplate: s.updateTemplate,
+    deleteTemplate: s.deleteTemplate,
+    duplicateTemplate: s.duplicateTemplate,
+    toggleFavorite: s.toggleFavorite,
+    searchTemplates: s.searchTemplates,
+  })));
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
