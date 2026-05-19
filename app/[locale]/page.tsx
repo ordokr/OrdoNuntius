@@ -1984,14 +1984,8 @@ export default function Home() {
     setActiveView("list");
   };
 
-  // Navigate to next/previous email in the list. Memoized: was an O(N)
-  // findIndex on every render (any state change in this page-level
-  // component would re-scan the entire emails array). Now only re-runs
-  // when emails or selectedEmail change.
-  const selectedEmailIndex = useMemo(
-    () => (selectedEmail ? emails.findIndex(e => e.id === selectedEmail.id) : -1),
-    [emails, selectedEmail]
-  );
+  // Navigate to next/previous email in the list
+  const selectedEmailIndex = selectedEmail ? emails.findIndex(e => e.id === selectedEmail.id) : -1;
 
   const handleNavigateNext = selectedEmailIndex >= 0 && selectedEmailIndex < emails.length - 1
     ? () => handleEmailSelect(emails[selectedEmailIndex + 1])
