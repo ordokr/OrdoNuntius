@@ -1084,7 +1084,15 @@ export function EmailViewer({
       rightGroup.style.flexShrink = '';
       el.style.overflow = '';
       setHiddenPriorities(prev => {
-        if (prev.size === hidden.size && [...hidden].every(p => prev.has(p))) return prev;
+        // Skip the `[...hidden]` spread + `.every()` array allocation
+        // when sizes already match — iterate the Set directly.
+        if (prev.size === hidden.size) {
+          let allMatch = true;
+          for (const p of hidden) {
+            if (!prev.has(p)) { allMatch = false; break; }
+          }
+          if (allMatch) return prev;
+        }
         return hidden;
       });
     };

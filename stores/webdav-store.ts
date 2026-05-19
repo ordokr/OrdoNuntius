@@ -231,16 +231,30 @@ export const useWebDAVStore = create<WebDAVState>((set, get) => ({
       }
     }
 
-    // Create directories first (sorted by depth)
-    const sortedDirs = [...dirs].sort((a, b) => a.split('/').length - b.split('/').length);
-    for (const dir of sortedDirs) {
-      if (abortController.signal.aborted) break;
-      const fullPath = currentPath === '/' ? `/${dir}` : `${currentPath}/${dir}`;
-      try {
-        await webdavClient.createDirectory(fullPath);
-      } catch {
-        // Directory may already exist
+    // Create directories first. WebDAV MKCOL requires the parent to
+    // exist, so we can't fire all in parallel — but dirs at the same
+    // depth ARE independent of each other. Group by depth and run each
+    // depth-level in parallel via Promise.allSettled. For a folder
+    // upload with M directories grouped into D depth levels this drops
+    // M sequential RTTs to D sequential RTTs (typically << M).
+    const dirsByDepth = new Map<number, string[]>();
+    for (const dir of dirs) {
+      const depth = dir.split('/').length;
+      let bucket = dirsByDepth.get(depth);
+      if (!bucket) {
+        bucket = [];
+        dirsByDepth.set(depth, bucket);
       }
+      bucket.push(dir);
+    }
+    const depths = [...dirsByDepth.keys()].sort((a, b) => a - b);
+    for (const depth of depths) {
+      if (abortController.signal.aborted) break;
+      const bucket = dirsByDepth.get(depth)!;
+      await Promise.allSettled(bucket.map(dir => {
+        const fullPath = currentPath === '/' ? `/${dir}` : `${currentPath}/${dir}`;
+        return webdavClient.createDirectory(fullPath);
+      }));
     }
 
     // Upload files
@@ -278,10 +292,12 @@ export const useWebDAVStore = create<WebDAVState>((set, get) => ({
     const { webdavClient, currentPath, refresh } = get();
     if (!webdavClient) return;
 
-    for (const name of names) {
+    // Each delete targets a unique path with no inter-dependencies —
+    // parallelize. Was N sequential WebDAV DELETE requests.
+    await Promise.allSettled(names.map(name => {
       const fullPath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
-      await webdavClient.delete(fullPath);
-    }
+      return webdavClient.delete(fullPath);
+    }));
     set({ selectedResources: new Set() });
     await refresh();
   },
@@ -367,14 +383,16 @@ export const useWebDAVStore = create<WebDAVState>((set, get) => ({
     const { webdavClient, currentPath, refresh } = get();
     if (!webdavClient) return;
 
+    // Each move targets a unique src + unique dest — parallelize. Was
+    // N sequential WebDAV MOVE RTTs (~N × 200ms for cross-network).
     const targetBase = currentPath === '/' ? `/${targetFolder}` : `${currentPath}/${targetFolder}`;
-    const entries: { from: string; to: string }[] = [];
-    for (const name of names) {
+    type Entry = { from: string; to: string };
+    const settled = await Promise.allSettled(names.map((name): Promise<Entry> => {
       const oldPath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
       const newPath = `${targetBase}/${name}`;
-      await webdavClient.move(oldPath, newPath);
-      entries.push({ from: oldPath, to: newPath });
-    }
+      return webdavClient.move(oldPath, newPath).then(() => ({ from: oldPath, to: newPath }));
+    }));
+    const entries: Entry[] = settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : []);
     set({ selectedResources: new Set(), lastAction: { type: 'move', entries, sourcePath: currentPath } });
     await refresh();
   },
@@ -395,21 +413,21 @@ export const useWebDAVStore = create<WebDAVState>((set, get) => ({
     const { webdavClient, currentPath, clipboard, refresh } = get();
     if (!webdavClient || !clipboard) return;
 
-    const entries: { from: string; to: string }[] = [];
-    for (let i = 0; i < clipboard.paths.length; i++) {
-      const srcPath = clipboard.paths[i];
-      const destPath = currentPath === '/' ? `/${clipboard.names[i]}` : `${currentPath}/${clipboard.names[i]}`;
-
-      if (clipboard.mode === 'cut') {
-        await webdavClient.move(srcPath, destPath);
-        entries.push({ from: srcPath, to: destPath });
-      } else {
-        await webdavClient.copy(srcPath, destPath);
-      }
-    }
-
+    // Each move/copy targets a unique src + unique dest — parallelize.
+    // Was N sequential WebDAV MOVE/COPY RTTs.
+    type Entry = { from: string; to: string };
     if (clipboard.mode === 'cut') {
+      const settled = await Promise.allSettled(clipboard.paths.map((srcPath, i): Promise<Entry> => {
+        const destPath = currentPath === '/' ? `/${clipboard.names[i]}` : `${currentPath}/${clipboard.names[i]}`;
+        return webdavClient.move(srcPath, destPath).then(() => ({ from: srcPath, to: destPath }));
+      }));
+      const entries: Entry[] = settled.flatMap(r => r.status === 'fulfilled' ? [r.value] : []);
       set({ clipboard: null, lastAction: { type: 'move', entries, sourcePath: currentPath } });
+    } else {
+      await Promise.allSettled(clipboard.paths.map((srcPath, i) => {
+        const destPath = currentPath === '/' ? `/${clipboard.names[i]}` : `${currentPath}/${clipboard.names[i]}`;
+        return webdavClient.copy(srcPath, destPath);
+      }));
     }
     await refresh();
   },

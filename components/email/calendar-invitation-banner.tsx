@@ -412,7 +412,10 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
               const matching = serverEvents.filter((e) => e.uid === parsed.uid);
               if (matching.length > 0) {
                 useCalendarStore.setState((s) => {
-                  const existingIds = new Set(s.events.map((e) => e.id));
+                  // Build the id Set directly — `s.events.map(...)`
+                  // would allocate a throwaway id-array first.
+                  const existingIds = new Set<string>();
+                  for (const e of s.events) existingIds.add(e.id);
                   const newEvents = matching.filter((e) => !existingIds.has(e.id));
                   return newEvents.length > 0 ? { events: [...s.events, ...newEvents] } : s;
                 });

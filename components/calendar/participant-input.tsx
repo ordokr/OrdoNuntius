@@ -41,9 +41,19 @@ export const ParticipantInput = forwardRef<ParticipantInputHandle, ParticipantIn
       return;
     }
     const results = useContactStore.getState().getAutocomplete(q);
-    const existing = new Set(participants.map(p => p.email.toLowerCase()));
-    const filtered = results.filter(r => !existing.has(r.email.toLowerCase()));
-    setSuggestions(filtered.slice(0, 8));
+    // Was: `participants.map(p => p.email.toLowerCase())` → values array
+    // → `new Set(...)`. Build the Set directly with a for-of. Also
+    // accumulate up to 8 filtered results with an early break instead
+    // of `.filter().slice(0, 8)` which walks the full results array.
+    const existing = new Set<string>();
+    for (const p of participants) existing.add(p.email.toLowerCase());
+    const filtered: typeof results = [];
+    for (const r of results) {
+      if (existing.has(r.email.toLowerCase())) continue;
+      filtered.push(r);
+      if (filtered.length >= 8) break;
+    }
+    setSuggestions(filtered);
     setShowSuggestions(filtered.length > 0);
     setActiveIndex(-1);
   }, [participants]);

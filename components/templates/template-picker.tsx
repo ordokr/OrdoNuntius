@@ -114,12 +114,19 @@ export function TemplatePicker({ isOpen, onClose, onSelect }: TemplatePickerProp
   const categorizedEntries = Object.entries(byCategory).filter(
     ([cat]) => cat !== ''
   );
-  const favoriteIds = new Set(favorites.map((f) => f.id));
-  const recentFiltered = recent.filter((r) => !favoriteIds.has(r.id));
-  const shownIds = new Set([
-    ...favoriteIds,
-    ...recentFiltered.map((r) => r.id),
-  ]);
+  // Build favoriteIds + shownIds in one walk each (avoids the
+  // intermediate `.map(...).id` array allocations). recentFiltered
+  // is a separate `.filter()` walk but its result is also accumulated
+  // into shownIds for the next gate.
+  const favoriteIds = new Set<string>();
+  for (const f of favorites) favoriteIds.add(f.id);
+  const shownIds = new Set(favoriteIds);
+  const recentFiltered: typeof recent = [];
+  for (const r of recent) {
+    if (favoriteIds.has(r.id)) continue;
+    recentFiltered.push(r);
+    shownIds.add(r.id);
+  }
   const uncategorizedFiltered = (byCategory[''] || []).filter(
     (i) => !shownIds.has(i.id)
   );

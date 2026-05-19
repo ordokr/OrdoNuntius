@@ -502,8 +502,14 @@ async function syncServerPlugins(
     // Ensure no duplicate IDs remain after sync.
     set(state => ({ plugins: dedupeInstalledPlugins(state.plugins) }));
 
-    // Remove plugins that were previously server-managed but no longer on the server
-    const staleIds = [...prevServerIds].filter(id => !serverPluginIds.has(id));
+    // Remove plugins that were previously server-managed but no longer
+    // on the server. Iterate prevServerIds directly — `[...set].filter`
+    // allocates the spread array AND the filtered array. We build the
+    // result array in one walk.
+    const staleIds: string[] = [];
+    for (const id of prevServerIds) {
+      if (!serverPluginIds.has(id)) staleIds.push(id);
+    }
     if (staleIds.length > 0) {
       for (const id of staleIds) {
         deactivatePlugin(id);

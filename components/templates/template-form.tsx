@@ -53,7 +53,12 @@ export function TemplateForm({ template, initialData, onSave, onCancel }: Templa
   const [showPlaceholderMenu, setShowPlaceholderMenu] = useState<'subject' | 'body' | null>(null);
 
   const existingCategories = useMemo(() => {
-    const cats = new Set(templates.map((t) => t.category).filter(Boolean));
+    // Was: map → filter → new Set → Array.from. Build the Set in one walk
+    // (skipping falsy categories) then Array.from once.
+    const cats = new Set<string>();
+    for (const t of templates) {
+      if (t.category) cats.add(t.category);
+    }
     return Array.from(cats).sort();
   }, [templates]);
 
