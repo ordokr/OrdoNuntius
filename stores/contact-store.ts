@@ -61,6 +61,21 @@ export function findContactByEmail(
   return getContactByEmailIndex(contacts).get(email.toLowerCase());
 }
 
+// id→contact lookup. Mirror of `_contactByEmailIndex` for actions that
+// resolve a contact by primary key (group-member walks, RSVP edits, etc.).
+// 9 actions in this store did `contacts.find(c => c.id === id)`. WeakMap
+// keyed on the array reference; lazy build; auto-GC on next set().
+const _contactByIdIndex = new WeakMap<readonly ContactCard[], Map<string, ContactCard>>();
+function contactByIdLookup(contacts: readonly ContactCard[]): Map<string, ContactCard> {
+  let m = _contactByIdIndex.get(contacts);
+  if (!m) {
+    m = new Map<string, ContactCard>();
+    for (const c of contacts) m.set(c.id, c);
+    _contactByIdIndex.set(contacts, m);
+  }
+  return m;
+}
+
 function getContactSearchIndex(contact: ContactCard): ContactSearchIndex {
   const cached = _contactSearchIndex.get(contact);
   if (cached) return cached;
@@ -359,7 +374,7 @@ export const useContactStore = create<ContactStore>()(
       updateContact: async (client, id, updates) => {
         set({ error: null });
         try {
-          const contact = get().contacts.find(c => c.id === id);
+          const contact = contactByIdLookup(get().contacts).get(id);
           const originalId = contact?.originalId || id;
           const accountId = contact?.isShared ? contact.accountId : undefined;
 
@@ -393,7 +408,7 @@ export const useContactStore = create<ContactStore>()(
       deleteContact: async (client, id) => {
         set({ error: null });
         try {
-          const contact = get().contacts.find(c => c.id === id);
+          const contact = contactByIdLookup(get().contacts).get(id);
           const originalId = contact?.originalId || id;
           const accountId = contact?.isShared ? contact.accountId : undefined;
           await client.deleteContact(originalId, accountId);
@@ -510,7 +525,7 @@ export const useContactStore = create<ContactStore>()(
 
       getGroupMembers: (groupId) => {
         const { contacts } = get();
-        const group = contacts.find(c => c.id === groupId);
+        const group = contactByIdLookup(contacts).get(groupId);
         if (!group?.members) return [];
         // Sets give O(1) membership checks. Was O(M × K) with two
         // Array.includes per contact; now O(M + K). Single for...in walk
@@ -571,7 +586,7 @@ export const useContactStore = create<ContactStore>()(
           name: { components: [{ kind: 'given', value: name }], isOrdered: true },
         };
         if (client && get().supportsSync) {
-          const group = get().contacts.find(c => c.id === groupId);
+          const group = contactByIdLookup(get().contacts).get(groupId);
           const originalId = group?.originalId || groupId;
           const accountId = group?.isShared ? group.accountId : undefined;
           await client.updateContact(originalId, updates, accountId);
@@ -585,7 +600,7 @@ export const useContactStore = create<ContactStore>()(
 
       addMembersToGroup: async (client, groupId, memberIds) => {
         const { contacts } = get();
-        const group = contacts.find(c => c.id === groupId);
+        const group = contactByIdLookup(contacts).get(groupId);
         if (!group) return;
 
         // Same O(memberIds × contacts) → O(memberIds + contacts) win as
@@ -614,7 +629,7 @@ export const useContactStore = create<ContactStore>()(
 
       removeMembersFromGroup: async (client, groupId, memberIds) => {
         const { contacts } = get();
-        const group = contacts.find(c => c.id === groupId);
+        const group = contactByIdLookup(contacts).get(groupId);
         if (!group?.members) return;
 
         // O(memberIds × contacts) → O(memberIds + contacts).
@@ -660,7 +675,7 @@ export const useContactStore = create<ContactStore>()(
 
       deleteGroup: async (client, groupId) => {
         if (client && get().supportsSync) {
-          const group = get().contacts.find(c => c.id === groupId);
+          const group = contactByIdLookup(get().contacts).get(groupId);
           const originalId = group?.originalId || groupId;
           const accountId = group?.isShared ? group.accountId : undefined;
           await client.deleteContact(originalId, accountId);
