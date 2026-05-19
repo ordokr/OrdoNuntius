@@ -1189,7 +1189,9 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
       // Bulk operations on large mailboxes were O(selected × emails) because
       // each loop did emails.find(e.id === emailId). One Map build is
       // O(emails); each lookup becomes O(1).
-      const emailsById = new Map(emails.map(e => [e.id, e]));
+      // Direct Map build skips the .map(e => [e.id, e]) tuples-array.
+      const emailsById = new Map<string, typeof emails[number]>();
+      for (const e of emails) emailsById.set(e.id, e);
 
       if (get().isUnifiedView) {
         // Group emails by accountId for cross-account operations
@@ -1274,7 +1276,9 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
       const forceDestroy = permanent || isInTrash || (isInJunk && permanentlyDeleteJunk);
 
       // Build emailsById once; loops below were each O(selected × emails).
-      const emailsById = new Map(emails.map(e => [e.id, e]));
+      // Direct Map build skips the .map(e => [e.id, e]) tuples-array.
+      const emailsById = new Map<string, typeof emails[number]>();
+      for (const e of emails) emailsById.set(e.id, e);
 
       // Group emails by accountId (handles unified view and search results spanning accounts).
       const emailsByAccount = new Map<string, string[]>();
@@ -1427,7 +1431,9 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
 
       if (get().isUnifiedView) {
         // Build emailsById once; the loop below was O(selected × emails).
-        const emailsById = new Map(emails.map(e => [e.id, e]));
+        // Direct Map build skips the .map(e => [e.id, e]) tuples-array.
+      const emailsById = new Map<string, typeof emails[number]>();
+      for (const e of emails) emailsById.set(e.id, e);
         // Group emails by accountId for cross-account operations
         const emailsByAccount = new Map<string, string[]>();
         for (const emailId of emailIdsArray) {

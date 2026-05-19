@@ -246,7 +246,8 @@ export default function ContactsPage() {
       // calls are independent (different ids, disjoint server writes) —
       // fire all in parallel via Promise.all. For a 50-item drag-drop
       // batch this collapses 50 sequential JMAP RTTs to 1.
-      const byId = new Map(contacts.map(c => [c.id, c]));
+      const byId = new Map<string, typeof contacts[number]>();
+      for (const c of contacts) byId.set(c.id, c);
       await Promise.all(contactIds.map(async (contactId) => {
         const contact = byId.get(contactId);
         if (!contact) return;

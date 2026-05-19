@@ -524,7 +524,9 @@ export const useContactStore = create<ContactStore>()(
         const { contacts } = get();
         // Was O(memberIds × contacts): per id, `.find(c => c.id === id)`
         // walked the whole contacts array. Index once, lookup O(1).
-        const byId = new Map(contacts.map(c => [c.id, c]));
+        // Direct Map build skips the .map() tuples-array allocation.
+        const byId = new Map<string, typeof contacts[number]>();
+        for (const c of contacts) byId.set(c.id, c);
         const members: Record<string, boolean> = {};
         for (const id of memberIds) {
           const contact = byId.get(id);
@@ -574,7 +576,9 @@ export const useContactStore = create<ContactStore>()(
 
         // Same O(memberIds × contacts) → O(memberIds + contacts) win as
         // createGroup. Build a by-id index once.
-        const byId = new Map(contacts.map(c => [c.id, c]));
+        // Direct Map build skips the .map() tuples-array allocation.
+        const byId = new Map<string, typeof contacts[number]>();
+        for (const c of contacts) byId.set(c.id, c);
         const newMembers = { ...group.members };
         for (const id of memberIds) {
           const contact = byId.get(id);
@@ -600,7 +604,9 @@ export const useContactStore = create<ContactStore>()(
         if (!group?.members) return;
 
         // O(memberIds × contacts) → O(memberIds + contacts).
-        const byId = new Map(contacts.map(c => [c.id, c]));
+        // Direct Map build skips the .map() tuples-array allocation.
+        const byId = new Map<string, typeof contacts[number]>();
+        for (const c of contacts) byId.set(c.id, c);
         const newMembers = { ...group.members };
         for (const id of memberIds) {
           // Try direct id match first

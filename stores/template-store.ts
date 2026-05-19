@@ -122,11 +122,16 @@ export const useTemplateStore = create<TemplateStore>()(
 
       getRecent: () => {
         const { templates, recentTemplateIds } = get();
-        // O(templates + recentTemplateIds) instead of O(recent × templates).
-        const byId = new Map(templates.map((t) => [t.id, t]));
-        return recentTemplateIds
-          .map((id) => byId.get(id))
-          .filter(Boolean) as EmailTemplate[];
+        // Direct Map build + direct push loop skip the .map() tuples-array
+        // AND the recent.map().filter() intermediate.
+        const byId = new Map<string, typeof templates[number]>();
+        for (const t of templates) byId.set(t.id, t);
+        const out: EmailTemplate[] = [];
+        for (const id of recentTemplateIds) {
+          const t = byId.get(id);
+          if (t) out.push(t);
+        }
+        return out;
       },
 
       searchTemplates: (query) => {
