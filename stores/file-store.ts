@@ -259,7 +259,9 @@ export const useFileStore = create<FileState>((set, get) => ({
 
       // Prune recent files whose backing node no longer exists on the server
       const { recentFiles } = get();
-      const existingIds = new Set(allNodes.map(n => n.id));
+      // Direct Set build skips the .map(n => n.id) intermediate.
+      const existingIds = new Set<string>();
+      for (const n of allNodes) existingIds.add(n.id);
       const prunedRecent = recentFiles.filter(r => existingIds.has(r.id));
       if (prunedRecent.length !== recentFiles.length) {
         try { localStorage.setItem('files-recent-files', JSON.stringify(prunedRecent)); } catch { /* ignore */ }
@@ -350,7 +352,9 @@ export const useFileStore = create<FileState>((set, get) => ({
     const abortController = new AbortController();
     set({ uploadAbortController: abortController });
     const totalFiles = files.length;
-    const existingNames = new Set(resources.map(r => r.name));
+    // Direct Set build skips the .map(r => r.name) intermediate.
+    const existingNames = new Set<string>();
+    for (const r of resources) existingNames.add(r.name);
 
     for (let i = 0; i < files.length; i++) {
       if (abortController.signal.aborted) break;
@@ -755,7 +759,10 @@ export const useFileStore = create<FileState>((set, get) => ({
 
   selectAll: () => {
     const { resources } = get();
-    set({ selectedResources: new Set(resources.map(r => r.name)) });
+    // Direct Set build skips the .map(r => r.name) intermediate.
+    const all = new Set<string>();
+    for (const r of resources) all.add(r.name);
+    set({ selectedResources: all });
   },
 
   clearSelection: () => {

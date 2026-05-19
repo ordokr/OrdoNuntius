@@ -386,7 +386,9 @@ async function syncServerPlugins(
     if (!data.plugins || !Array.isArray(data.plugins)) return;
 
     const serverPlugins = data.plugins;
-    const serverPluginIds = new Set(serverPlugins.map(p => p.id));
+    // Direct Set build skips the .map(p => p.id) intermediate.
+    const serverPluginIds = new Set<string>();
+    for (const p of serverPlugins) serverPluginIds.add(p.id);
 
     // Track which plugins came from the server (so we can clean up stale ones)
     const prevServerIds = getServerManagedPluginIds();

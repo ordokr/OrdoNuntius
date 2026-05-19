@@ -299,7 +299,9 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
 
   selectAllEmails: () => {
     const { emails } = get();
-    const allIds = new Set(emails.map(e => e.id));
+    // Direct Set build skips the .map(e => e.id) intermediate.
+    const allIds = new Set<string>();
+    for (const e of emails) allIds.add(e.id);
     set({ selectedEmailIds: allIds });
   },
 
@@ -576,7 +578,9 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
         }
         const result = await fetchUnifiedEmails(built, unifiedRole, emailsPerPage, position);
         const currentEmails = get().emails;
-        const existingIds = new Set(currentEmails.map(e => e.id));
+        // Direct Set build skips the .map(e => e.id) intermediate.
+        const existingIds = new Set<string>();
+        for (const e of currentEmails) existingIds.add(e.id);
         const newEmails = result.emails.filter(e => !existingIds.has(e.id));
         set({
           emails: [...currentEmails, ...newEmails],
@@ -640,7 +644,9 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
 
       // Deduplicate: the server may return overlapping results if new emails
       // arrived between paginated requests and shifted positions.
-      const existingIds = new Set(currentEmails.map(e => e.id));
+      // Direct Set build skips the .map(e => e.id) intermediate.
+      const existingIds = new Set<string>();
+      for (const e of currentEmails) existingIds.add(e.id);
       const newEmails = result.emails.filter((e: Email) => !existingIds.has(e.id));
 
       set({

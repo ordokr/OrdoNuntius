@@ -906,7 +906,11 @@ export const useCalendarStore = create<CalendarStore>()(
           const serverEvents = allServerEvents.filter(e => e.calendarIds?.[sub.calendarId]);
 
           // Build a map of incoming UIDs for diffing
-          const incomingUids = new Set(parsedEvents.map(e => e.uid).filter(Boolean));
+          // Direct Set build skips the .map().filter() intermediates.
+          const incomingUids = new Set<string>();
+          for (const e of parsedEvents) {
+            if (e.uid) incomingUids.add(e.uid);
+          }
 
           // Build a map of existing UIDs on server
           const existingByUid = new Map<string, CalendarEvent[]>();

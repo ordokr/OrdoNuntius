@@ -181,7 +181,9 @@ export const useWebDAVStore = create<WebDAVState>((set, get) => ({
     const abortController = new AbortController();
     set({ uploadAbortController: abortController });
     const totalFiles = files.length;
-    const existingNames = new Set(resources.map(r => r.name));
+    // Direct Set build skips the .map(r => r.name) intermediate.
+    const existingNames = new Set<string>();
+    for (const r of resources) existingNames.add(r.name);
 
     for (let i = 0; i < files.length; i++) {
       if (abortController.signal.aborted) break;
@@ -458,7 +460,9 @@ export const useWebDAVStore = create<WebDAVState>((set, get) => ({
 
   selectAll: () => {
     const { resources } = get();
-    set({ selectedResources: new Set(resources.map(r => r.name)) });
+    const all = new Set<string>();
+    for (const r of resources) all.add(r.name);
+    set({ selectedResources: all });
   },
 
   clearSelection: () => {
