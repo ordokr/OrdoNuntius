@@ -76,7 +76,8 @@ function emitTokens(
   }
 
   const lines: string[] = [];
-  for (const [rawKey, value] of Object.entries(expanded)) {
+  for (const rawKey in expanded) {
+    const value = expanded[rawKey];
     if (typeof value !== 'string' || !value.trim()) continue;
     if (!isSafeTokenKey(rawKey)) {
       warnings.push(`Token "${rawKey}" dropped - invalid key (only [a-z0-9-] allowed)`);
@@ -113,7 +114,8 @@ function isSafeTokenValue(value: string): boolean {
 
 function emitRadii(radii: ThemeRadii): string[] {
   const out: string[] = [];
-  for (const [k, v] of Object.entries(radii)) {
+  for (const k in radii) {
+    const v = radii[k as keyof ThemeRadii];
     if (typeof v === 'string' && isSafeTokenValue(v)) {
       out.push(`  --radius-${k}: ${v.trim()};`);
     }
@@ -163,7 +165,12 @@ const DENSITY_VARS: Record<ThemeDensity, Record<string, string>> = {
 };
 
 function emitDensity(density: ThemeDensity): string[] {
-  return Object.entries(DENSITY_VARS[density]).map(([k, v]) => `  ${k}: ${v};`);
+  // for...in build avoids the Object.entries tuples-array + per-tuple
+  // sub-arrays. Runs whenever theme density changes.
+  const vars = DENSITY_VARS[density];
+  const out: string[] = [];
+  for (const k in vars) out.push(`  ${k}: ${vars[k]};`);
+  return out;
 }
 
 export interface CompileOptions {

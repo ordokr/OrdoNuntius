@@ -101,8 +101,11 @@ function getHeaderValue(headers: Email['headers'] | undefined, headerName: strin
   if (!headers) return null;
 
   const target = headerName.toLowerCase();
-  for (const [name, value] of Object.entries(headers)) {
+  // for...in over headers Record avoids the Object.entries tuples-array.
+  // Per-header walk on every iMIP detect.
+  for (const name in headers) {
     if (name.toLowerCase() !== target) continue;
+    const value = headers[name];
     return Array.isArray(value) ? (value[0] ?? null) : value;
   }
 

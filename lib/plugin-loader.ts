@@ -94,8 +94,9 @@ export async function loadPlugin(plugin: InstalledPlugin): Promise<void> {
     // 4b. Auto-register translations bundled in the manifest (plugin.locales)
     //     Plugins may still call api.i18n.addTranslations() in activate() to add more.
     if (plugin.locales) {
-      for (const [locale, strings] of Object.entries(plugin.locales)) {
-        api.i18n.addTranslations(locale, strings);
+      const locales = plugin.locales;
+      for (const locale in locales) {
+        api.i18n.addTranslations(locale, locales[locale]);
       }
     }
 

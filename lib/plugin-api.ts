@@ -620,7 +620,10 @@ export function createPluginAPI(plugin: InstalledPlugin): PluginAPI {
   // Build hooks proxy â€” each hook method checks permission and registers on the right bus
   const hooks: PluginHooksAPI = {} as PluginHooksAPI;
 
-  for (const [hookName, bus] of Object.entries(HOOK_BUSES)) {
+  // for...in over the HOOK_BUSES Record drops the tuples-array allocation.
+  // Runs once per plugin during init.
+  for (const hookName in HOOK_BUSES) {
+    const bus = HOOK_BUSES[hookName as keyof typeof HOOK_BUSES];
     const perm = HOOK_PERMISSIONS[hookName];
     if (!perm) continue;
 
@@ -826,10 +829,13 @@ export function createPluginAPI(plugin: InstalledPlugin): PluginAPI {
         // host's same-origin /api flow uses to authenticate the user.
         const safeHeaders: Record<string, string> = {};
         if (init?.headers) {
-          for (const [k, v] of Object.entries(init.headers)) {
+          // for...in over the headers Record avoids the Object.entries
+          // tuples-array allocation. Per outbound plugin fetch.
+          const headers = init.headers;
+          for (const k in headers) {
             const lower = k.toLowerCase();
             if (lower === 'cookie' || lower === 'x-jmap-username') continue;
-            safeHeaders[k] = v;
+            safeHeaders[k] = headers[k];
           }
         }
         const res = await fetch(url.toString(), {

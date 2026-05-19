@@ -93,8 +93,8 @@ class ConfigManager {
    */
   getAll(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
-    for (const [key, mapping] of Object.entries(CONFIG_ENV_MAP)) {
-      result[key] = this.get(key, mapping.defaultValue);
+    for (const key in CONFIG_ENV_MAP) {
+      result[key] = this.get(key, CONFIG_ENV_MAP[key].defaultValue);
     }
     return result;
   }
@@ -104,7 +104,8 @@ class ConfigManager {
    */
   getAllWithSources(): Record<string, { value: unknown; source: 'admin' | 'env' | 'default' }> {
     const result: Record<string, { value: unknown; source: 'admin' | 'env' | 'default' }> = {};
-    for (const [key, mapping] of Object.entries(CONFIG_ENV_MAP)) {
+    for (const key in CONFIG_ENV_MAP) {
+      const mapping = CONFIG_ENV_MAP[key];
       if (key in this.adminConfig) {
         result[key] = { value: this.adminConfig[key], source: 'admin' };
       } else {

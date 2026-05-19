@@ -239,7 +239,11 @@ function cleanRecurrenceRules(event: Record<string, unknown>): void {
     recurrenceRules: 'recurrenceRule',
     excludedRecurrenceRules: 'excludedRecurrenceRule',
   };
-  for (const [pluralKey, singularKey] of Object.entries(keyMap)) {
+  // for...in over the keyMap + rule Records drops two tuples-array
+  // allocations. Runs per event during JMAP send/update for any event with
+  // recurrence; small per-call but free.
+  for (const pluralKey in keyMap) {
+    const singularKey = keyMap[pluralKey];
     const rules = event[pluralKey];
     if (rules === undefined) continue;
     delete event[pluralKey];
@@ -255,7 +259,8 @@ function cleanRecurrenceRules(event: Record<string, unknown>): void {
     // JSCalendar 2.0: recurrenceRule is a single object, use first rule
     const rule = rules[0] as Record<string, unknown>;
     const cleaned: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(rule)) {
+    for (const k in rule) {
+      const v = rule[k];
       if (v !== null) cleaned[k] = v;
     }
     event[singularKey] = cleaned;
@@ -3232,7 +3237,8 @@ export class JMAPClient implements IJMAPClient {
   private getCalendarCapableAccountIds(): string[] {
     const primaryId = this.getCalendarsAccountId();
     const accountIds: string[] = [];
-    for (const [id, account] of Object.entries(this.accounts)) {
+    for (const id in this.accounts) {
+      const account = this.accounts[id];
       if (id === primaryId) continue;
       // Include accounts that either advertise calendar capability
       // or are non-personal (shared/group) accounts - Stalwart doesn't
@@ -3248,7 +3254,8 @@ export class JMAPClient implements IJMAPClient {
   private getContactCapableAccountIds(): string[] {
     const primaryId = this.getContactsAccountId();
     const accountIds: string[] = [];
-    for (const [id, account] of Object.entries(this.accounts)) {
+    for (const id in this.accounts) {
+      const account = this.accounts[id];
       if (id === primaryId) continue;
       // Include accounts that either advertise contacts capability
       // or are non-personal (shared/group) accounts - Stalwart doesn't
@@ -3547,17 +3554,27 @@ export class JMAPClient implements IJMAPClient {
         const isPrimary = accountId === primaryId;
         const account = this.accounts[accountId];
         const rawContacts = await this.fetchPaginatedContacts(accountId);
-        return rawContacts.map((contact) => ({
-          ...contact,
-          id: isPrimary ? contact.id : `${accountId}:${contact.id}`,
-          originalId: contact.id,
-          addressBookIds: isPrimary ? contact.addressBookIds : (contact.addressBookIds ? Object.fromEntries(
-            Object.entries(contact.addressBookIds).map(([bookId, v]) => [`${accountId}:${bookId}`, v])
-          ) : contact.addressBookIds),
-          accountId,
-          accountName: account?.name || (isPrimary ? this.username : accountId),
-          isShared: !isPrimary,
-        }));
+        return rawContacts.map((contact) => {
+          // Was `Object.fromEntries(Object.entries(...).map(...))` — three
+          // allocations (entries-array + per-tuple sub-array + final
+          // fromEntries object). Direct for...in build for namespaced book IDs.
+          let remappedBookIds = contact.addressBookIds;
+          if (!isPrimary && contact.addressBookIds) {
+            const out: Record<string, boolean> = {};
+            const ids = contact.addressBookIds;
+            for (const bookId in ids) out[`${accountId}:${bookId}`] = ids[bookId];
+            remappedBookIds = out;
+          }
+          return {
+            ...contact,
+            id: isPrimary ? contact.id : `${accountId}:${contact.id}`,
+            originalId: contact.id,
+            addressBookIds: remappedBookIds,
+            accountId,
+            accountName: account?.name || (isPrimary ? this.username : accountId),
+            isShared: !isPrimary,
+          };
+        });
       }));
 
       const allContacts: ContactCard[] = [];
@@ -3945,18 +3962,30 @@ export class JMAPClient implements IJMAPClient {
         const isPrimary = accountId === primaryId;
         const account = this.accounts[accountId];
         const events = await this.queryCalendarEvents(filter, sort, limit, accountId);
-        return events.map((event) => ({
-          ...event,
-          id: isPrimary ? event.id : `${accountId}:${event.id}`,
-          originalId: event.id,
-          originalCalendarIds: event.calendarIds,
-          calendarIds: isPrimary ? (event.calendarIds || {}) : Object.fromEntries(
-            Object.entries(event.calendarIds || {}).map(([calId, v]) => [`${accountId}:${calId}`, v])
-          ),
-          accountId,
-          accountName: account?.name || (isPrimary ? this.username : accountId),
-          isShared: !isPrimary,
-        }));
+        return events.map((event) => {
+          // Same direct for...in build as the contact path above — was
+          // Object.fromEntries(Object.entries(...).map(...)).
+          let remappedCalIds: Record<string, boolean>;
+          if (isPrimary) {
+            remappedCalIds = event.calendarIds || {};
+          } else if (event.calendarIds) {
+            remappedCalIds = {};
+            const ids = event.calendarIds;
+            for (const calId in ids) remappedCalIds[`${accountId}:${calId}`] = ids[calId];
+          } else {
+            remappedCalIds = {};
+          }
+          return {
+            ...event,
+            id: isPrimary ? event.id : `${accountId}:${event.id}`,
+            originalId: event.id,
+            originalCalendarIds: event.calendarIds,
+            calendarIds: remappedCalIds,
+            accountId,
+            accountName: account?.name || (isPrimary ? this.username : accountId),
+            isShared: !isPrimary,
+          };
+        });
       }));
 
       const allEvents: CalendarEvent[] = [];
