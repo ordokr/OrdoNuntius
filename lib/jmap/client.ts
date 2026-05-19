@@ -953,12 +953,13 @@ export class JMAPClient implements IJMAPClient {
       const getResponse = response.methodResponses?.[1]?.[1];
 
       if (response.methodResponses?.[1]?.[0] === "Email/get" && getResponse) {
-        const emails = (getResponse.list || []) as Email[];
+        const rawEmails = (getResponse.list || []) as Email[];
         // Sort client-side as safety net - some servers may not honour
         // the query sort for large mailboxes without additional filters.
-        emails.sort((a: Email, b: Email) =>
-          new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
-        );
+        // Schwartzian: decorate-once on receivedAt.
+        const decorated = rawEmails.map(e => ({ e, ms: new Date(e.receivedAt).getTime() }));
+        decorated.sort((a, b) => b.ms - a.ms);
+        const emails = decorated.map(d => d.e);
         const total = queryResponse?.total || 0;
         const hasMore = computeHasMore(position, emails.length, total, limit);
 
@@ -1699,10 +1700,11 @@ export class JMAPClient implements IJMAPClient {
       ]);
 
       const queryResponse = response.methodResponses?.[0]?.[1];
-      const emails = (response.methodResponses?.[1]?.[1]?.list || []) as Email[];
-      emails.sort((a: Email, b: Email) =>
-        new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
-      );
+      const rawEmails = (response.methodResponses?.[1]?.[1]?.list || []) as Email[];
+      // Schwartzian: parse each receivedAt once instead of N log N times.
+      const decorated = rawEmails.map(e => ({ e, ms: new Date(e.receivedAt).getTime() }));
+      decorated.sort((a, b) => b.ms - a.ms);
+      const emails = decorated.map(d => d.e);
       const total = queryResponse?.total || 0;
       const hasMore = computeHasMore(position, emails.length, total, limit);
 
@@ -1739,10 +1741,10 @@ export class JMAPClient implements IJMAPClient {
       ]);
 
       const queryResponse = response.methodResponses?.[0]?.[1];
-      const emails = (response.methodResponses?.[1]?.[1]?.list || []) as Email[];
-      emails.sort((a: Email, b: Email) =>
-        new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
-      );
+      const rawEmails = (response.methodResponses?.[1]?.[1]?.list || []) as Email[];
+      const decorated = rawEmails.map(e => ({ e, ms: new Date(e.receivedAt).getTime() }));
+      decorated.sort((a, b) => b.ms - a.ms);
+      const emails = decorated.map(d => d.e);
       const total = queryResponse?.total || 0;
       const hasMore = computeHasMore(position, emails.length, total, limit);
 
@@ -1779,15 +1781,21 @@ export class JMAPClient implements IJMAPClient {
   async getThreadEmails(threadId: string, accountId?: string): Promise<Email[]> {
     try {
       const targetAccountId = accountId || this.accountId;
-      const thread = await this.getThread(threadId, accountId);
-      if (!thread?.emailIds?.length) {
-        return [];
-      }
 
+      // Pipeline Thread/get → Email/get in one JMAP request via the
+      // `#ids` resultOf reference. Was: two sequential RTTs
+      // (await this.getThread, then await this.request for Email/get).
+      // Pipelined: 1 RTT. JMAP servers process method calls in order
+      // within a single request and expose intermediate results via
+      // resultOf — this is exactly that case.
       const response = await this.request([
+        ["Thread/get", {
+          accountId: targetAccountId,
+          ids: [threadId],
+        }, "t"],
         ["Email/get", {
           accountId: targetAccountId,
-          ids: thread.emailIds,
+          "#ids": { resultOf: "t", name: "Thread/get", path: "/list/*/emailIds" },
           properties: [
             ...EMAIL_LIST_PROPERTIES,
             "textBody", "htmlBody", "bodyValues",
@@ -1798,19 +1806,21 @@ export class JMAPClient implements IJMAPClient {
           fetchHTMLBodyValues: true,
           fetchAllBodyValues: true,
           maxBodyValueBytes: 256000,
-        }, "0"],
+        }, "e"],
       ]);
 
-      if (response.methodResponses?.[0]?.[0] === "Email/get") {
-        const emails = response.methodResponses[0][1].list || [];
+      if (response.methodResponses?.[1]?.[0] === "Email/get") {
+        const emails = (response.methodResponses[1][1].list || []) as Email[];
+        if (emails.length === 0) return [];
 
         if (accountId && accountId !== this.accountId) {
           namespaceMailboxIds(emails, accountId);
         }
 
-        return emails.sort((a: Email, b: Email) =>
-          new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
-        );
+        // Schwartzian: parse each receivedAt once, sort by ms.
+        const decorated = emails.map(e => ({ e, ms: new Date(e.receivedAt).getTime() }));
+        decorated.sort((a, b) => b.ms - a.ms);
+        return decorated.map(d => d.e);
       }
 
       return [];
