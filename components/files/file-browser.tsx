@@ -441,17 +441,21 @@ export function FileBrowser({
     // Across an O(N log N) sort that's many redundant parses. Decorate once
     // (only for the modified case), sort, then unwrap.
     if (sortKey === "modified") {
-      const decorated = filtered.map(r => ({
-        r,
-        ms: new Date(r.lastModified || 0).getTime(),
-        isDir: r.isDirectory,
-      }));
+      // Pre-sized decorated + indexed unwrap — drops two .map intermediates.
+      const decorated: { r: typeof filtered[number]; ms: number; isDir: boolean }[] =
+        new Array(filtered.length);
+      for (let i = 0; i < filtered.length; i++) {
+        const r = filtered[i];
+        decorated[i] = { r, ms: new Date(r.lastModified || 0).getTime(), isDir: r.isDirectory };
+      }
       decorated.sort((a, b) => {
         if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
         const cmp = a.ms - b.ms;
         return sortDir === "asc" ? cmp : -cmp;
       });
-      return decorated.map(d => d.r);
+      const out: typeof filtered = new Array(decorated.length);
+      for (let i = 0; i < decorated.length; i++) out[i] = decorated[i].r;
+      return out;
     }
 
     const sorted = [...filtered].sort((a, b) => {

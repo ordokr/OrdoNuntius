@@ -47,18 +47,27 @@ export function packWeekSegments(rawSegments: CalendarWeekSegment[]): CalendarWe
     return (left.segment.event.title || "").localeCompare(right.segment.event.title || "");
   });
 
+  // Pre-sized output replaces `decorated.map(...)`. findIndex is a manual
+  // for-loop too so we drop both the .map allocation and the .findIndex
+  // closure cost per segment.
   const rowEndIndices: number[] = [];
-  return decorated.map(({ segment }) => {
+  const out: CalendarWeekSegment[] = new Array(decorated.length);
+  for (let i = 0; i < decorated.length; i++) {
+    const segment = decorated[i].segment;
     const segmentEndIndex = segment.startIndex + segment.span - 1;
-    let row = rowEndIndices.findIndex((endIndex) => endIndex < segment.startIndex);
+    let row = -1;
+    for (let r = 0; r < rowEndIndices.length; r++) {
+      if (rowEndIndices[r] < segment.startIndex) { row = r; break; }
+    }
     if (row === -1) {
       row = rowEndIndices.length;
       rowEndIndices.push(segmentEndIndex);
     } else {
       rowEndIndices[row] = segmentEndIndex;
     }
-    return { ...segment, row };
-  });
+    out[i] = { ...segment, row };
+  }
+  return out;
 }
 
 export function getEventEndDate(event: CalendarEvent): Date {

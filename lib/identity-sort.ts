@@ -39,10 +39,11 @@ export function sortIdentities(
   username: string,
   preferredPrimaryId?: string | null,
 ): Identity[] {
-  const decorated = rawIdentities.map(id => ({
-    id,
-    matches: emailMatchesUsername(id.email, username),
-  }));
+  // Pre-sized decorated + indexed unwrap — drops two .map intermediates.
+  const decorated: { id: Identity; matches: boolean }[] = new Array(rawIdentities.length);
+  for (let i = 0; i < rawIdentities.length; i++) {
+    decorated[i] = { id: rawIdentities[i], matches: emailMatchesUsername(rawIdentities[i].email, username) };
+  }
   decorated.sort((a, b) => {
     if (a.matches !== b.matches) return a.matches ? -1 : 1;
     if (a.matches && b.matches) {
@@ -50,7 +51,8 @@ export function sortIdentities(
     }
     return 0;
   });
-  const sorted = decorated.map(d => d.id);
+  const sorted: Identity[] = new Array(decorated.length);
+  for (let i = 0; i < decorated.length; i++) sorted[i] = decorated[i].id;
 
   if (preferredPrimaryId) {
     const idx = sorted.findIndex(id => id.id === preferredPrimaryId);
