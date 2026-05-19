@@ -108,8 +108,12 @@ function normalizeStalwartPropertyNames<T extends Partial<CalendarEvent>>(event:
   if (!patched) return event;
 
   const result = { ...event, ...updates } as T;
-  delete (result as Record<string, unknown>).recurrenceRule;
-  delete (result as Record<string, unknown>).excludedRecurrenceRule;
+  // Set to undefined instead of `delete` — JSON.stringify omits undefined
+  // values, downstream consumers only read the plural (already in `updates`),
+  // and `delete` would transition the object to V8 dictionary mode for the
+  // rest of its lifetime. Runs per event in normalized calendar responses.
+  (result as Record<string, unknown>).recurrenceRule = undefined;
+  (result as Record<string, unknown>).excludedRecurrenceRule = undefined;
   return result;
 }
 
