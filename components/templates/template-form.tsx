@@ -31,7 +31,7 @@ export function TemplateForm({ template, initialData, onSave, onCancel }: Templa
   const tSettings = useTranslations('settings.templates');
   const tComposer = useTranslations('email_composer');
 
-  const { identities } = useAuthStore();
+  const identities = useAuthStore(s => s.identities);
   const templates = useTemplateStore((s) => s.templates);
 
   const [name, setName] = useState(template?.name || '');

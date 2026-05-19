@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { X, Search, Star, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { useShallow } from 'zustand/react/shallow';
 import { useTemplateStore } from '@/stores/template-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useFocusTrap } from '@/hooks/use-focus-trap';
@@ -25,9 +26,19 @@ export function TemplatePicker({ isOpen, onClose, onSelect }: TemplatePickerProp
   const t = useTranslations('templates');
   const locale = useLocale();
 
+  // useShallow on useTemplateStore + per-field on useAuthStore — template
+  // picker mounts inside composer and re-rendered on every unrelated
+  // template-store mutation before.
   const { templates, getFavorites, getRecent, getTemplatesByCategory, searchTemplates, recordUsage } =
-    useTemplateStore();
-  const { primaryIdentity } = useAuthStore();
+    useTemplateStore(useShallow(s => ({
+      templates: s.templates,
+      getFavorites: s.getFavorites,
+      getRecent: s.getRecent,
+      getTemplatesByCategory: s.getTemplatesByCategory,
+      searchTemplates: s.searchTemplates,
+      recordUsage: s.recordUsage,
+    })));
+  const primaryIdentity = useAuthStore(s => s.primaryIdentity);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);

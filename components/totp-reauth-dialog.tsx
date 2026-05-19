@@ -17,7 +17,11 @@ import { Shield } from "lucide-react";
  */
 export function TotpReauthDialog() {
   const t = useTranslations("totp_reauth");
-  const { isOpen, submit, cancel } = useTotpReauthStore();
+  // Mounted at app root — whole-store sub re-ran on every TOTP store
+  // mutation. Per-field selectors narrow the subscription.
+  const isOpen = useTotpReauthStore(s => s.isOpen);
+  const submit = useTotpReauthStore(s => s.submit);
+  const cancel = useTotpReauthStore(s => s.cancel);
   const [code, setCode] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 

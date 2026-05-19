@@ -35,9 +35,12 @@ export function useTour() {
 export function TourProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isDemoMode } = useAuthStore();
-  const { supportsCalendar } = useCalendarStore();
-  const { supportsWebDAV } = useWebDAVStore();
+  // Per-field selectors — TourProvider mounts at the app shell, so a
+  // whole-store sub re-ran this (and re-derived `steps`) on every set()
+  // in 3 separate stores.
+  const isDemoMode = useAuthStore(s => s.isDemoMode);
+  const supportsCalendar = useCalendarStore(s => s.supportsCalendar);
+  const supportsWebDAV = useWebDAVStore(s => s.supportsWebDAV);
 
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);

@@ -624,7 +624,8 @@ function DemoBanner() {
 function VacationBanner() {
   const t = useTranslations('sidebar');
   const router = useRouter();
-  const { isEnabled, isSupported } = useVacationStore();
+  const isEnabled = useVacationStore(s => s.isEnabled);
+  const isSupported = useVacationStore(s => s.isSupported);
 
   if (!isSupported || !isEnabled) return null;
 
