@@ -965,8 +965,12 @@ export function EmailViewer({
   const moveMenuRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [hiddenPriorities, setHiddenPriorities] = useState<Set<number>>(new Set());
-  const currentColors = getCurrentColors(email?.keywords);
+  const currentColors = useMemo(() => getCurrentColors(email?.keywords), [email?.keywords]);
   const currentColor = currentColors[0] ?? null;
+  // Set form for `.includes(option.value)` callsites — three different
+  // dropdown menus each map over colorOptions and check membership per
+  // option. O(1) Set lookup instead of O(currentColors.length) per option.
+  const currentColorsSet = useMemo(() => new Set(currentColors), [currentColors]);
 
   // S/MIME state
   const [smimeStatus, setSmimeStatus] = useState<SmimeStatus | null>(null);
@@ -2132,25 +2136,32 @@ export function EmailViewer({
     }
 
     const hasCalInvitation = calendarInvitationParsingEnabled && !!email && !!findCalendarAttachment(email);
-    const jmapAttachments = (email?.attachments ?? [])
-      // Hide winmail.dat when we have successfully extracted TNEF content or attachments
-      .filter(att => !(tnefHtml || tnefText || tnefAttachments.length > 0) || !isTnefAttachment(att.name, att.type))
-      // Hide message/rfc822 when we have unwrapped the embedded email
-      .filter(att => !embeddedEmailUnwrapped || att.type !== 'message/rfc822')
-      // Hide calendar MIME parts (text/calendar, application/ics) when the invitation
-      // banner is shown - prevents raw ICS files appearing as spurious attachments.
-      .filter(att => !hasCalInvitation || !isCalendarMimeType(att.type))
-      // Hide inline cid-referenced images when the user has opted to keep them
-      // out of the attachment list (default on): these are embedded in the body.
-      .filter(att => !(hideInlineImageAttachments && att.cid && att.disposition === 'inline' && (att.type || '').startsWith('image/')))
-      .map((attachment, index) => ({
-        id: attachment.blobId || `${attachment.name || 'attachment'}-${index}`,
-        name: attachment.name || null,
-        type: attachment.type || 'application/octet-stream',
-        size: attachment.size,
-        blobId: attachment.blobId,
-        cid: attachment.cid,
-      }));
+    // Was 4 chained `.filter()` calls plus a `.map()` — each allocated its
+    // own intermediate array. Single-pass walk in one allocation. Per-
+    // condition predicates kept here so the rules are still readable.
+    const hasTnefExtraction = !!(tnefHtml || tnefText || tnefAttachments.length > 0);
+    const jmapAttachments: EffectiveAttachment[] = [];
+    const rawAttachments = email?.attachments ?? [];
+    for (let index = 0; index < rawAttachments.length; index++) {
+      const att = rawAttachments[index];
+      // Hide winmail.dat when we have TNEF content extracted.
+      if (hasTnefExtraction && isTnefAttachment(att.name, att.type)) continue;
+      // Hide message/rfc822 when we have unwrapped the embedded email.
+      if (embeddedEmailUnwrapped && att.type === 'message/rfc822') continue;
+      // Hide calendar MIME parts when the invitation banner is shown.
+      if (hasCalInvitation && isCalendarMimeType(att.type)) continue;
+      // Hide inline cid-referenced images when the user has opted to keep
+      // them out of the attachment list (default on): embedded in the body.
+      if (hideInlineImageAttachments && att.cid && att.disposition === 'inline' && (att.type || '').startsWith('image/')) continue;
+      jmapAttachments.push({
+        id: att.blobId || `${att.name || 'attachment'}-${index}`,
+        name: att.name || null,
+        type: att.type || 'application/octet-stream',
+        size: att.size,
+        blobId: att.blobId,
+        cid: att.cid,
+      });
+    }
 
     // Append attachments extracted from TNEF
     const tnefExtracted: EffectiveAttachment[] = tnefAttachments.map((att, index) => ({
@@ -3441,7 +3452,7 @@ export function EmailViewer({
           {tagMenuOpen && (
             <div className="absolute right-0 top-full mt-1 py-1 w-40 bg-background rounded-lg shadow-lg border border-border z-10">
               {colorOptions.map((option) => {
-                const isActive = currentColors.includes(option.value);
+                const isActive = currentColorsSet.has(option.value);
                 return (
                   <button
                     key={option.value}
@@ -3676,7 +3687,7 @@ export function EmailViewer({
                   {moreMenuSub === 'tag' && (
                     <div className="absolute right-full top-0 mr-1 py-1 w-40 bg-background rounded-md shadow-lg border border-border z-10">
                       {colorOptions.map((option) => {
-                        const isActive = currentColors.includes(option.value);
+                        const isActive = currentColorsSet.has(option.value);
                         return (
                           <button
                             key={option.value}
@@ -3939,7 +3950,7 @@ export function EmailViewer({
           {moreMenuSub === 'tag' && colorOptions.length > 0 && (
             <>
               {colorOptions.map((option) => {
-                const isActive = currentColors.includes(option.value);
+                const isActive = currentColorsSet.has(option.value);
                 return (
                   <button
                     key={option.value}

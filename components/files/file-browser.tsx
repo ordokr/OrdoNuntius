@@ -485,6 +485,15 @@ export function FileBrowser({
     return [...selectedResources].filter(n => !dirByName.get(n));
   }, [resources, selectedResources]);
 
+  // `clipboard.names.includes(resource.name)` was called per resource row in
+  // the className computation — O(C) per row × N rows = O(N·C) per render.
+  // With a 1000-file folder and 50 cut items that's 50k ops per render.
+  // Memoized Set makes each check O(1).
+  const cutNamesSet = useMemo(
+    () => (clipboard?.mode === 'cut' ? new Set(clipboard.names) : null),
+    [clipboard],
+  );
+
   // Build breadcrumb segments
   const breadcrumbs = currentPath === '/'
     ? [{ name: t("breadcrumb_root"), path: '/' }]
@@ -1339,7 +1348,7 @@ export function FileBrowser({
                         : dragTarget === resource.name
                           ? "bg-primary/5 ring-1 ring-primary/40"
                           : "hover:bg-muted/50",
-                      clipboard?.mode === "cut" && clipboard.names.includes(resource.name) && "opacity-50"
+                      cutNamesSet?.has(resource.name) && "opacity-50"
                     )}
                     onClick={(e) => handleResourceClick(resource, e)}
                     onDoubleClick={() => handleResourceDoubleClick(resource)}
@@ -1487,7 +1496,7 @@ export function FileBrowser({
                       : dragTarget === resource.name
                         ? "bg-primary/5 ring-1 ring-primary/40"
                         : "hover:bg-muted/50",
-                    clipboard?.mode === "cut" && clipboard.names.includes(resource.name) && "opacity-50"
+                    cutNamesSet?.has(resource.name) && "opacity-50"
                   )}
                   onClick={(e) => handleResourceClick(resource, e)}
                   onDoubleClick={() => handleResourceDoubleClick(resource)}

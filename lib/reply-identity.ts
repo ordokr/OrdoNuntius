@@ -117,40 +117,42 @@ export function resolveReplyFrom(
     return null;
   }
 
-  const identityEmails = new Set(identities.map((i) => normalizeEmailAddress(i.email)));
-  const identityBaseEmails = new Set(identities.map((i) => normalizeBaseEmailAddress(i.email)));
-
-  const exactIdentity = identities.find((i) =>
-    received.some((r) => normalizeEmailAddress(r.email) === normalizeEmailAddress(i.email)),
-  );
-  if (exactIdentity) {
-    return { identityId: exactIdentity.id };
+  // Index identities once. Previously walked `identities` 3× via `.map(...)`
+  // to build Sets + did `.find(...)` over identities with nested `.some(...)`
+  // over received (O(I × R) per find, twice). Now each per-identity
+  // normalization happens exactly once, and lookups are O(1).
+  const identityByEmail = new Map<string, Identity>();
+  const identityByBase = new Map<string, Identity>();
+  const identityByDomain = new Map<string, Identity>();
+  for (const id of identities) {
+    const norm = normalizeEmailAddress(id.email);
+    const base = normalizeBaseEmailAddress(id.email);
+    const domain = domainOf(id.email);
+    if (!identityByEmail.has(norm)) identityByEmail.set(norm, id);
+    if (!identityByBase.has(base)) identityByBase.set(base, id);
+    if (domain && !identityByDomain.has(domain)) identityByDomain.set(domain, id);
   }
 
-  const baseIdentity = identities.find((i) =>
-    received.some((r) => normalizeBaseEmailAddress(r.email) === normalizeBaseEmailAddress(i.email)),
-  );
-  if (baseIdentity) {
-    return { identityId: baseIdentity.id };
+  for (const r of received) {
+    const exact = identityByEmail.get(normalizeEmailAddress(r.email));
+    if (exact) return { identityId: exact.id };
+  }
+  for (const r of received) {
+    const base = identityByBase.get(normalizeBaseEmailAddress(r.email));
+    if (base) return { identityId: base.id };
   }
 
-  const ownedDomains = new Set(identities.map((i) => domainOf(i.email)).filter(Boolean));
-
-  const catchAll = received.find((r) => {
-    const email = normalizeEmailAddress(r.email);
-    if (identityEmails.has(email) || identityBaseEmails.has(normalizeBaseEmailAddress(email))) {
-      return false;
+  // Catch-all: a recipient on an owned domain that's NOT an exact/base
+  // identity (so we'd reply *from* the domain's anchor identity but with
+  // the recipient's address as override).
+  for (const r of received) {
+    const norm = normalizeEmailAddress(r.email);
+    if (identityByEmail.has(norm) || identityByBase.has(normalizeBaseEmailAddress(norm))) continue;
+    const domain = domainOf(norm);
+    const anchor = identityByDomain.get(domain) || identities[0];
+    if (identityByDomain.has(domain)) {
+      return { identityId: anchor.id, overrideEmail: r.email, overrideName: r.name };
     }
-    return ownedDomains.has(domainOf(email));
-  });
-
-  if (catchAll) {
-    const anchor = identities.find((i) => domainOf(i.email) === domainOf(catchAll.email)) || identities[0];
-    return {
-      identityId: anchor.id,
-      overrideEmail: catchAll.email,
-      overrideName: catchAll.name,
-    };
   }
 
   return null;

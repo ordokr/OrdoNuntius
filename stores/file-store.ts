@@ -157,6 +157,28 @@ function buildPathFromStack(stack: { id: string | null; name: string }[]): strin
   return '/' + stack.slice(1).map(s => s.name).join('/');
 }
 
+// Resolves a list of resource names against the current view in one pass.
+// Was: cutResources / copyResources each built `byName` + walked `names`
+// twice (once for ids, once for serverNames). Identical bodies, just
+// `mode: 'cut'` vs `mode: 'copy'`. Fused into one walk + one shared helper.
+function buildClipboard(
+  mode: 'cut' | 'copy',
+  names: string[],
+  state: { currentPath: string; resources: FileResource[] },
+): ClipboardState {
+  const byName = new Map<string, FileResource>();
+  for (const r of state.resources) byName.set(r.name, r);
+  const ids: string[] = [];
+  const serverNames: string[] = [];
+  for (const n of names) {
+    const r = byName.get(n);
+    if (!r) continue;
+    if (r.id) ids.push(r.id);
+    if (r.serverName) serverNames.push(r.serverName);
+  }
+  return { mode, ids, names, serverNames, sourceParentId: null, sourcePath: state.currentPath };
+}
+
 export const useFileStore = create<FileState>((set, get) => ({
   currentParentId: null,
   currentPath: '/',
@@ -638,22 +660,11 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   cutResources: (names: string[]) => {
-    const { currentPath, resources } = get();
-    // Was O(names × resources) — names.map(.find()) walked the resources
-    // array for every name. Single Map build is O(resources); each lookup
-    // is O(1), so total is O(names + resources).
-    const byName = new Map(resources.map(r => [r.name, r]));
-    const ids = names.map(n => byName.get(n)?.id).filter(Boolean) as string[];
-    const serverNames = names.map(n => byName.get(n)?.serverName).filter(Boolean) as string[];
-    set({ clipboard: { mode: 'cut', ids, names, serverNames, sourceParentId: null, sourcePath: currentPath } });
+    set({ clipboard: buildClipboard('cut', names, get()) });
   },
 
   copyResources: (names: string[]) => {
-    const { currentPath, resources } = get();
-    const byName = new Map(resources.map(r => [r.name, r]));
-    const ids = names.map(n => byName.get(n)?.id).filter(Boolean) as string[];
-    const serverNames = names.map(n => byName.get(n)?.serverName).filter(Boolean) as string[];
-    set({ clipboard: { mode: 'copy', ids, names, serverNames, sourceParentId: null, sourcePath: currentPath } });
+    set({ clipboard: buildClipboard('copy', names, get()) });
   },
 
   pasteResources: async () => {

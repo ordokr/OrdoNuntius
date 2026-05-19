@@ -75,6 +75,10 @@ export function CalendarSidebarPanel({
   const [refreshingSubId, setRefreshingSubId] = useState<string | null>(null);
 
   const personalCalendars = useMemo(() => calendars.filter(c => !c.isShared), [calendars]);
+  // O(1) membership check for the per-calendar `selectedCalendarIds
+  // .includes(cal.id)` callsite. With many calendars rendered the array
+  // .includes() walked the same list per row.
+  const selectedCalendarIdsSet = useMemo(() => new Set(selectedCalendarIds), [selectedCalendarIds]);
   const sharedAccountGroups = useMemo(() => {
     const shared = calendars.filter(c => c.isShared);
     const groups = new Map<string, { accountName: string; calendars: Calendar[] }>();
@@ -118,7 +122,7 @@ export function CalendarSidebarPanel({
   if (calendars.length === 0 && !onSubscribe) return null;
 
   const renderCalendarItem = (cal: Calendar) => {
-    const isVisible = selectedCalendarIds.includes(cal.id);
+    const isVisible = selectedCalendarIdsSet.has(cal.id);
     const color = cal.color || "#3b82f6";
     const hasMenu = isSubscriptionCalendar(cal.id) ? !!client : true;
 

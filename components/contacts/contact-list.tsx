@@ -224,24 +224,30 @@ export function ContactList({
     });
   }, [contacts, searchQuery, filters]);
 
-  const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
-      const nameA = getContactDisplayName(a).toLowerCase();
-      const nameB = getContactDisplayName(b).toLowerCase();
-      return nameA.localeCompare(nameB);
+  // Schwartzian: decorate once with both the lowercase name (for sort)
+  // and the trimmed display name (for grouping). Was computing
+  // `getContactDisplayName(...)` per comparison (so O(N log N) times)
+  // PLUS again per item in groupedSections. Now exactly once per item.
+  const sortedDecorated = useMemo(() => {
+    const decorated = filtered.map(contact => {
+      const display = getContactDisplayName(contact);
+      return { contact, lower: display.toLowerCase(), trimmed: display.trim() };
     });
+    decorated.sort((a, b) => a.lower.localeCompare(b.lower));
+    return decorated;
   }, [filtered]);
 
+  const sorted = useMemo(() => sortedDecorated.map(d => d.contact), [sortedDecorated]);
   const sortedIds = useMemo(() => sorted.map(c => c.id), [sorted]);
 
   // Group sorted contacts by first letter of display name. Non-letter
   // starters (digits, symbols, empty) collect under "#" which sorts last.
+  // Reuses the decorate-once display name from sortedDecorated.
   const groupedSections = useMemo(() => {
     const collator = new Intl.Collator(locale, { sensitivity: "base" });
     const groups = new Map<string, ContactCard[]>();
-    for (const contact of sorted) {
-      const name = getContactDisplayName(contact).trim();
-      const first = name.charAt(0);
+    for (const { contact, trimmed } of sortedDecorated) {
+      const first = trimmed.charAt(0);
       const letter = first && first.toLocaleUpperCase(locale).match(/\p{L}/u)
         ? first.toLocaleUpperCase(locale)
         : "#";
@@ -256,7 +262,7 @@ export function ContactList({
         return collator.compare(a, b);
       })
       .map(([letter, items]) => ({ letter, items }));
-  }, [sorted, locale]);
+  }, [sortedDecorated, locale]);
 
   const hasSelection = selectedContactIds.size > 0;
   const allSelected = sorted.length > 0 && sorted.every(c => selectedContactIds.has(c.id));

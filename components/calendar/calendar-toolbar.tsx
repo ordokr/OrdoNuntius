@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Plus, Upload, CalendarDays, Globe, ChevronDown, ArrowLeft } from "lucide-react";
@@ -99,6 +99,10 @@ export function CalendarToolbar({
   const [showImportDropdown, setShowImportDropdown] = useState(false);
   const importDropdownRef = useRef<HTMLDivElement>(null);
 
+  // O(1) membership check per calendar row (two dropdown variants render
+  // the same `selectedCalendarIds.includes(cal.id)` check per cal).
+  const selectedCalendarIdsSet = useMemo(() => new Set(selectedCalendarIds), [selectedCalendarIds]);
+
 
   useEffect(() => {
     if (!showImportDropdown) return;
@@ -181,7 +185,7 @@ export function CalendarToolbar({
                     </h3>
                     <div className="space-y-0.5">
                       {calendars.filter(c => !c.isShared).map((cal) => {
-                        const isVisible = selectedCalendarIds.includes(cal.id);
+                        const isVisible = selectedCalendarIdsSet.has(cal.id);
                         const color = cal.color || "#3b82f6";
                         return (
                           <button
@@ -221,7 +225,7 @@ export function CalendarToolbar({
                           </h3>
                           <div className="space-y-0.5">
                             {group.cals.map((cal) => {
-                              const isVisible = selectedCalendarIds.includes(cal.id);
+                              const isVisible = selectedCalendarIdsSet.has(cal.id);
                               const color = cal.color || "#3b82f6";
                               return (
                                 <button
