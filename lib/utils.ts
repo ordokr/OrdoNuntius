@@ -156,28 +156,29 @@ function deduplicateMailboxes(mailboxes: Mailbox[]): Mailbox[] {
   const result: Mailbox[] = [];
   const removed: { id: string; name: string; matchedRole: string; parentId?: string }[] = [];
 
-  // Group role mailboxes by account so deduplication is scoped per-account
+  // Was: two separate `forEach` passes over `mailboxes` to build
+  // rolesByAccount and referencedParentIds. Fused into one pre-pass.
   const rolesByAccount = new Map<string, Mailbox[]>();
-  mailboxes.forEach(mb => {
+  const referencedParentIds = new Set<string>();
+  for (const mb of mailboxes) {
     if (mb.role) {
       const key = mb.accountId || '';
-      if (!rolesByAccount.has(key)) rolesByAccount.set(key, []);
-      rolesByAccount.get(key)!.push(mb);
+      let group = rolesByAccount.get(key);
+      if (!group) {
+        group = [];
+        rolesByAccount.set(key, group);
+      }
+      group.push(mb);
     }
-  });
-
-  // Build a set of IDs that are referenced as parents
-  const referencedParentIds = new Set<string>();
-  mailboxes.forEach(mb => {
     if (mb.parentId) referencedParentIds.add(mb.parentId);
-  });
+  }
 
   // Filter out duplicates scoped to the same account
-  mailboxes.forEach(mb => {
+  for (const mb of mailboxes) {
     // If this mailbox has a role, always keep it
     if (mb.role) {
       result.push(mb);
-      return;
+      continue;
     }
 
     // Never deduplicate nested mailboxes - only root-level folders can be
@@ -186,7 +187,7 @@ function deduplicateMailboxes(mailboxes: Mailbox[]): Mailbox[] {
     // orphan its children to root level. (GitHub #118)
     if (mb.parentId) {
       result.push(mb);
-      return;
+      continue;
     }
 
     // Check if this root-level mailbox is a duplicate of a role-based mailbox in the SAME account
@@ -213,7 +214,7 @@ function deduplicateMailboxes(mailboxes: Mailbox[]): Mailbox[] {
         );
       }
     }
-  });
+  }
 
   if (removed.length > 0) {
     debug.log('jmap', `[Mailbox Tree] Deduplication removed ${removed.length} mailbox(es):`, removed);
@@ -317,21 +318,21 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
       group.push(mb);
     }
 
-    accountGroups.forEach((accountMailboxes, accountId) => {
+    for (const [accountId, accountMailboxes] of accountGroups) {
       // Create nodes for this account's mailboxes
       const accountMailboxMap = new Map<string, MailboxNode>();
       const accountRootNodes: MailboxNode[] = [];
 
-      accountMailboxes.forEach(mailbox => {
+      for (const mailbox of accountMailboxes) {
         accountMailboxMap.set(mailbox.id, {
           ...mailbox,
           children: [],
           depth: 0,
         });
-      });
+      }
 
       // Build tree for this account's mailboxes
-      accountMailboxes.forEach(mailbox => {
+      for (const mailbox of accountMailboxes) {
         const node = accountMailboxMap.get(mailbox.id)!;
 
         if (mailbox.parentId && accountMailboxMap.has(mailbox.parentId)) {
@@ -340,7 +341,7 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
         } else {
           accountRootNodes.push(node);
         }
-      });
+      }
 
       // Render the shared account's mailboxes flush with primary-account
       // mailboxes (depth 0) so the indents line up. The virtual account
@@ -386,7 +387,7 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
       };
 
       rootMailboxes.push(accountNode);
-    });
+    }
   }
 
   // Smart multi-level sorting
@@ -421,11 +422,11 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
     });
 
     // Recursively sort children
-    nodes.forEach(node => {
+    for (const node of nodes) {
       if (node.children.length > 0) {
         sortNodes(node.children);
       }
-    });
+    }
   };
 
   sortNodes(rootMailboxes);
@@ -471,12 +472,12 @@ export function flattenMailboxTree(nodes: MailboxNode[]): MailboxNode[] {
   const result: MailboxNode[] = [];
 
   const traverse = (nodes: MailboxNode[], depth: number = 0) => {
-    nodes.forEach(node => {
+    for (const node of nodes) {
       result.push({ ...node, depth });
       if (node.children.length > 0) {
         traverse(node.children, depth + 1);
       }
-    });
+    }
   };
 
   traverse(nodes);
