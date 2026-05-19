@@ -441,11 +441,12 @@ export const useContactStore = create<ContactStore>()(
               for (const member of members) {
                 if (results.length >= MAX_RESULTS) break;
                 const memberName = getContactDisplayName(member);
-                const memberEmails = member.emails ? Object.values(member.emails) : [];
-                for (const emailEntry of memberEmails) {
+                // `for...in` avoids per-member `Object.values` allocation.
+                if (!member.emails) continue;
+                for (const k in member.emails) {
                   if (results.length >= MAX_RESULTS) break;
-                  if (!emailEntry.address) continue;
-                  results.push({ name: memberName, email: emailEntry.address });
+                  const addr = member.emails[k]?.address;
+                  if (addr) results.push({ name: memberName, email: addr });
                 }
               }
             }

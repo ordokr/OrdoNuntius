@@ -145,12 +145,14 @@ export function FolderSettings() {
 
   const getIconName = (mb: { id: string; role?: string }): string => {
     if (folderIcons[mb.id]) return folderIcons[mb.id];
+    // Was `Object.entries(ROLE_ICONS).find(([r]) => r === mb.role)` —
+    // walks an N-entry tuple array just to look up by key. The key
+    // (mb.role) IS the role; `ROLE_ICONS[mb.role]` already gives the
+    // value (and we already checked it's defined).
     if (mb.role && ROLE_ICONS[mb.role]) {
-      const entry = Object.entries(ROLE_ICONS).find(([r]) => r === mb.role);
-      if (entry) {
-        const found = ICON_CHOICES.find(c => c.icon === entry[1]);
-        if (found) return found.name;
-      }
+      const icon = ROLE_ICONS[mb.role];
+      const found = ICON_CHOICES.find(c => c.icon === icon);
+      if (found) return found.name;
     }
     return 'Folder';
   };

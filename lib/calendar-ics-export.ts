@@ -77,7 +77,8 @@ function pushFrequencyRule(lines: string[], event: CalendarEvent): void {
 
 function pushAlerts(lines: string[], event: CalendarEvent): void {
   if (!event.alerts) return;
-  for (const alert of Object.values(event.alerts)) {
+  for (const k in event.alerts) {
+    const alert = event.alerts[k];
     const trigger = alert.trigger;
     if (!trigger) continue;
     lines.push("BEGIN:VALARM");
@@ -128,25 +129,37 @@ export function eventToICS(event: CalendarEvent): string {
   }
 
   if (event.locations) {
-    const first = Object.values(event.locations)[0];
-    if (first?.name) lines.push(`LOCATION:${escapeText(first.name)}`);
+    // First-value pick without `Object.values(...)[0]` allocation.
+    for (const k in event.locations) {
+      const first = event.locations[k];
+      if (first?.name) lines.push(`LOCATION:${escapeText(first.name)}`);
+      break;
+    }
   }
   if (event.virtualLocations) {
-    for (const loc of Object.values(event.virtualLocations)) {
-      if (loc.uri) lines.push(`URL:${loc.uri}`);
+    for (const k in event.virtualLocations) {
+      const uri = event.virtualLocations[k]?.uri;
+      if (uri) lines.push(`URL:${uri}`);
     }
   }
 
   if (event.participants) {
-    const organizer = Object.values(event.participants).find((p) => p.roles?.owner);
-    if (organizer) {
-      const email = organizer.email || organizer.sendTo?.imip?.replace("mailto:", "");
+    // Single pass: find organizer + emit ATTENDEE lines for non-organizers
+    // in one walk. Was: `Object.values(...).find(...)` for organizer +
+    // another `Object.values(...)` walk for attendees — two values-array
+    // allocations.
+    for (const k in event.participants) {
+      const p = event.participants[k];
+      if (!p.roles?.owner) continue;
+      const email = p.email || p.sendTo?.imip?.replace("mailto:", "");
       if (email) {
-        const cn = organizer.name ? `;CN=${escapeText(organizer.name)}` : "";
+        const cn = p.name ? `;CN=${escapeText(p.name)}` : "";
         lines.push(`ORGANIZER${cn}:mailto:${email}`);
       }
+      break; // ICS spec: one ORGANIZER per VEVENT
     }
-    for (const p of Object.values(event.participants)) {
+    for (const k in event.participants) {
+      const p = event.participants[k];
       if (p.roles?.owner) continue;
       const email = p.email || p.sendTo?.imip?.replace("mailto:", "");
       if (!email) continue;

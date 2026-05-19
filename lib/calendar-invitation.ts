@@ -377,12 +377,9 @@ export function getInvitationMethod(
     return 'reply';
   }
 
-  if (event.participants && Object.keys(event.participants).length > 0) {
-    const hasOrganizer = Object.values(event.participants).some(
-      (p: CalendarParticipant) => isOrganizerParticipant(p)
-    );
-    if (hasOrganizer) {
-      return 'request';
+  if (event.participants) {
+    for (const k in event.participants) {
+      if (isOrganizerParticipant(event.participants[k])) return 'request';
     }
   }
 
