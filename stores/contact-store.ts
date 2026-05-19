@@ -234,12 +234,16 @@ export const useContactStore = create<ContactStore>()(
           if (c.kind !== 'group' || !c.members) return c;
           let changed = false;
           const newMembers: Record<string, boolean> = {};
-          for (const [key, val] of Object.entries(c.members)) {
+          // for...in avoids the Object.entries Array-of-tuples allocation.
+          // Groups can hold 100-500 members; over a multi-contact delete this
+          // skipped allocation matters.
+          const members = c.members;
+          for (const key in members) {
             const bareKey = key.startsWith('urn:uuid:') ? key.slice(9) : key;
             if (removedKeys.has(key) || removedKeys.has(bareKey)) {
               changed = true;
             } else {
-              newMembers[key] = val;
+              newMembers[key] = members[key];
             }
           }
           return changed ? { ...c, members: newMembers } : c;
