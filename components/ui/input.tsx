@@ -4,20 +4,23 @@ import { cn } from "@/lib/utils";
 export interface InputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {}
 
+// Single hoisted string — previous cn() call passed 6 separate string
+// args every render, forcing twMerge to walk the whole concat list per
+// keystroke. Pre-join once at module load.
+const INPUT_BASE =
+  "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground transition-all duration-200 " +
+  "file:border-0 file:bg-transparent file:text-sm file:font-medium " +
+  "placeholder:text-muted-foreground " +
+  "hover:border-muted-foreground " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-ring " +
+  "disabled:cursor-not-allowed disabled:opacity-50";
+
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, ...props }, ref) => {
     return (
       <input
         type={type}
-        className={cn(
-          "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground transition-all duration-200",
-          "file:border-0 file:bg-transparent file:text-sm file:font-medium",
-          "placeholder:text-muted-foreground",
-          "hover:border-muted-foreground",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-ring",
-          "disabled:cursor-not-allowed disabled:opacity-50",
-          className
-        )}
+        className={cn(INPUT_BASE, className)}
         ref={ref}
         {...props}
       />
