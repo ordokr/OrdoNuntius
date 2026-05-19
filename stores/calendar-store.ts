@@ -11,6 +11,33 @@ import { generateUUID } from '@/lib/utils';
 import { apiFetch } from '@/lib/browser-navigation';
 import { BIRTHDAY_CALENDAR_ID } from '@/lib/birthday-calendar';
 
+// id→entity lookup caches against the array identity. The calendar store
+// calls `calendars.find(c => c.id === ...)` and `events.find(e => e.id === ...)`
+// in 8+ actions (RSVPs, event edits, calendar share toggles). For event lists
+// that grow to hundreds in a busy month view, the `.find()` was O(N) per
+// action; the cache makes it O(1) after the first lookup. WeakMap is freed
+// via GC when zustand swaps the array reference on the next set().
+const _calendarByIdCache = new WeakMap<readonly Calendar[], Map<string, Calendar>>();
+function calendarByIdLookup(calendars: readonly Calendar[]): Map<string, Calendar> {
+  let m = _calendarByIdCache.get(calendars);
+  if (!m) {
+    m = new Map<string, Calendar>();
+    for (const c of calendars) m.set(c.id, c);
+    _calendarByIdCache.set(calendars, m);
+  }
+  return m;
+}
+const _eventByIdCache = new WeakMap<readonly CalendarEvent[], Map<string, CalendarEvent>>();
+function eventByIdLookup(events: readonly CalendarEvent[]): Map<string, CalendarEvent> {
+  let m = _eventByIdCache.get(events);
+  if (!m) {
+    m = new Map<string, CalendarEvent>();
+    for (const e of events) m.set(e.id, e);
+    _eventByIdCache.set(events, m);
+  }
+  return m;
+}
+
 export type CalendarViewMode = 'month' | 'week' | 'day' | 'agenda' | 'tasks';
 
 const CALENDAR_VIEW_MODES: CalendarViewMode[] = ['month', 'week', 'day', 'agenda', 'tasks'];
@@ -353,7 +380,7 @@ export const useCalendarStore = create<CalendarStore>()(
         set({ error: null });
         try {
           // Resolve shared event IDs and client-side expanded occurrence IDs
-          const storeEvent = get().events.find(e => e.id === id);
+          const storeEvent = eventByIdLookup(get().events).get(id);
           const realId = storeEvent?.originalId || id;
           const targetAccountId = storeEvent?.accountId;
           if (isDebugEnabled('calendar')) {
@@ -442,7 +469,7 @@ export const useCalendarStore = create<CalendarStore>()(
         }
         try {
           // Resolve shared event IDs and client-side expanded occurrence IDs
-          const storeEvent = get().events.find(e => e.id === eventId);
+          const storeEvent = eventByIdLookup(get().events).get(eventId);
           const realId = storeEvent?.originalId || eventId;
           const targetAccountId = storeEvent?.accountId;
           // Escape per RFC 6901 (JSON Pointer): ~ → ~0, / → ~1
@@ -481,7 +508,7 @@ export const useCalendarStore = create<CalendarStore>()(
 
       importEvents: async (client, events, calendarId) => {
         // Resolve shared calendar IDs
-        const cal = get().calendars.find(c => c.id === calendarId);
+        const cal = calendarByIdLookup(get().calendars).get(calendarId);
         const realCalendarId = cal?.originalId || calendarId;
         const targetAccountId = cal?.accountId;
 
@@ -655,7 +682,7 @@ export const useCalendarStore = create<CalendarStore>()(
         set({ error: null });
         try {
           // Resolve shared event IDs and client-side expanded occurrence IDs
-          const storeEvent = get().events.find(e => e.id === id);
+          const storeEvent = eventByIdLookup(get().events).get(id);
           const realId = storeEvent?.originalId || id;
           const targetAccountId = storeEvent?.accountId;
           if (sendSchedulingMessages) {
@@ -693,7 +720,7 @@ export const useCalendarStore = create<CalendarStore>()(
       updateCalendar: async (client, calendarId, updates) => {
         set({ error: null });
         try {
-          const cal = get().calendars.find(c => c.id === calendarId);
+          const cal = calendarByIdLookup(get().calendars).get(calendarId);
           const realId = cal?.originalId || calendarId;
           const targetAccountId = cal?.accountId;
           await client.updateCalendar(realId, updates, targetAccountId);
@@ -712,7 +739,7 @@ export const useCalendarStore = create<CalendarStore>()(
       shareCalendar: async (client, calendarId, principalId, rights) => {
         set({ error: null });
         try {
-          const cal = get().calendars.find(c => c.id === calendarId);
+          const cal = calendarByIdLookup(get().calendars).get(calendarId);
           const realId = cal?.originalId || calendarId;
           const targetAccountId = cal?.accountId;
           await client.setCalendarShare(realId, principalId, rights, targetAccountId);
@@ -751,7 +778,7 @@ export const useCalendarStore = create<CalendarStore>()(
       removeCalendar: async (client, calendarId) => {
         set({ error: null });
         try {
-          const cal = get().calendars.find(c => c.id === calendarId);
+          const cal = calendarByIdLookup(get().calendars).get(calendarId);
           const realId = cal?.originalId || calendarId;
           const targetAccountId = cal?.accountId;
           await client.deleteCalendar(realId, targetAccountId);
@@ -770,7 +797,7 @@ export const useCalendarStore = create<CalendarStore>()(
       clearCalendarEvents: async (client, calendarId) => {
         set({ error: null });
         try {
-          const cal = get().calendars.find(c => c.id === calendarId);
+          const cal = calendarByIdLookup(get().calendars).get(calendarId);
           const realCalId = cal?.originalId || calendarId;
           const targetAccountId = cal?.accountId;
           let totalDeleted = 0;
