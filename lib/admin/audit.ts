@@ -60,20 +60,30 @@ export async function readAuditLog(page: number = 1, limit: number = 50, actionF
   const logPath = getAuditLogPath();
   try {
     const content = await readFile(logPath, 'utf-8');
-    const lines = content.trim().split('\n').filter(Boolean);
-
-    let entries: AuditEntry[] = lines.map(line => {
-      try { return JSON.parse(line); } catch { return null; }
-    }).filter((e): e is AuditEntry => e !== null);
-
-    if (actionFilter) {
-      entries = entries.filter(e => e.action === actionFilter);
+    // Fused single walk replaces split.filter.map.filter.reverse.slice chain.
+    // Was: 4 intermediate arrays (filtered-blank, mapped-parsed,
+    // filtered-non-null, filtered-by-action) plus an in-place reverse and
+    // a slice. Now: one in-place push loop + one pre-sized output slice.
+    const all: AuditEntry[] = [];
+    for (const line of content.trim().split('\n')) {
+      if (!line) continue;
+      let entry: AuditEntry | null = null;
+      try { entry = JSON.parse(line) as AuditEntry; } catch { continue; }
+      if (!entry) continue;
+      if (actionFilter && entry.action !== actionFilter) continue;
+      all.push(entry);
     }
-
-    const total = entries.length;
-    entries.reverse();
+    const total = all.length;
+    // Newest-first paging — read backwards from the tail into out, skipping
+    // the in-place reverse + slice intermediate.
     const start = (page - 1) * limit;
-    return { entries: entries.slice(start, start + limit), total };
+    const end = Math.min(start + limit, total);
+    const windowLen = Math.max(0, end - start);
+    const entries: AuditEntry[] = new Array(windowLen);
+    for (let i = 0; i < windowLen; i++) {
+      entries[i] = all[total - 1 - start - i];
+    }
+    return { entries, total };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return { entries: [], total: 0 };
