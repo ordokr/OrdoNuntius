@@ -14,6 +14,21 @@ export interface FileResource {
   parentId: string | null;
 }
 
+// name→resource lookup cached against the resources array identity. Six
+// actions in this store do `resources.find(r => r.name === name)` — each
+// O(N) on a directory listing that can grow large. WeakMap is freed on
+// next array swap (refresh / nav).
+const _resourceByNameCache = new WeakMap<readonly FileResource[], Map<string, FileResource>>();
+function resourceByNameLookup(resources: readonly FileResource[]): Map<string, FileResource> {
+  let m = _resourceByNameCache.get(resources);
+  if (!m) {
+    m = new Map<string, FileResource>();
+    for (const r of resources) m.set(r.name, r);
+    _resourceByNameCache.set(resources, m);
+  }
+  return m;
+}
+
 interface UploadProgress {
   name: string;
   loaded: number;
@@ -450,7 +465,7 @@ export const useFileStore = create<FileState>((set, get) => ({
     const { client, resources, recentFiles, refresh } = get();
     if (!client) return;
 
-    const resource = resources.find(r => r.name === name);
+    const resource = resourceByNameLookup(resources).get(name);
     if (!resource) return;
 
     const idsToDelete = [resource.id];
@@ -516,7 +531,7 @@ export const useFileStore = create<FileState>((set, get) => ({
     const { client, resources, currentPath, refresh } = get();
     if (!client) return;
 
-    const resource = resources.find(r => r.name === oldName);
+    const resource = resourceByNameLookup(resources).get(oldName);
     if (!resource) return;
 
     const prefix = getPathPrefix(currentPath);
@@ -557,7 +572,7 @@ export const useFileStore = create<FileState>((set, get) => ({
     const { client, resources } = get();
     if (!client) return;
 
-    const resource = resources.find(r => r.name === name);
+    const resource = resourceByNameLookup(resources).get(name);
     if (!resource?.blobId) return;
 
     await client.downloadBlob(resource.blobId, resource.name, resource.contentType);
@@ -574,7 +589,7 @@ export const useFileStore = create<FileState>((set, get) => ({
     const { client, resources } = get();
     if (!client) throw new Error('No client');
 
-    const resource = resources.find(r => r.name === name);
+    const resource = resourceByNameLookup(resources).get(name);
     if (!resource?.blobId) throw new Error('No blob');
 
     return client.fetchBlobAsObjectUrl(resource.blobId, resource.name, resource.contentType);
@@ -584,7 +599,7 @@ export const useFileStore = create<FileState>((set, get) => ({
     const { client, resources } = get();
     if (!client) throw new Error('No client');
 
-    const resource = resources.find(r => r.name === name);
+    const resource = resourceByNameLookup(resources).get(name);
     if (!resource?.blobId) throw new Error('No blob');
 
     const url = client.getBlobDownloadUrl(resource.blobId, resource.name, resource.contentType);
@@ -612,7 +627,7 @@ export const useFileStore = create<FileState>((set, get) => ({
     const { client, resources, currentPath, refresh } = get();
     if (!client) return;
 
-    const resource = resources.find(r => r.name === name);
+    const resource = resourceByNameLookup(resources).get(name);
     if (!resource) return;
 
     const prefix = getPathPrefix(currentPath);
