@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle, FileText, BookmarkPlus, ShieldCheck, Lock } from "lucide-react";
-import { cn, formatFileSize, formatDateTime, generateUUID } from "@/lib/utils";
+import { cn, formatFileSize, formatDateTime, generateUUID, splitTrimmed } from "@/lib/utils";
 import { debug } from "@/lib/debug";
 import { toast } from "@/stores/toast-store";
 import { sanitizeEmailHtml } from "@/lib/email-sanitization";
@@ -639,7 +639,7 @@ export function EmailComposer({
     const setter = field === 'to' ? setTo : field === 'cc' ? setCc : setBcc;
     const getter = field === 'to' ? to : field === 'cc' ? cc : bcc;
 
-    const parts = getter.split(',').map(s => s.trim()).filter(Boolean);
+    const parts = splitTrimmed(getter);
     if (!getter.trimEnd().endsWith(',') && parts.length > 0) {
       parts.pop();
     }
@@ -907,9 +907,9 @@ export function EmailComposer({
   const saveDraft = async (): Promise<string | null> => {
     if (!client) return null;
 
-    const toAddresses = to.split(",").map(e => e.trim()).filter(Boolean);
-    const ccAddresses = cc.split(",").map(e => e.trim()).filter(Boolean);
-    const bccAddresses = bcc.split(",").map(e => e.trim()).filter(Boolean);
+    const toAddresses = splitTrimmed(to);
+    const ccAddresses = splitTrimmed(cc);
+    const bccAddresses = splitTrimmed(bcc);
 
     if (!toAddresses.length && !subject && !(plainTextMode ? body.trim() : htmlToPlainText(body).trim())) {
       return null;
@@ -999,9 +999,9 @@ export function EmailComposer({
     saveTimeoutRef.current = setTimeout(() => {
       // Plugin observers (AI assist, grammar, …) get a debounced snapshot here.
       emailHooks.onDraftChange.emit({
-        to: to.split(',').map(s => s.trim()).filter(Boolean),
-        cc: cc.split(',').map(s => s.trim()).filter(Boolean),
-        bcc: bcc.split(',').map(s => s.trim()).filter(Boolean),
+        to: splitTrimmed(to),
+        cc: splitTrimmed(cc),
+        bcc: splitTrimmed(bcc),
         subject,
         htmlBody: plainTextMode ? '' : body,
         textBody: plainTextMode ? body : htmlToPlainText(body),
@@ -1030,7 +1030,7 @@ export function EmailComposer({
     };
   }, []);
 
-  const toAddresses = to.split(",").map(e => e.trim()).filter(Boolean);
+  const toAddresses = splitTrimmed(to);
   const bodyPlainText = plainTextMode ? body.trim() : htmlToPlainText(body).trim();
   const hasContent = bodyPlainText || attachments.some(att => att.blobId && !att.uploading);
   const canSend = toAddresses.length > 0 && !!subject && hasContent;
@@ -1093,8 +1093,8 @@ export function EmailComposer({
   };
 
   const handleSend = async (skipAttachmentCheck = false) => {
-    const ccAddresses = cc.split(",").map(e => e.trim()).filter(Boolean);
-    const bccAddresses = bcc.split(",").map(e => e.trim()).filter(Boolean);
+    const ccAddresses = splitTrimmed(cc);
+    const bccAddresses = splitTrimmed(bcc);
 
     if (!canSend) {
       const errors: { to?: boolean; subject?: boolean; body?: boolean } = {};
@@ -1574,7 +1574,7 @@ export function EmailComposer({
                       ? identities.find(id => id.id === selectedIdentityId)?.email
                       : primaryIdentity?.email) || ''
                   }
-                  recipientEmails={to.split(',').map(e => e.trim()).filter(Boolean)}
+                  recipientEmails={splitTrimmed(to)}
                   onSelectTag={setSubAddressTag}
                 />
               )}
@@ -1942,9 +1942,9 @@ export function EmailComposer({
               initialData={{
                 subject,
                 body,
-                to: to.split(',').map(s => s.trim()).filter(Boolean),
-                cc: cc.split(',').map(s => s.trim()).filter(Boolean),
-                bcc: bcc.split(',').map(s => s.trim()).filter(Boolean),
+                to: splitTrimmed(to),
+                cc: splitTrimmed(cc),
+                bcc: splitTrimmed(bcc),
               }}
               onSave={(data) => {
                 addTemplate(data);
@@ -2149,7 +2149,7 @@ function RecipientChipInput({
   validationMessage?: string;
   onTab?: () => void;
 }) {
-  const allParts = value.split(',').map(s => s.trim()).filter(Boolean);
+  const allParts = splitTrimmed(value);
   const hasTrailingComma = value.trimEnd().endsWith(',');
   const chips = hasTrailingComma ? allParts : allParts.slice(0, -1);
   const inputText = hasTrailingComma ? '' : (allParts[allParts.length - 1] || '');

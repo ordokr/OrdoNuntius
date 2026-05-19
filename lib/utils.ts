@@ -22,6 +22,23 @@ export function firstValue<T>(rec: Record<string, T> | null | undefined): T | un
   return undefined;
 }
 
+/**
+ * Split a comma-separated string into trimmed non-empty parts.
+ *
+ * Replaces the ubiquitous `s.split(',').map(x => x.trim()).filter(Boolean)`
+ * chain — which allocates THREE intermediate arrays (split, map, filter)
+ * for one final result. Single push loop = 1 array. Hot enough in the
+ * email composer (~15 call sites, recomputed on every keystroke).
+ */
+export function splitTrimmed(s: string, separator: string = ','): string[] {
+  const out: string[] = [];
+  for (const part of s.split(separator)) {
+    const t = part.trim();
+    if (t) out.push(t);
+  }
+  return out;
+}
+
 export function generateUUID(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();

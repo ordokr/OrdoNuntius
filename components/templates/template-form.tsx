@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Star, Plus } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, splitTrimmed } from '@/lib/utils';
 import { validateTemplateName } from '@/lib/template-utils';
 import { BUILT_IN_PLACEHOLDERS } from '@/lib/template-types';
 import type { EmailTemplate } from '@/lib/template-types';
@@ -70,12 +70,9 @@ export function TemplateForm({ template, initialData, onSave, onCancel }: Templa
       return;
     }
 
-    const parseRecipients = (val: string) =>
-      val.split(',').map((s) => s.trim()).filter(Boolean);
-
-    const to = parseRecipients(toRecipients);
-    const cc = parseRecipients(ccRecipients);
-    const bcc = parseRecipients(bccRecipients);
+    const to = splitTrimmed(toRecipients);
+    const cc = splitTrimmed(ccRecipients);
+    const bcc = splitTrimmed(bccRecipients);
 
     onSave({
       name: name.trim(),

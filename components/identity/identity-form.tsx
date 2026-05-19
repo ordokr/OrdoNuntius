@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import type { Identity, EmailAddress } from '@/lib/jmap/types';
 import { sanitizeSignatureHtml } from '@/lib/email-sanitization';
 import { getEmailValidationErrorCode, validateEmailList } from '@/lib/validation';
+import { splitTrimmed } from '@/lib/utils';
 
 interface IdentityFormData {
   name: string;
@@ -52,7 +53,7 @@ export function IdentityForm({ identity, onSave, onCancel }: IdentityFormProps) 
   const parseEmailList = (input: string): EmailAddress[] | undefined => {
     if (!input.trim()) return undefined;
 
-    const emails = input.split(',').map(e => e.trim()).filter(Boolean);
+    const emails = splitTrimmed(input);
     return emails.map(email => ({ email }));
   };
 
