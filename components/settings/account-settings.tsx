@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from 'next-intl';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { useAccountStore } from '@/stores/account-store';
@@ -15,8 +16,15 @@ export function AccountSettings() {
   // nothing, logging a missing-translation error and rendering the raw
   // key. Pull `common` separately and use it for cross-namespace keys.
   const tCommon = useTranslations('common');
-  const { username, serverUrl, isDemoMode, primaryIdentity, authMode, activeAccountId } = useAuthStore();
-  const { quota } = useEmailStore();
+  const { username, serverUrl, isDemoMode, primaryIdentity, authMode, activeAccountId } = useAuthStore(useShallow(s => ({
+    username: s.username,
+    serverUrl: s.serverUrl,
+    isDemoMode: s.isDemoMode,
+    primaryIdentity: s.primaryIdentity,
+    authMode: s.authMode,
+    activeAccountId: s.activeAccountId,
+  })));
+  const quota = useEmailStore(s => s.quota);
   const account = useAccountStore((s) => activeAccountId ? s.getAccountById(activeAccountId) : undefined);
 
   const quotaPercentage = quota ? Math.round((quota.used / quota.total) * 100) : 0;

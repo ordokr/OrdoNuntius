@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from 'next-intl';
+import { useShallow } from 'zustand/react/shallow';
 import { useThemeStore } from '@/stores/theme-store';
 import { useSettingsStore, type Density } from '@/stores/settings-store';
 import { SettingsSection, SettingItem, RadioGroup, ToggleSwitch } from './settings-section';
@@ -66,10 +67,19 @@ export function AppearanceSettings() {
   const t = useTranslations('settings.appearance');
   const tAdvanced = useTranslations('settings.advanced');
   const tTour = useTranslations('tour');
-  const { theme, setTheme } = useThemeStore();
-  const { fontSize, density, animationsEnabled, senderFavicons, showAvatarsInJunk, updateSetting } = useSettingsStore();
+  const theme = useThemeStore(s => s.theme);
+  const setTheme = useThemeStore(s => s.setTheme);
+  const { fontSize, density, animationsEnabled, senderFavicons, showAvatarsInJunk, updateSetting } = useSettingsStore(useShallow(s => ({
+    fontSize: s.fontSize,
+    density: s.density,
+    animationsEnabled: s.animationsEnabled,
+    senderFavicons: s.senderFavicons,
+    showAvatarsInJunk: s.showAvatarsInJunk,
+    updateSetting: s.updateSetting,
+  })));
   const { startTour, resetTourCompletion } = useTour();
-  const { isSettingLocked, isSettingHidden } = usePolicyStore();
+  const isSettingLocked = usePolicyStore(s => s.isSettingLocked);
+  const isSettingHidden = usePolicyStore(s => s.isSettingHidden);
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>

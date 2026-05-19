@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '@/stores/settings-store';
 import { SettingsSection, SettingItem, Select, ToggleSwitch } from './settings-section';
 import { X } from 'lucide-react';
@@ -26,7 +27,15 @@ export function ComposingSettings() {
     signaturePosition,
     signatureSeparatorEnabled,
     updateSetting,
-  } = useSettingsStore();
+  } = useSettingsStore(useShallow(s => ({
+    autoSelectReplyIdentity: s.autoSelectReplyIdentity,
+    attachmentReminderEnabled: s.attachmentReminderEnabled,
+    attachmentReminderKeywords: s.attachmentReminderKeywords,
+    subAddressDelimiter: s.subAddressDelimiter,
+    signaturePosition: s.signaturePosition,
+    signatureSeparatorEnabled: s.signatureSeparatorEnabled,
+    updateSetting: s.updateSetting,
+  })));
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>

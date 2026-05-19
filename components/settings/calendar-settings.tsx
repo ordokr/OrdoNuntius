@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from 'next-intl';
+import { useShallow } from 'zustand/react/shallow';
 import { useCalendarStore, CalendarViewMode } from '@/stores/calendar-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { usePolicyStore } from '@/stores/policy-store';
@@ -11,7 +12,8 @@ export function CalendarSettings() {
   const tViews = useTranslations('calendar.views');
   const tDays = useTranslations('calendar.days');
 
-  const { viewMode, setViewMode } = useCalendarStore();
+  const viewMode = useCalendarStore(s => s.viewMode);
+  const setViewMode = useCalendarStore(s => s.setViewMode);
   const {
     timeFormat,
     firstDayOfWeek,
@@ -22,8 +24,18 @@ export function CalendarSettings() {
     showBirthdayCalendar,
     calendarHoverPreview,
     updateSetting,
-  } = useSettingsStore();
-  const { isFeatureEnabled } = usePolicyStore();
+  } = useSettingsStore(useShallow(s => ({
+    timeFormat: s.timeFormat,
+    firstDayOfWeek: s.firstDayOfWeek,
+    showTimeInMonthView: s.showTimeInMonthView,
+    showWeekNumbers: s.showWeekNumbers,
+    enableCalendarTasks: s.enableCalendarTasks,
+    showTasksOnCalendar: s.showTasksOnCalendar,
+    showBirthdayCalendar: s.showBirthdayCalendar,
+    calendarHoverPreview: s.calendarHoverPreview,
+    updateSetting: s.updateSetting,
+  })));
+  const isFeatureEnabled = usePolicyStore(s => s.isFeatureEnabled);
 
   return (
     <SettingsSection title={t('title')}>
