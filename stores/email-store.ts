@@ -389,7 +389,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
     // Coalesce overlapping callers (e.g. login() and a slow home-page useEffect
     // racing for the same fetch). The promise is stashed on the client so we
     // don't need a separate keyed map and stale entries can't outlive the client.
-    const target = client as IJMAPClient & { __prefetchPromise?: Promise<void> };
+    const target = client as IJMAPClient & { __prefetchPromise?: Promise<void> | undefined };
     if (target.__prefetchPromise) return target.__prefetchPromise;
     target.__prefetchPromise = (async () => {
       try {
@@ -471,7 +471,10 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
           setTimeout(fireTagCounts, 500);
         }
       } finally {
-        delete target.__prefetchPromise;
+        // Set to undefined instead of `delete` — `delete` on a V8 object
+        // transitions it to dictionary mode, which is a measurable deopt
+        // for subsequent property accesses on the client object.
+        target.__prefetchPromise = undefined;
       }
     })();
     return target.__prefetchPromise;
