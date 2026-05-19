@@ -111,9 +111,18 @@ export function EmailList({
 
   const disableThreading = useSettingsStore((state) => state.disableThreading);
 
-  const threadGroups = useMemo(() => {
+  // threadGroups + a co-built emailId→threadIndex Map. The Map powers
+  // the "scroll-to-selected" effect below in O(1) instead of an
+  // O(threadGroups × emailsPerThread) findIndex+some scan on every email
+  // selection click. Built once per emails change, not per click.
+  const { threadGroups, emailIdToThreadIndex } = useMemo(() => {
     const groups = groupEmailsByThread(emails, disableThreading);
-    return sortThreadGroups(groups);
+    const sorted = sortThreadGroups(groups);
+    const map = new Map<string, number>();
+    for (let i = 0; i < sorted.length; i++) {
+      for (const e of sorted[i].emails) map.set(e.id, i);
+    }
+    return { threadGroups: sorted, emailIdToThreadIndex: map };
   }, [emails, disableThreading]);
 
   const { contextMenu, openContextMenu, closeContextMenu, menuRef } = useContextMenu<Email>();
@@ -286,14 +295,12 @@ export function EmailList({
     };
   }, [lastVirtualItemIndex, threadGroups.length, handleLoadMore]);
 
-  // Scroll to the thread group containing the selected email
+  // Scroll to the thread group containing the selected email. O(1) Map
+  // lookup; was O(threadGroups × emailsPerThread) findIndex+some scan.
   useEffect(() => {
     if (!selectedEmailId) return;
-    const index = threadGroups.findIndex(thread =>
-      thread.latestEmail.id === selectedEmailId ||
-      thread.emails.some(e => e.id === selectedEmailId)
-    );
-    if (index >= 0) {
+    const index = emailIdToThreadIndex.get(selectedEmailId);
+    if (index !== undefined && index >= 0) {
       virtualizer.scrollToIndex(index, { align: 'auto' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
