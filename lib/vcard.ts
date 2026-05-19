@@ -635,14 +635,19 @@ function generateSingleVCard(contact: ContactCard): string {
     lines.push(`N:${encodeValue(surname)};${encodeValue(given)};${encodeValue(additional)};${encodeValue(prefix)};${encodeValue(suffix)}`);
   }
 
+  // for...in over the Record drops the per-block Object.values array
+  // allocation. Across a multi-thousand-contact vcard export each block
+  // saves one throwaway array per contact — 5-10 arrays per contact × N
+  // contacts adds up.
   if (contact.nicknames) {
-    for (const nick of Object.values(contact.nicknames)) {
-      lines.push(`NICKNAME:${encodeValue(nick.name)}`);
+    for (const k in contact.nicknames) {
+      lines.push(`NICKNAME:${encodeValue(contact.nicknames[k].name)}`);
     }
   }
 
   if (contact.emails) {
-    for (const email of Object.values(contact.emails)) {
+    for (const k in contact.emails) {
+      const email = contact.emails[k];
       const type = contextToType(email.contexts);
       const typeParam = type ? `;TYPE=${type}` : "";
       lines.push(`EMAIL${typeParam}:${email.address}`);
@@ -650,12 +655,13 @@ function generateSingleVCard(contact: ContactCard): string {
   }
 
   if (contact.phones) {
-    for (const phone of Object.values(contact.phones)) {
+    for (const k in contact.phones) {
+      const phone = contact.phones[k];
       const typeParts: string[] = [];
       const ctxType = contextToType(phone.contexts);
       if (ctxType) typeParts.push(ctxType);
       if (phone.features) {
-        for (const feat of Object.keys(phone.features)) {
+        for (const feat in phone.features) {
           if (phone.features[feat]) typeParts.push(feat.toUpperCase());
         }
       }
@@ -665,7 +671,8 @@ function generateSingleVCard(contact: ContactCard): string {
   }
 
   if (contact.organizations) {
-    for (const org of Object.values(contact.organizations)) {
+    for (const k in contact.organizations) {
+      const org = contact.organizations[k];
       const parts = [org.name || ""];
       if (org.units) parts.push(...org.units.map(u => u.name));
       lines.push(`ORG:${parts.map(encodeValue).join(";")}`);
@@ -673,7 +680,8 @@ function generateSingleVCard(contact: ContactCard): string {
   }
 
   if (contact.titles) {
-    for (const title of Object.values(contact.titles)) {
+    for (const k in contact.titles) {
+      const title = contact.titles[k];
       if (title.kind === "role") {
         lines.push(`ROLE:${encodeValue(title.name)}`);
       } else {
@@ -683,7 +691,8 @@ function generateSingleVCard(contact: ContactCard): string {
   }
 
   if (contact.addresses) {
-    for (const addr of Object.values(contact.addresses)) {
+    for (const k in contact.addresses) {
+      const addr = contact.addresses[k];
       const type = contextToType(addr.contexts);
       const typeParam = type ? `;TYPE=${type}` : "";
       let street = addr.street || "";
@@ -716,7 +725,8 @@ function generateSingleVCard(contact: ContactCard): string {
   }
 
   if (contact.anniversaries) {
-    for (const ann of Object.values(contact.anniversaries)) {
+    for (const k in contact.anniversaries) {
+      const ann = contact.anniversaries[k];
       const dateStr = anniversaryDateToVcardString(ann.date);
       if (ann.kind === "birth") {
         lines.push(`BDAY:${dateStr}`);
@@ -729,7 +739,8 @@ function generateSingleVCard(contact: ContactCard): string {
   }
 
   if (contact.onlineServices) {
-    for (const svc of Object.values(contact.onlineServices)) {
+    for (const k in contact.onlineServices) {
+      const svc = contact.onlineServices[k];
       if (svc.service || svc.user) {
         // Output as IMPP for instant messaging / social profiles
         const params: string[] = [];
@@ -748,14 +759,22 @@ function generateSingleVCard(contact: ContactCard): string {
   }
 
   if (contact.keywords) {
-    const cats = Object.keys(contact.keywords).filter(k => contact.keywords![k]);
+    // Single-pass conditional push: was `Object.keys(...).filter(...)`
+    // (two array allocations). For an exported categories list this is
+    // small but compounds across N contacts.
+    const cats: string[] = [];
+    const kw = contact.keywords;
+    for (const k in kw) {
+      if (kw[k]) cats.push(k);
+    }
     if (cats.length > 0) {
       lines.push(`CATEGORIES:${cats.map(encodeValue).join(",")}`);
     }
   }
 
   if (contact.preferredLanguages) {
-    for (const lang of Object.values(contact.preferredLanguages)) {
+    for (const k in contact.preferredLanguages) {
+      const lang = contact.preferredLanguages[k];
       const type = contextToType(lang.contexts);
       const typeParam = type ? `;TYPE=${type}` : "";
       lines.push(`LANG${typeParam}:${lang.language}`);
@@ -763,15 +782,22 @@ function generateSingleVCard(contact: ContactCard): string {
   }
 
   if (contact.relatedTo) {
-    for (const [uri, rel] of Object.entries(contact.relatedTo)) {
-      const relType = rel.relation ? Object.keys(rel.relation).find(k => rel.relation![k]) : undefined;
+    for (const uri in contact.relatedTo) {
+      const rel = contact.relatedTo[uri];
+      let relType: string | undefined;
+      if (rel.relation) {
+        for (const rk in rel.relation) {
+          if (rel.relation[rk]) { relType = rk; break; }
+        }
+      }
       const typeParam = relType ? `;TYPE=${relType}` : "";
       lines.push(`RELATED${typeParam}:${uri}`);
     }
   }
 
   if (contact.cryptoKeys) {
-    for (const key of Object.values(contact.cryptoKeys)) {
+    for (const k in contact.cryptoKeys) {
+      const key = contact.cryptoKeys[k];
       const type = contextToType(key.contexts);
       const typeParam = type ? `;TYPE=${type}` : "";
       lines.push(`KEY${typeParam}:${key.uri}`);
@@ -779,13 +805,13 @@ function generateSingleVCard(contact: ContactCard): string {
   }
 
   if (contact.notes) {
-    for (const n of Object.values(contact.notes)) {
-      lines.push(`NOTE:${encodeValue(n.note)}`);
+    for (const k in contact.notes) {
+      lines.push(`NOTE:${encodeValue(contact.notes[k].note)}`);
     }
   }
 
   if (contact.members) {
-    for (const memberId of Object.keys(contact.members)) {
+    for (const memberId in contact.members) {
       if (contact.members[memberId]) {
         lines.push(`MEMBER:urn:uuid:${memberId}`);
       }
@@ -793,7 +819,8 @@ function generateSingleVCard(contact: ContactCard): string {
   }
 
   if (contact.media) {
-    for (const media of Object.values(contact.media)) {
+    for (const k in contact.media) {
+      const media = contact.media[k];
       if (media.uri) {
         const prop = media.kind === "logo" ? "LOGO" : media.kind === "sound" ? "SOUND" : "PHOTO";
         if (media.uri.startsWith("data:")) {
