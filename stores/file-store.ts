@@ -525,17 +525,22 @@ export const useFileStore = create<FileState>((set, get) => ({
 
     await client.updateFileNode(resource.id, { name: newServerName });
 
-    // If renaming a folder, also rename all files inside it
+    // If renaming a folder, also rename all files inside it. Was a
+    // sequential `await` per child node — for a folder with 100 files
+    // that's 100 × RTT. Parallel updates drop the wall-time to ~1 RTT
+    // (server handles each FileNode/set independently).
     if (resource.isDirectory) {
       const allNodes = await client.listFileNodes(null);
       const oldFolderPrefix = oldServerName + PATH_SEP;
       const newFolderPrefix = newServerName + PATH_SEP;
+      const renames: Promise<unknown>[] = [];
       for (const node of allNodes) {
         if (node.name.startsWith(oldFolderPrefix)) {
           const newNodeName = newFolderPrefix + node.name.slice(oldFolderPrefix.length);
-          await client.updateFileNode(node.id, { name: newNodeName });
+          renames.push(client.updateFileNode(node.id, { name: newNodeName }));
         }
       }
+      await Promise.all(renames);
     }
 
     set({
@@ -833,9 +838,11 @@ export const useFileStore = create<FileState>((set, get) => ({
     const { client, lastAction, refresh } = get();
     if (!client || !lastAction) return;
 
-    for (const entry of lastAction.entries) {
-      await client.updateFileNode(entry.id, entry.from);
-    }
+    // Was sequential N×RTT — undoing a paste of 50 files paid 50 round
+    // trips before refresh. Each FileNode/set is independent, so parallel.
+    await Promise.allSettled(
+      lastAction.entries.map(entry => client.updateFileNode(entry.id, entry.from)),
+    );
     set({ lastAction: null });
     await refresh();
   },
