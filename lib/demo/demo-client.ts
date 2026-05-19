@@ -4,6 +4,19 @@ import type { SieveScript, SieveCapabilities } from '@/lib/jmap/sieve-types';
 import { getDemoData, type DemoData } from './demo-data';
 import { generateDemoId } from './demo-utils';
 
+// Schwartzian transform: parse receivedAt once per email instead of 2×N log N
+// `new Date(...).getTime()` calls inside the comparator. Demo data sets only
+// tens of emails so the saving is small in absolute terms, but the pattern
+// also matches whatever the user ships against the demo (could be hundreds).
+function sortByReceivedAt<T extends { receivedAt: string }>(emails: T[], direction: 'asc' | 'desc'): T[] {
+  const decorated: { ms: number; e: T }[] = new Array(emails.length);
+  for (let i = 0; i < emails.length; i++) decorated[i] = { ms: new Date(emails[i].receivedAt).getTime(), e: emails[i] };
+  decorated.sort(direction === 'desc' ? (a, b) => b.ms - a.ms : (a, b) => a.ms - b.ms);
+  const out: T[] = new Array(emails.length);
+  for (let i = 0; i < decorated.length; i++) out[i] = decorated[i].e;
+  return out;
+}
+
 /**
  * In-memory JMAP client for demo mode.
  * All data lives in memory - no network calls, no cookies.
@@ -154,9 +167,9 @@ export class DemoJMAPClient implements IJMAPClient {
     if (mailboxId) {
       filtered = filtered.filter(e => e.mailboxIds[mailboxId]);
     }
-    filtered.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
-    const total = filtered.length;
-    const emails = filtered.slice(position, position + limit);
+    const sorted = sortByReceivedAt(filtered, 'desc');
+    const total = sorted.length;
+    const emails = sorted.slice(position, position + limit);
     return { emails, hasMore: position + limit < total, total };
   }
 
@@ -169,13 +182,20 @@ export class DemoJMAPClient implements IJMAPClient {
   }
 
   async getTagCounts(tagIds: string[]): Promise<Record<string, { total: number; unread: number }>> {
+    // Was O(tagIds × emails × 2 filter walks + 2 throwaway arrays per tag).
+    // Now O(emails + tagIds): pre-build the requested-tag set, walk emails
+    // once, and bump the counter only for tags the email actually carries.
+    const requested = new Set(tagIds);
     const result: Record<string, { total: number; unread: number }> = {};
-    for (const tagId of tagIds) {
-      const tagged = this.data.emails.filter(e => e.keywords[tagId]);
-      result[tagId] = {
-        total: tagged.length,
-        unread: tagged.filter(e => !e.keywords.$seen).length,
-      };
+    for (const tagId of tagIds) result[tagId] = { total: 0, unread: 0 };
+    for (const e of this.data.emails) {
+      const isUnread = !e.keywords.$seen;
+      for (const k in e.keywords) {
+        if (!e.keywords[k] || !requested.has(k)) continue;
+        const bucket = result[k];
+        bucket.total++;
+        if (isUnread) bucket.unread++;
+      }
     }
     return result;
   }
@@ -187,9 +207,9 @@ export class DemoJMAPClient implements IJMAPClient {
       return text.includes(q);
     });
     if (mailboxId) filtered = filtered.filter(e => e.mailboxIds[mailboxId]);
-    filtered.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
-    const total = filtered.length;
-    const emails = filtered.slice(position, position + limit);
+    const sorted = sortByReceivedAt(filtered, 'desc');
+    const total = sorted.length;
+    const emails = sorted.slice(position, position + limit);
     return { emails, hasMore: position + limit < total, total };
   }
 
@@ -201,9 +221,9 @@ export class DemoJMAPClient implements IJMAPClient {
       const q = (filter.text as string).toLowerCase();
       filtered = filtered.filter(e => [e.subject, e.preview].filter(Boolean).join(' ').toLowerCase().includes(q));
     }
-    filtered.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
-    const total = filtered.length;
-    const emails = filtered.slice(position, position + limit);
+    const sorted = sortByReceivedAt(filtered, 'desc');
+    const total = sorted.length;
+    const emails = sorted.slice(position, position + limit);
     return { emails, hasMore: position + limit < total, total };
   }
 
@@ -378,9 +398,10 @@ export class DemoJMAPClient implements IJMAPClient {
   }
 
   async getThreadEmails(threadId: string): Promise<Email[]> {
-    return this.data.emails
-      .filter(e => e.threadId === threadId)
-      .sort((a, b) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime());
+    return sortByReceivedAt(
+      this.data.emails.filter(e => e.threadId === threadId),
+      'asc',
+    );
   }
 
   // ── Compose / Send ────────────────────────────────────────────
@@ -904,12 +925,33 @@ export class DemoJMAPClient implements IJMAPClient {
   // ── Internal helpers ──────────────────────────────────────────
 
   private recalcMailboxCounts(): void {
+    // Was O(M × E) — for each mailbox we re-filtered all emails (3 walks) and
+    // built two Sets via .map intermediates. Invert: one walk over emails,
+    // accumulate per-mailbox totals/unread/threads into pre-built buckets.
+    const buckets = new Map<string, { total: number; unread: number; threads: Set<string>; unreadThreads: Set<string> }>();
     for (const mb of this.data.mailboxes) {
-      const inMb = this.data.emails.filter(e => e.mailboxIds[mb.id]);
-      mb.totalEmails = inMb.length;
-      mb.unreadEmails = inMb.filter(e => !e.keywords.$seen).length;
-      mb.totalThreads = new Set(inMb.map(e => e.threadId)).size;
-      mb.unreadThreads = new Set(inMb.filter(e => !e.keywords.$seen).map(e => e.threadId)).size;
+      buckets.set(mb.id, { total: 0, unread: 0, threads: new Set(), unreadThreads: new Set() });
+    }
+    for (const e of this.data.emails) {
+      const isUnread = !e.keywords.$seen;
+      for (const mid in e.mailboxIds) {
+        if (!e.mailboxIds[mid]) continue;
+        const b = buckets.get(mid);
+        if (!b) continue;
+        b.total++;
+        if (isUnread) b.unread++;
+        if (e.threadId) {
+          b.threads.add(e.threadId);
+          if (isUnread) b.unreadThreads.add(e.threadId);
+        }
+      }
+    }
+    for (const mb of this.data.mailboxes) {
+      const b = buckets.get(mb.id)!;
+      mb.totalEmails = b.total;
+      mb.unreadEmails = b.unread;
+      mb.totalThreads = b.threads.size;
+      mb.unreadThreads = b.unreadThreads.size;
     }
   }
 

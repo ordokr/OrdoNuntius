@@ -70,11 +70,15 @@ export const createSearchSlice: StateCreator<
       const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
 
-      const result = await client.searchEmails(query, jmapMailboxId, accountId, emailsPerPage, 0);
-      const externals = await emailHooks.onProvideSearchResults.transform(
-        [] as ExternalSearchResult[],
-        { query, filters: searchFilters },
-      );
+      // Run JMAP search and external hook in parallel — they're independent
+      // RTTs, so awaiting sequentially doubled the user-visible search latency.
+      const [result, externals] = await Promise.all([
+        client.searchEmails(query, jmapMailboxId, accountId, emailsPerPage, 0),
+        emailHooks.onProvideSearchResults.transform(
+          [] as ExternalSearchResult[],
+          { query, filters: searchFilters },
+        ),
+      ]);
 
       set({
         emails: result.emails,
@@ -121,14 +125,18 @@ export const createSearchSlice: StateCreator<
 
       const filter = buildJMAPFilter(searchQuery, searchFilters, jmapMailboxId);
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
-      const result = await client.advancedSearchEmails(filter, accountId, emailsPerPage, 0);
+      // Parallel fan-out — JMAP advanced search and the external-provider
+      // hook are independent network round-trips. The abort check is moved
+      // after the parallel await so a late cancel still bails before set().
+      const [result, externals] = await Promise.all([
+        client.advancedSearchEmails(filter, accountId, emailsPerPage, 0),
+        emailHooks.onProvideSearchResults.transform(
+          [] as ExternalSearchResult[],
+          { query: searchQuery, filters: searchFilters },
+        ),
+      ]);
 
       if (controller.signal.aborted) return;
-
-      const externals = await emailHooks.onProvideSearchResults.transform(
-        [] as ExternalSearchResult[],
-        { query: searchQuery, filters: searchFilters },
-      );
 
       set({
         emails: result.emails,
