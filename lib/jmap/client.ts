@@ -1157,7 +1157,11 @@ export class JMAPClient implements IJMAPClient {
   async batchMarkAsRead(emailIds: string[], read: boolean = true): Promise<void> {
     if (emailIds.length === 0) return;
 
-    const updates = Object.fromEntries(emailIds.map(id => [id, { "keywords/$seen": read }]));
+    // Direct object build avoids Object.fromEntries(entries.map(...)) —
+    // saves the entries-array + per-tuple sub-array allocations. The batch
+    // can include hundreds of email IDs.
+    const updates: Record<string, { "keywords/$seen": boolean }> = {};
+    for (const id of emailIds) updates[id] = { "keywords/$seen": read };
     await this.request([
       ["Email/set", { accountId: this.accountId, update: updates }, "0"],
     ]);
@@ -1290,7 +1294,9 @@ export class JMAPClient implements IJMAPClient {
   async batchMoveEmails(emailIds: string[], toMailboxId: string, accountId?: string): Promise<void> {
     if (emailIds.length === 0) return;
 
-    const updates = Object.fromEntries(emailIds.map(id => [id, { mailboxIds: { [toMailboxId]: true } }]));
+    // Direct object build skips Object.fromEntries(entries.map(...)).
+    const updates: Record<string, { mailboxIds: Record<string, true> }> = {};
+    for (const id of emailIds) updates[id] = { mailboxIds: { [toMailboxId]: true } };
     await this.request([
       ["Email/set", { accountId: accountId || this.accountId, update: updates }, "0"],
     ]);
@@ -1473,9 +1479,9 @@ export class JMAPClient implements IJMAPClient {
       const ids: string[] = queryResponse.methodResponses?.[0]?.[1]?.ids || [];
       if (ids.length === 0) break;
 
-      const updates = Object.fromEntries(
-        ids.map((id) => [id, { "keywords/$seen": true }])
-      );
+      // Direct object build skips Object.fromEntries(ids.map(...)).
+      const updates: Record<string, { "keywords/$seen": true }> = {};
+      for (const id of ids) updates[id] = { "keywords/$seen": true };
 
       await this.request([
         ["Email/set", { accountId: targetAccountId, update: updates }, "0"],
@@ -1517,19 +1523,29 @@ export class JMAPClient implements IJMAPClient {
 
       if (ids.length === 0) break;
 
-      const targetIds = excludeSet.size === 0
-        ? ids
-        : emails
-            .filter(e => {
-              const mbIds = e.mailboxIds ? Object.keys(e.mailboxIds) : [];
-              return mbIds.some(id => !excludeSet.has(id));
-            })
-            .map(e => e.id);
+      // Single-pass filter+map walk over emails when excludeSet is set —
+      // was filter(...).map(...) which allocated two intermediate arrays
+      // AND built a per-email Object.keys array inside the filter predicate.
+      // for...in over mailboxIds drops that per-email allocation.
+      let targetIds: string[];
+      if (excludeSet.size === 0) {
+        targetIds = ids;
+      } else {
+        targetIds = [];
+        for (const e of emails) {
+          if (!e.mailboxIds) continue;
+          let kept = false;
+          for (const id in e.mailboxIds) {
+            if (!excludeSet.has(id)) { kept = true; break; }
+          }
+          if (kept) targetIds.push(e.id);
+        }
+      }
 
       if (targetIds.length > 0) {
-        const updates = Object.fromEntries(
-          targetIds.map((id) => [id, { "keywords/$seen": true }])
-        );
+        // Direct object build skips Object.fromEntries(targetIds.map(...)).
+        const updates: Record<string, { "keywords/$seen": true }> = {};
+        for (const id of targetIds) updates[id] = { "keywords/$seen": true };
         await this.request([
           ["Email/set", { accountId: targetAccountId, update: updates }, "0"],
         ]);
