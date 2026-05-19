@@ -37,7 +37,11 @@ export function useCalendarAlerts() {
 
     try {
       const now = Date.now();
-      const acknowledgedKeys = new Set(Object.keys(acknowledgedAlerts));
+      // Direct Set build skips the Object.keys intermediate array.
+      // The alert-check loop fires periodically (per minute) so the
+      // saved allocation isn't huge but the pattern is free.
+      const acknowledgedKeys = new Set<string>();
+      for (const k in acknowledgedAlerts) acknowledgedKeys.add(k);
       const allEvents = [...events, ...proactiveEventsRef.current];
       const pending = getPendingAlerts(allEvents, calendars, acknowledgedKeys, now);
 

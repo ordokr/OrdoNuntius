@@ -235,7 +235,12 @@ export function useTimeGridInteractions({
 
     try {
       const event = useCalendarStore.getState().events.find(ev => ev.id === resize.eventId);
-      const hasParticipants = event?.participants && Object.keys(event.participants).length > 0;
+      // for...in break-at-first avoids Object.keys array allocation just
+       // to compute a boolean. Called per resize/drag drop.
+       let hasParticipants = false;
+       if (event?.participants) {
+         for (const _ in event.participants) { hasParticipants = true; break; }
+       }
       const updates: { start?: string; duration: string } = { duration: dur };
       if (startChanged && event?.start) {
         // Shift the event's floating `start` wall-clock by the delta (preserves event.timeZone).
@@ -367,7 +372,12 @@ export function useTimeGridInteractions({
         toast.error(errorMessages.move);
         return;
       }
-      const hasParticipants = event?.participants && Object.keys(event.participants).length > 0;
+      // for...in break-at-first avoids Object.keys array allocation just
+       // to compute a boolean. Called per resize/drag drop.
+       let hasParticipants = false;
+       if (event?.participants) {
+         for (const _ in event.participants) { hasParticipants = true; break; }
+       }
       await useCalendarStore.getState().updateEvent(client, data.eventId, { start: newStartISO }, hasParticipants || undefined);
     } catch {
       toast.error(errorMessages.move);
