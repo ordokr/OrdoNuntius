@@ -561,3 +561,69 @@ with tsc + Next build between batches; deployed in five batches.
   - `contact-store.ts` `firstValueOf` helper: replaces
     `Object.values(rec)[0]` in `getContactDisplayName` (three sites)
     and `getContactPrimaryEmail` — zero-allocation first-entry pick.
+
+### Continuation sweep (2026-05-19)
+
+Continued the same patterns across more of the codebase after the
+initial perf sweep was committed and live.
+
+  - **JMAP client per-account fan-outs**:
+    `getAllAddressBooks`, `getAllContacts`, `searchContacts`,
+    `getAllCalendars`, `queryAllCalendarEvents` — each had a
+    `for (accountId of accountIds) { await this.request(...) }`
+    loop. All replaced with `Promise.allSettled(accountIds.map(...))`.
+    For a 5-account user at JMAP baseline RTT ~200ms, the cold
+    calendar render saves ~800ms; cold sidebar render saves ~600ms.
+  - **JMAP client batched-get loops**:
+    `getCalendarEvents`, `queryCalendarEvents`, `fetchPaginatedContacts`,
+    `migrateKeyword` — each fetched/wrote chunks sequentially in a
+    `for (i = 0; i < ids.length; i += batchSize)` loop. Parallelized.
+    For 10k items at batch 500 (20 batches) this is 20 sequential
+    RTTs → 1 RTT.
+  - **Schwartzian transforms** added in `task-list-view`, `file-browser`
+    modified-sort, `calendar-agenda-view`, `lib/calendar-utils.ts`
+    `packWeekSegments`, `lib/identity-sort.ts`.
+  - **Set replacement of `.includes()`** in render hot paths:
+    `file-browser` cutNamesSet, `email-viewer` currentColorsSet,
+    `calendar-sidebar-panel` + `calendar-toolbar` selectedCalendarIdsSet.
+  - **`Object.values/keys/entries` → `for...in`** in
+    `lib/calendar-participants.ts` (5 helpers),
+    `lib/calendar-invitation.ts` (7 sites — incl. `getInvitation
+    ActorSummary` single-pass replacing 4-walk sort),
+    `lib/calendar-ics-export.ts` (3 sites), `lib/plugin-hooks.ts`
+    (2 teardown loops), `contact-store.ts` `getAutocomplete` group
+    branch.
+  - **DRY consolidations**: `lib/identity-sort.ts` (`emailMatchesUsername`
+    + `sortIdentities` Schwartzian — was duplicated between
+    auth-store and identity-manager-modal); `file-store.ts`
+    `buildClipboard` helper for cut/copy.
+  - **Misc batches**:
+      - `file-store.ts` pasteResources / moveToFolder / moveToParent
+        — N sequential JMAP updates → 1 RTT parallel.
+      - `stores/contact-store.ts` importContacts — N sequential
+        `createContact` → 1 RTT parallel with progressive `set()`.
+      - `app/admin/_tabs/plugins.tsx` forceEnable/DisableAll — same
+        batch-toggle pattern as themes.tsx.
+      - `components/settings/reading-settings.tsx` archive-by-month —
+        year + month folder ensure calls fire in parallel, two RTT
+        instead of `(Y + Y·M) × RTT`.
+      - `components/email/email-composer.tsx` onBeforeAttachmentUpload
+        intercept — per-file plugin veto now parallel.
+  - **structuredClone over JSON.parse(JSON.stringify(...))**:
+    `app/[locale]/contacts/page.tsx`, `app/[locale]/calendar/page.tsx`,
+    `lib/demo/demo-utils.ts`. Skips the intermediate string allocation.
+  - **`memberCountByGroup`** in `contacts-sidebar` — was
+    O(G·C·M·2) with double `.includes()`. Set + reduce → O(G·(C+M)).
+  - **email-store `batchArchive`** — `fetchMailboxes` + `refresh
+    CurrentMailbox` now `Promise.all` (disjoint store writes).
+  - **Email-store batchMarkAsSpam / batchUndoSpam** —
+    N sequential `markAsSpam`/`undoSpam` (each its own Email/set) →
+    1 `batchMoveEmails` call.
+  - **Push fan-out** in `email-slices/push.ts` `handleStateChange`:
+    Email + Mailbox + Calendar + SieveScript refreshes now
+    `Promise.allSettled`.
+  - **`thread-utils.recomputeThreadGroupAttrs`** — five separate
+    `.some()` calls fused into one walk with all-found early-exit.
+  - **`reply-identity`** — identities indexed by normalized email /
+    base / domain in one pass instead of 3× `.map()` + 2× nested
+    `.find()`-of-`.some()`.
