@@ -65,6 +65,7 @@ import { NotificationSettings } from '@/components/settings/notification-setting
 import { ThemesSettings } from '@/components/settings/themes-settings';
 import { PluginsSettings } from '@/components/settings/plugins-settings';
 import { ProtocolHandlerSettings } from '@/components/settings/protocol-handler-settings';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore, redirectToLogin } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { usePluginStore } from '@/stores/plugin-store';
@@ -346,12 +347,22 @@ export default function SettingsPage() {
   const router = useRouter();
   const t = useTranslations('settings');
   const tSidebar = useTranslations('sidebar');
-  const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore();
+  // useShallow narrows from "any auth-store mutation" to "any of these
+  // 5 fields changed (shallow equal)". Settings page re-rendered the
+  // whole tab tree on every set() on auth — including unrelated fields
+  // like serverUrl/username changes.
+  const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore(useShallow(s => ({
+    client: s.client,
+    isAuthenticated: s.isAuthenticated,
+    logout: s.logout,
+    checkAuth: s.checkAuth,
+    isLoading: s.isLoading,
+  })));
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const quota = useEmailStore(s => s.quota);
   const { stalwartFeaturesEnabled } = useConfig();
-  const { isFeatureEnabled } = usePolicyStore();
+  const isFeatureEnabled = usePolicyStore(s => s.isFeatureEnabled);
   const [activeTab, setActiveTab] = useState<Tab>(readPersistedTab);
   const [mobileShowContent, setMobileShowContent] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

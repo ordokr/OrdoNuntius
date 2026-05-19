@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { X, ShieldCheck, Search, Trash2, Plus, Loader2 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { useShallow } from "zustand/react/shallow";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useContactStore } from "@/stores/contact-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -19,7 +20,16 @@ export function TrustedSendersModal({ isOpen, onClose }: TrustedSendersModalProp
   const modalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { trustedSenders, addTrustedSender, removeTrustedSender, trustedSendersAddressBook } = useSettingsStore();
+  // useShallow narrows the subscription. Modal was destructuring 4
+  // settings fields + 6 contact fields, so every set() on either store
+  // re-rendered the modal — including unrelated mutations like address-
+  // book sync ticks and settings unrelated to trusted senders.
+  const { trustedSenders, addTrustedSender, removeTrustedSender, trustedSendersAddressBook } = useSettingsStore(useShallow(s => ({
+    trustedSenders: s.trustedSenders,
+    addTrustedSender: s.addTrustedSender,
+    removeTrustedSender: s.removeTrustedSender,
+    trustedSendersAddressBook: s.trustedSendersAddressBook,
+  })));
   const {
     trustedSenderEmails,
     trustedSendersLoaded,
@@ -27,8 +37,15 @@ export function TrustedSendersModal({ isOpen, onClose }: TrustedSendersModalProp
     loadTrustedSendersBook,
     addToTrustedSendersBook,
     removeFromTrustedSendersBook,
-  } = useContactStore();
-  const { client } = useAuthStore();
+  } = useContactStore(useShallow(s => ({
+    trustedSenderEmails: s.trustedSenderEmails,
+    trustedSendersLoaded: s.trustedSendersLoaded,
+    trustedSendersLoading: s.trustedSendersLoading,
+    loadTrustedSendersBook: s.loadTrustedSendersBook,
+    addToTrustedSendersBook: s.addToTrustedSendersBook,
+    removeFromTrustedSendersBook: s.removeFromTrustedSendersBook,
+  })));
+  const client = useAuthStore(s => s.client);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isAdding, setIsAdding] = useState(false);
