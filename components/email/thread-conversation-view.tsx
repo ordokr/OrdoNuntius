@@ -88,7 +88,7 @@ export function ThreadConversationView({
   const trustedSendersAddressBook = useSettingsStore((state) => state.trustedSendersAddressBook);
   const isTrustedAddressBookSender = useContactStore((state) => state.isTrustedAddressBookSender);
   const addToTrustedSendersBook = useContactStore((state) => state.addToTrustedSendersBook);
-  const { client } = useAuthStore();
+  const client = useAuthStore(s => s.client);
 
   // Track which emails are expanded (most recent by default)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -244,7 +244,7 @@ function EmailCard({
   const isStarred = email.keywords?.$flagged;
   const [hasBlockedContent, setHasBlockedContent] = useState(false);
   const [cidBlobUrls, setCidBlobUrls] = useState<Record<string, string>>({});
-  const { client } = useAuthStore();
+  const client = useAuthStore(s => s.client);
 
   // Mark as read when email is expanded
   useEffect(() => {
