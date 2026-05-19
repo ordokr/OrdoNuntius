@@ -3237,34 +3237,35 @@ export class JMAPClient implements IJMAPClient {
 
   async getAllAddressBooks(): Promise<AddressBook[]> {
     try {
-      const allBooks: AddressBook[] = [];
       const primaryId = this.getContactsAccountId();
       const accountIds = this.getContactCapableAccountIds();
 
-      for (const accountId of accountIds) {
+      // Per-account fetches are independent — parallelize. Was N
+      // sequential RTT (often visible at sidebar render on multi-account
+      // logins). allSettled so one account's failure doesn't strand
+      // the rest, matching the original try/catch-around-each pattern.
+      const settled = await Promise.allSettled(accountIds.map(async (accountId) => {
         const isPrimary = accountId === primaryId;
         const account = this.accounts[accountId];
-
-        try {
-          const response = await this.request([
-            ["AddressBook/get", { accountId, properties: ADDRESS_BOOK_PROPERTIES }, "0"]
-          ], this.contactUsing());
-
-          if (response.methodResponses?.[0]?.[0] === "AddressBook/get") {
-            const rawBooks = (response.methodResponses[0][1].list || []) as AddressBook[];
-            const books = rawBooks.map((book) => ({
-              ...book,
-              id: isPrimary ? book.id : `${accountId}:${book.id}`,
-              originalId: book.id,
-              accountId,
-              accountName: account?.name || (isPrimary ? this.username : accountId),
-              isShared: !isPrimary,
-            }));
-            allBooks.push(...books);
-          }
-        } catch (error) {
-          console.error(`Failed to fetch address books for account ${accountId}:`, error);
-        }
+        const response = await this.request([
+          ["AddressBook/get", { accountId, properties: ADDRESS_BOOK_PROPERTIES }, "0"]
+        ], this.contactUsing());
+        if (response.methodResponses?.[0]?.[0] !== "AddressBook/get") return [];
+        const rawBooks = (response.methodResponses[0][1].list || []) as AddressBook[];
+        return rawBooks.map((book) => ({
+          ...book,
+          id: isPrimary ? book.id : `${accountId}:${book.id}`,
+          originalId: book.id,
+          accountId,
+          accountName: account?.name || (isPrimary ? this.username : accountId),
+          isShared: !isPrimary,
+        }));
+      }));
+      const allBooks: AddressBook[] = [];
+      for (let i = 0; i < settled.length; i++) {
+        const r = settled[i];
+        if (r.status === 'fulfilled') allBooks.push(...r.value);
+        else console.error(`Failed to fetch address books for account ${accountIds[i]}:`, r.reason);
       }
 
       return allBooks;
@@ -3490,31 +3491,34 @@ export class JMAPClient implements IJMAPClient {
 
   async getAllContacts(): Promise<ContactCard[]> {
     try {
-      const allContacts: ContactCard[] = [];
       const primaryId = this.getContactsAccountId();
       const accountIds = this.getContactCapableAccountIds();
 
-      for (const accountId of accountIds) {
+      // Parallel per-account fetch. Was N sequential — meaningful on
+      // multi-account address-book loads where each account may hold
+      // hundreds of contacts.
+      const settled = await Promise.allSettled(accountIds.map(async (accountId) => {
         const isPrimary = accountId === primaryId;
         const account = this.accounts[accountId];
+        const rawContacts = await this.fetchPaginatedContacts(accountId);
+        return rawContacts.map((contact) => ({
+          ...contact,
+          id: isPrimary ? contact.id : `${accountId}:${contact.id}`,
+          originalId: contact.id,
+          addressBookIds: isPrimary ? contact.addressBookIds : (contact.addressBookIds ? Object.fromEntries(
+            Object.entries(contact.addressBookIds).map(([bookId, v]) => [`${accountId}:${bookId}`, v])
+          ) : contact.addressBookIds),
+          accountId,
+          accountName: account?.name || (isPrimary ? this.username : accountId),
+          isShared: !isPrimary,
+        }));
+      }));
 
-        try {
-          const rawContacts = await this.fetchPaginatedContacts(accountId);
-          const contacts = rawContacts.map((contact) => ({
-            ...contact,
-            id: isPrimary ? contact.id : `${accountId}:${contact.id}`,
-            originalId: contact.id,
-            addressBookIds: isPrimary ? contact.addressBookIds : (contact.addressBookIds ? Object.fromEntries(
-              Object.entries(contact.addressBookIds).map(([bookId, v]) => [`${accountId}:${bookId}`, v])
-            ) : contact.addressBookIds),
-            accountId,
-            accountName: account?.name || (isPrimary ? this.username : accountId),
-            isShared: !isPrimary,
-          }));
-          allContacts.push(...contacts);
-        } catch (error) {
-          console.error(`Failed to fetch contacts for account ${accountId}:`, error);
-        }
+      const allContacts: ContactCard[] = [];
+      for (let i = 0; i < settled.length; i++) {
+        const r = settled[i];
+        if (r.status === 'fulfilled') allContacts.push(...r.value);
+        else console.error(`Failed to fetch contacts for account ${accountIds[i]}:`, r.reason);
       }
 
       return allContacts;
@@ -3642,44 +3646,44 @@ export class JMAPClient implements IJMAPClient {
 
   async searchContacts(query: string): Promise<ContactCard[]> {
     try {
-      const allResults: ContactCard[] = [];
       const primaryId = this.getContactsAccountId();
       const accountIds = this.getContactCapableAccountIds();
 
-      for (const accountId of accountIds) {
+      // Parallel per-account search. Search must merge results across
+      // accounts; each account-search is independent so the fan-out
+      // collapses N sequential RTTs to 1.
+      const settled = await Promise.allSettled(accountIds.map(async (accountId) => {
         const isPrimary = accountId === primaryId;
         const account = this.accounts[accountId];
+        const response = await this.request([
+          ["ContactCard/query", {
+            accountId,
+            filter: { text: query },
+            limit: 50,
+          }, "0"],
+          ["ContactCard/get", {
+            accountId,
+            "#ids": { resultOf: "0", name: "ContactCard/query", path: "/ids" },
+          }, "1"]
+        ], this.contactUsing());
+        if (response.methodResponses?.[1]?.[0] !== "ContactCard/get") return [];
+        const rawContacts = (response.methodResponses[1][1].list || []) as ContactCard[];
+        return rawContacts.map((contact) => ({
+          ...contact,
+          id: isPrimary ? contact.id : `${accountId}:${contact.id}`,
+          originalId: contact.id,
+          accountId,
+          accountName: account?.name || (isPrimary ? this.username : accountId),
+          isShared: !isPrimary,
+        }));
+      }));
 
-        try {
-          const response = await this.request([
-            ["ContactCard/query", {
-              accountId,
-              filter: { text: query },
-              limit: 50,
-            }, "0"],
-            ["ContactCard/get", {
-              accountId,
-              "#ids": { resultOf: "0", name: "ContactCard/query", path: "/ids" },
-            }, "1"]
-          ], this.contactUsing());
-
-          if (response.methodResponses?.[1]?.[0] === "ContactCard/get") {
-            const rawContacts = (response.methodResponses[1][1].list || []) as ContactCard[];
-            const contacts = rawContacts.map((contact) => ({
-              ...contact,
-              id: isPrimary ? contact.id : `${accountId}:${contact.id}`,
-              originalId: contact.id,
-              accountId,
-              accountName: account?.name || (isPrimary ? this.username : accountId),
-              isShared: !isPrimary,
-            }));
-            allResults.push(...contacts);
-          }
-        } catch (error) {
-          console.error(`Failed to search contacts for account ${accountId}:`, error);
-        }
+      const allResults: ContactCard[] = [];
+      for (let i = 0; i < settled.length; i++) {
+        const r = settled[i];
+        if (r.status === 'fulfilled') allResults.push(...r.value);
+        else console.error(`Failed to search contacts for account ${accountIds[i]}:`, r.reason);
       }
-
       return allResults;
     } catch (error) {
       console.error('Failed to search contacts:', error);
@@ -3706,36 +3710,34 @@ export class JMAPClient implements IJMAPClient {
 
   async getAllCalendars(): Promise<Calendar[]> {
     try {
-      const allCalendars: Calendar[] = [];
       const primaryId = this.getCalendarsAccountId();
       const accountIds = this.getCalendarCapableAccountIds();
 
-      for (const accountId of accountIds) {
+      // Parallel per-account fetch (cold calendar sidebar render).
+      const settled = await Promise.allSettled(accountIds.map(async (accountId) => {
         const isPrimary = accountId === primaryId;
         const account = this.accounts[accountId];
+        const response = await this.request([
+          ["Calendar/get", { accountId, properties: CALENDAR_PROPERTIES }, "0"]
+        ], this.calendarUsing());
+        if (response.methodResponses?.[0]?.[0] !== "Calendar/get") return [];
+        const rawCalendars = (response.methodResponses[0][1].list || []) as Calendar[];
+        return rawCalendars.map((cal) => ({
+          ...cal,
+          id: isPrimary ? cal.id : `${accountId}:${cal.id}`,
+          originalId: cal.id,
+          accountId,
+          accountName: account?.name || (isPrimary ? this.username : accountId),
+          isShared: !isPrimary,
+        }));
+      }));
 
-        try {
-          const response = await this.request([
-            ["Calendar/get", { accountId, properties: CALENDAR_PROPERTIES }, "0"]
-          ], this.calendarUsing());
-
-          if (response.methodResponses?.[0]?.[0] === "Calendar/get") {
-            const rawCalendars = (response.methodResponses[0][1].list || []) as Calendar[];
-            const calendars = rawCalendars.map((cal) => ({
-              ...cal,
-              id: isPrimary ? cal.id : `${accountId}:${cal.id}`,
-              originalId: cal.id,
-              accountId,
-              accountName: account?.name || (isPrimary ? this.username : accountId),
-              isShared: !isPrimary,
-            }));
-            allCalendars.push(...calendars);
-          }
-        } catch (error) {
-          console.error(`Failed to fetch calendars for account ${accountId}:`, error);
-        }
+      const allCalendars: Calendar[] = [];
+      for (let i = 0; i < settled.length; i++) {
+        const r = settled[i];
+        if (r.status === 'fulfilled') allCalendars.push(...r.value);
+        else console.error(`Failed to fetch calendars for account ${accountIds[i]}:`, r.reason);
       }
-
       return allCalendars;
     } catch (error) {
       console.error('Failed to fetch all calendars:', error);
@@ -3881,34 +3883,36 @@ export class JMAPClient implements IJMAPClient {
     limit?: number
   ): Promise<CalendarEvent[]> {
     try {
-      const allEvents: CalendarEvent[] = [];
       const primaryId = this.getCalendarsAccountId();
       const accountIds = this.getCalendarCapableAccountIds();
 
-      for (const accountId of accountIds) {
+      // Parallel per-account query. Calendar event fetches dominate the
+      // calendar-page load latency on multi-account setups (and this is
+      // called on date-range changes too).
+      const settled = await Promise.allSettled(accountIds.map(async (accountId) => {
         const isPrimary = accountId === primaryId;
         const account = this.accounts[accountId];
+        const events = await this.queryCalendarEvents(filter, sort, limit, accountId);
+        return events.map((event) => ({
+          ...event,
+          id: isPrimary ? event.id : `${accountId}:${event.id}`,
+          originalId: event.id,
+          originalCalendarIds: event.calendarIds,
+          calendarIds: isPrimary ? (event.calendarIds || {}) : Object.fromEntries(
+            Object.entries(event.calendarIds || {}).map(([calId, v]) => [`${accountId}:${calId}`, v])
+          ),
+          accountId,
+          accountName: account?.name || (isPrimary ? this.username : accountId),
+          isShared: !isPrimary,
+        }));
+      }));
 
-        try {
-          const events = await this.queryCalendarEvents(filter, sort, limit, accountId);
-          const mapped = events.map((event) => ({
-            ...event,
-            id: isPrimary ? event.id : `${accountId}:${event.id}`,
-            originalId: event.id,
-            originalCalendarIds: event.calendarIds,
-            calendarIds: isPrimary ? (event.calendarIds || {}) : Object.fromEntries(
-              Object.entries(event.calendarIds || {}).map(([calId, v]) => [`${accountId}:${calId}`, v])
-            ),
-            accountId,
-            accountName: account?.name || (isPrimary ? this.username : accountId),
-            isShared: !isPrimary,
-          }));
-          allEvents.push(...mapped);
-        } catch (error) {
-          console.error(`Failed to query calendar events for account ${accountId}:`, error);
-        }
+      const allEvents: CalendarEvent[] = [];
+      for (let i = 0; i < settled.length; i++) {
+        const r = settled[i];
+        if (r.status === 'fulfilled') allEvents.push(...r.value);
+        else console.error(`Failed to query calendar events for account ${accountIds[i]}:`, r.reason);
       }
-
       return allEvents;
     } catch (error) {
       console.error('Failed to query all calendar events:', error);
