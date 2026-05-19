@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
+import { useShallow } from "zustand/react/shallow";
 import { useFileStore } from "@/stores/file-store";
 import { toast } from "@/stores/toast-store";
 import { cn, formatFileSize } from "@/lib/utils";
@@ -30,7 +31,17 @@ export default function FilesPage() {
   const router = useRouter();
   const t = useTranslations("files");
   const filesEnabled = usePolicyStore((s) => s.isFeatureEnabled('filesEnabled'));
-  const { isAuthenticated, logout, checkAuth, isLoading: authLoading, client } = useAuthStore();
+  // useShallow narrows the subscription. Plain destructure on useAuthStore
+  // (5 fields) and useFileStore (47 fields!) re-rendered the entire files
+  // page on every store mutation — including upload progress ticks for
+  // files we're not even viewing.
+  const { isAuthenticated, logout, checkAuth, isLoading: authLoading, client } = useAuthStore(useShallow(s => ({
+    isAuthenticated: s.isAuthenticated,
+    logout: s.logout,
+    checkAuth: s.checkAuth,
+    isLoading: s.isLoading,
+    client: s.client,
+  })));
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const quota = useEmailStore(s => s.quota);
@@ -80,7 +91,53 @@ export default function FilesPage() {
     cancelUpload,
     undoLastAction,
     lastAction,
-  } = useFileStore();
+  } = useFileStore(useShallow(s => ({
+    currentPath: s.currentPath,
+    resources: s.resources,
+    isLoading: s.isLoading,
+    error: s.error,
+    supportsFiles: s.supportsFiles,
+    selectedResources: s.selectedResources,
+    uploadProgress: s.uploadProgress,
+    clipboard: s.clipboard,
+    initClient: s.initClient,
+    checkSupport: s.checkSupport,
+    navigate: s.navigate,
+    navigateByPath: s.navigateByPath,
+    refresh: s.refresh,
+    createDirectory: s.createDirectory,
+    uploadFile: s.uploadFile,
+    uploadFiles: s.uploadFiles,
+    uploadFolder: s.uploadFolder,
+    deleteResource: s.deleteResource,
+    deleteResources: s.deleteResources,
+    renameResource: s.renameResource,
+    downloadResource: s.downloadResource,
+    getImageUrl: s.getImageUrl,
+    getFileContent: s.getFileContent,
+    createTextFile: s.createTextFile,
+    duplicateResource: s.duplicateResource,
+    downloadResources: s.downloadResources,
+    moveToFolder: s.moveToFolder,
+    moveToParent: s.moveToParent,
+    cutResources: s.cutResources,
+    copyResources: s.copyResources,
+    pasteResources: s.pasteResources,
+    selectResource: s.selectResource,
+    toggleSelect: s.toggleSelect,
+    selectAll: s.selectAll,
+    clearSelection: s.clearSelection,
+    setSelection: s.setSelection,
+    listPath: s.listPath,
+    listByParentId: s.listByParentId,
+    favorites: s.favorites,
+    recentFiles: s.recentFiles,
+    toggleFavorite: s.toggleFavorite,
+    addRecentFile: s.addRecentFile,
+    cancelUpload: s.cancelUpload,
+    undoLastAction: s.undoLastAction,
+    lastAction: s.lastAction,
+  })));
 
   const isMobile = useIsMobile();
   const [folderLayout, setFolderLayout] = useState<FolderLayout>(() => loadFilesSettings().folderLayout);

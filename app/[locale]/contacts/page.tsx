@@ -15,6 +15,7 @@ import { ContactsSidebar, type ContactCategory } from "@/components/contacts/con
 import { ContactImportDialog } from "@/components/contacts/contact-import-dialog";
 import { RenameDialog } from "@/components/files/rename-dialog";
 import { exportContacts } from "@/components/contacts/contact-export";
+import { useShallow } from "zustand/react/shallow";
 import { useContactStore, getContactDisplayName, countActiveGroupMembers } from "@/stores/contact-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
@@ -42,7 +43,18 @@ type View =
 
 export default function ContactsPage() {
   const t = useTranslations("contacts");
-  const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore();
+  // useShallow narrows the subscription. Plain destructure on useAuthStore
+  // (5 fields) and useContactStore (34 fields) re-rendered the entire
+  // contacts page tree (sidebar + list + detail) on every mutation in
+  // either store — including unrelated trusted-sender / address-book
+  // changes happening outside this page.
+  const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore(useShallow(s => ({
+    client: s.client,
+    isAuthenticated: s.isAuthenticated,
+    logout: s.logout,
+    checkAuth: s.checkAuth,
+    isLoading: s.isLoading,
+  })));
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const quota = useEmailStore(s => s.quota);
@@ -80,7 +92,41 @@ export default function ContactsPage() {
     shareAddressBook,
     renameKeyword,
     importContacts,
-  } = useContactStore();
+  } = useContactStore(useShallow(s => ({
+    contacts: s.contacts,
+    addressBooks: s.addressBooks,
+    selectedContactId: s.selectedContactId,
+    searchQuery: s.searchQuery,
+    supportsSync: s.supportsSync,
+    selectedContactIds: s.selectedContactIds,
+    setSelectedContact: s.setSelectedContact,
+    setSearchQuery: s.setSearchQuery,
+    fetchContacts: s.fetchContacts,
+    createContact: s.createContact,
+    updateContact: s.updateContact,
+    deleteContact: s.deleteContact,
+    addLocalContact: s.addLocalContact,
+    updateLocalContact: s.updateLocalContact,
+    deleteLocalContact: s.deleteLocalContact,
+    getGroupMembers: s.getGroupMembers,
+    createGroup: s.createGroup,
+    updateGroup: s.updateGroup,
+    addMembersToGroup: s.addMembersToGroup,
+    removeMembersFromGroup: s.removeMembersFromGroup,
+    deleteGroup: s.deleteGroup,
+    toggleContactSelection: s.toggleContactSelection,
+    selectRangeContacts: s.selectRangeContacts,
+    selectAllContacts: s.selectAllContacts,
+    clearSelection: s.clearSelection,
+    bulkDeleteContacts: s.bulkDeleteContacts,
+    bulkAddToGroup: s.bulkAddToGroup,
+    moveContactToAddressBook: s.moveContactToAddressBook,
+    renameAddressBook: s.renameAddressBook,
+    removeAddressBook: s.removeAddressBook,
+    shareAddressBook: s.shareAddressBook,
+    renameKeyword: s.renameKeyword,
+    importContacts: s.importContacts,
+  })));
 
   const [view, setView] = useState<View>("list");
   const [activeCategory, setActiveCategory] = useState<ContactCategory>("all");
