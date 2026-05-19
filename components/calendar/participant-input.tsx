@@ -62,7 +62,10 @@ export const ParticipantInput = forwardRef<ParticipantInputHandle, ParticipantIn
 
   const addParticipant = useCallback((p: Participant) => {
     if (!p.email || !EMAIL_REGEX.test(p.email)) return;
-    if (participants.some(e => e.email.toLowerCase() === p.email.toLowerCase())) return;
+    // Lowercase the new participant's email once, not N times in the
+    // `.some()` comparator.
+    const pLower = p.email.toLowerCase();
+    if (participants.some(e => e.email.toLowerCase() === pLower)) return;
     onAdd(p);
     setQuery("");
     setSuggestions([]);

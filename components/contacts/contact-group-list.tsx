@@ -27,19 +27,23 @@ export function ContactGroupList({
 }: ContactGroupListProps) {
   const t = useTranslations("contacts");
 
-  const filtered = useMemo(() => {
-    if (!searchQuery) return groups;
-    const lower = searchQuery.toLowerCase();
-    return groups.filter((g) =>
-      getContactDisplayName(g).toLowerCase().includes(lower)
-    );
-  }, [groups, searchQuery]);
-
+  // Schwartzian decorate: compute display name once per group, then
+  // filter + sort by the cached lowercase form. Previous version
+  // called `getContactDisplayName(...)` per filter check AND per
+  // comparison during sort — for an N-group list with M comparisons
+  // that's `N + N log N` getContactDisplayName invocations.
   const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) =>
-      getContactDisplayName(a).localeCompare(getContactDisplayName(b))
-    );
-  }, [filtered]);
+    const lower = searchQuery ? searchQuery.toLowerCase() : null;
+    const decorated: { g: typeof groups[number]; name: string; lowerName: string }[] = [];
+    for (const g of groups) {
+      const name = getContactDisplayName(g);
+      const lowerName = name.toLowerCase();
+      if (lower !== null && !lowerName.includes(lower)) continue;
+      decorated.push({ g, name, lowerName });
+    }
+    decorated.sort((a, b) => a.name.localeCompare(b.name));
+    return decorated.map(d => d.g);
+  }, [groups, searchQuery]);
 
   return (
     <div className={cn("flex flex-col", className)}>

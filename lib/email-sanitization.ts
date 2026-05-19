@@ -150,7 +150,7 @@ export function collapseBlockedImageContainers(html: string): string {
   const doc = parseHtmlSafely(html);
   const blockedImages = doc.querySelectorAll('img[data-blocked-src]');
 
-  blockedImages.forEach((img) => {
+  for (const img of blockedImages) {
     let el: HTMLElement | null = img.parentElement;
     while (el && el !== doc.body) {
       if (el.tagName === 'TD' || el.tagName === 'TH' || (el.tagName === 'DIV' && el.parentElement?.tagName === 'TD')) {
@@ -169,7 +169,7 @@ export function collapseBlockedImageContainers(html: string): string {
       if (el.tagName === 'TABLE' || el.tagName === 'TR') break;
       el = el.parentElement;
     }
-  });
+  }
 
   return doc.body.innerHTML;
 }

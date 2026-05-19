@@ -123,6 +123,9 @@ function createPluginLogger(pluginId: string) {
  */
 function originMatchesAllowlist(url: URL, allowlist: string[]): boolean {
   if (url.protocol !== 'https:') return false;
+  // url.hostname is stable across the loop — lowercase once.
+  const urlHostLower = url.hostname.toLowerCase();
+  const port = url.port || '';
   for (const entry of allowlist) {
     let parsed: URL;
     try {
@@ -131,18 +134,17 @@ function originMatchesAllowlist(url: URL, allowlist: string[]): boolean {
       continue;
     }
     if (parsed.protocol !== 'https:') continue;
-    const port = url.port || '';
-    const expectedPort = parsed.port || '';
-    if (port !== expectedPort) continue;
+    if (port !== (parsed.port || '')) continue;
+    const parsedHostLower = parsed.hostname.toLowerCase();
     if (entry.includes('*.')) {
-      const suffix = '.' + parsed.hostname.toLowerCase();
-      if (url.hostname.toLowerCase().endsWith(suffix)) {
-        const prefix = url.hostname.slice(0, url.hostname.length - suffix.length);
+      const suffix = '.' + parsedHostLower;
+      if (urlHostLower.endsWith(suffix)) {
+        const prefix = urlHostLower.slice(0, urlHostLower.length - suffix.length);
         // Require exactly one non-empty subdomain label.
         if (prefix.length > 0 && !prefix.includes('.')) return true;
       }
     } else {
-      if (url.hostname.toLowerCase() === parsed.hostname.toLowerCase()) return true;
+      if (urlHostLower === parsedHostLower) return true;
     }
   }
   return false;
