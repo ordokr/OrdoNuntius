@@ -40,6 +40,16 @@ if (basePath && !basePath.startsWith("/")) {
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Exclude the deploy tarball directory from outputFileTracing. Without
+  // this, each `next build` traces `dist/` (which holds the previous
+  // pack's tarball) into `.next/standalone/dist/`, and the next pack
+  // bundles THAT tarball inside its own tarball — recursive bloat.
+  // Symptom: a typical ~100MB bundle ballooned to 2.4GB after a few
+  // deploy cycles. Excluding `dist/**` keeps the standalone subtree
+  // confined to actual app artifacts.
+  outputFileTracingExcludes: {
+    "*": ["./dist/**/*", "./Nuntius.zip", "./Nuntiustemplate/**/*"],
+  },
   allowedDevOrigins: ["192.168.1.51"],
   basePath: basePath || undefined,
   // esbuild ships native binaries + a README the bundler can't parse; load
