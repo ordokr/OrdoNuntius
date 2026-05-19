@@ -266,8 +266,26 @@ function deduplicateMailboxes(mailboxes: Mailbox[]): Mailbox[] {
   return result;
 }
 
+// Memoize the tree against the input array's identity. 6 separate
+// components (sidebar, email-viewer, email-context-menu, settings/folder,
+// filter-rule-modal, etc.) call this with the same mailboxes array; each
+// previously rebuilt the whole tree (dedup + 2-pass node wiring + depth
+// recursion) independently. WeakMap is freed via GC when the store
+// replaces the mailboxes array. Consumers that filter/transform the tree
+// copy node objects via spread — verified no consumer mutates the
+// returned children arrays.
+const _mailboxTreeCache = new WeakMap<readonly Mailbox[], MailboxNode[]>();
+
 // Build a hierarchical tree structure from flat mailbox array
 export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
+  const cached = _mailboxTreeCache.get(mailboxes);
+  if (cached) return cached;
+  const tree = buildMailboxTreeUncached(mailboxes);
+  _mailboxTreeCache.set(mailboxes, tree);
+  return tree;
+}
+
+function buildMailboxTreeUncached(mailboxes: Mailbox[]): MailboxNode[] {
   debug.log('jmap', `[Mailbox Tree] Building tree from ${mailboxes.length} mailboxes`);
 
   // Deduplicate mailboxes first
