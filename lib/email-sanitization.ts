@@ -87,17 +87,21 @@ export function parseHtmlSafely(html: string): Document {
   return parser.parseFromString(html, 'text/html');
 }
 
+// Module-level constant for the rich-formatting probe selector.
+// Hoisting prevents the string + concat from being re-evaluated on every
+// hasRichFormatting() call (per-email-render hot path).
+const RICH_FORMATTING_SELECTOR =
+  'table, img, style, b, strong, i, em, u, font, ' +
+  'div[style], span[style], p[style], ' +
+  'h1, h2, h3, h4, h5, h6, ul, ol, blockquote';
+
 /**
  * Detect if HTML content has rich formatting
  * Safe alternative to innerHTML parsing
  */
 export function hasRichFormatting(html: string): boolean {
   const doc = parseHtmlSafely(html);
-  return !!doc.querySelector(
-    'table, img, style, b, strong, i, em, u, font, ' +
-    'div[style], span[style], p[style], ' +
-    'h1, h2, h3, h4, h5, h6, ul, ol, blockquote'
-  );
+  return !!doc.querySelector(RICH_FORMATTING_SELECTOR);
 }
 
 const HTML_ESCAPES: Record<string, string> = {

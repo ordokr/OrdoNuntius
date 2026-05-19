@@ -285,8 +285,16 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
     const { emails, lastSelectedEmailId, selectedEmailIds } = get();
     const anchorId = lastSelectedEmailId || emails[0]?.id;
     if (!anchorId) return;
-    const anchorIndex = emails.findIndex(e => e.id === anchorId);
-    const targetIndex = emails.findIndex(e => e.id === targetEmailId);
+    // Single walk finds both indices, early-exits once both are known.
+    // Was two findIndex walks (worst case 2N).
+    let anchorIndex = -1;
+    let targetIndex = -1;
+    for (let i = 0; i < emails.length; i++) {
+      const id = emails[i].id;
+      if (id === anchorId) anchorIndex = i;
+      if (id === targetEmailId) targetIndex = i;
+      if (anchorIndex !== -1 && targetIndex !== -1) break;
+    }
     if (anchorIndex === -1 || targetIndex === -1) return;
     const start = Math.min(anchorIndex, targetIndex);
     const end = Math.max(anchorIndex, targetIndex);
