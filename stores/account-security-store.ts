@@ -93,7 +93,11 @@ function credentialFromResult(raw: Record<string, unknown>): AppPasswordInfo {
 
 function ipsToMap(ips?: string[]): Record<string, true> | undefined {
   if (!ips || ips.length === 0) return undefined;
-  return Object.fromEntries(ips.map((ip) => [ip, true]));
+  // Direct build skips Object.fromEntries(ips.map(...)) — saves the
+  // entries-array + per-tuple sub-array allocations.
+  const out: Record<string, true> = {};
+  for (const ip of ips) out[ip] = true;
+  return out;
 }
 
 function buildCreateBody(input: AppCredentialInput): Record<string, unknown> {
