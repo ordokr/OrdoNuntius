@@ -1006,24 +1006,38 @@ export default function CalendarPage() {
   }, [calendars, showBirthdayCalendar, birthdayCalendarName, birthdayCalendarColor]);
 
   const visibleEvents = useMemo(() => {
-    const filtered = events.filter((e) => {
-      if (!e.start || !e.calendarIds) return false;
-      const calIds = Object.keys(e.calendarIds);
-      return calIds.some((id) => selectedCalendarIds.includes(id));
-    });
-    if (showBirthdayCalendar && selectedCalendarIds.includes(BIRTHDAY_CALENDAR_ID)) {
+    // O(events × event.calendarIds) walk with O(1) set lookup. Was
+    // events.filter + Object.keys (per-event allocation) + .some +
+    // .includes (O(selectedCalendarIds) per check). For 1000 events × 3
+    // calendars each × 10 selected, that's ~30k ops + 1000 keys-arrays;
+    // this version is ~3k ops + zero per-event allocations.
+    const selectedSet = new Set(selectedCalendarIds);
+    const filtered: typeof events = [];
+    for (const e of events) {
+      if (!e.start || !e.calendarIds) continue;
+      let visible = false;
+      for (const id in e.calendarIds) {
+        if (selectedSet.has(id)) { visible = true; break; }
+      }
+      if (visible) filtered.push(e);
+    }
+    if (showBirthdayCalendar && selectedSet.has(BIRTHDAY_CALENDAR_ID)) {
       return [...filtered, ...birthdayEvents];
     }
     return filtered;
   }, [events, selectedCalendarIds, showBirthdayCalendar, birthdayEvents]);
 
   useEffect(() => {
+    // Same selectedSet + for...in pattern as visibleEvents above. This
+    // runs as a debug-log effect — was the same O(events × cals × selected)
+    // walk + per-event keys-array. Compute once with O(1) lookups.
+    const selectedSet = new Set(selectedCalendarIds);
     const hiddenEvents = events.filter((event) => {
-      if (!event.start || !event.calendarIds) {
-        return true;
+      if (!event.start || !event.calendarIds) return true;
+      for (const id in event.calendarIds) {
+        if (selectedSet.has(id)) return false;
       }
-
-      return !Object.keys(event.calendarIds).some((calendarId) => selectedCalendarIds.includes(calendarId));
+      return true;
     });
 
     if (hiddenEvents.length === 0) {

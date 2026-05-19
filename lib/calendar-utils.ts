@@ -269,8 +269,14 @@ export function layoutOverlappingEvents(
 
     let placed = false;
     for (let col = 0; col < columns.length; col++) {
-      if (columns[col].every(e => e.end <= event.startMinutes)) {
-        columns[col].push({ event: event.event, end: event.endMinutes });
+      // Within each column, events are non-overlapping (column invariant)
+      // and pushed in start-time order (we iterate `sorted`), so the last
+      // entry has the latest end. Was `columns[col].every(e => e.end <= ...)`
+      // which scanned every event in the column — O(K) per column-probe.
+      // The last-entry check is O(1) and is logically sufficient.
+      const colArr = columns[col];
+      if (colArr[colArr.length - 1].end <= event.startMinutes) {
+        colArr.push({ event: event.event, end: event.endMinutes });
         result.push({ ...event, column: col, totalColumns: 0 });
         placed = true;
         break;
