@@ -2285,7 +2285,14 @@ export class JMAPClient implements IJMAPClient {
       if (envelopeMailFrom) {
         create.envelope = {
           mailFrom: { email: envelopeMailFrom },
-          rcptTo: [...to, ...(cc || []), ...(bcc || [])].map((email) => ({ email })),
+          // Build rcptTo in one walk — 3-spread + .map allocated 4 arrays.
+          rcptTo: (() => {
+            const rcpts: { email: string }[] = [];
+            for (const e of to) rcpts.push({ email: e });
+            if (cc) for (const e of cc) rcpts.push({ email: e });
+            if (bcc) for (const e of bcc) rcpts.push({ email: e });
+            return rcpts;
+          })(),
         };
       }
       return { [submissionId]: create };
@@ -4549,24 +4556,29 @@ export class JMAPClient implements IJMAPClient {
           return tasks;
         }
 
-        list.forEach((task, i) => {
-          debug.log('tasks', `CalendarTask/fetch [${i}]`, {
-            id: task.id,
-            uid: task.uid,
-            '@type': task['@type'],
-            title: task.title,
-            due: task.due,
-            start: task.start,
-            progress: task.progress,
-            showWithoutTime: task.showWithoutTime,
-            calendarIds: task.calendarIds,
-          });
-        });
-
-        const results = list.map((task) => ({
-          ...task,
-          '@type': 'Task' as const,
-        }));
+        // Fuse the per-task debug-log walk with the @type-stamping walk.
+        // The debug payload literal is allocated per task — gate it behind
+        // isDebugEnabled('tasks') so we don't burn CPU formatting payloads
+        // that debug.log will discard. Single walk replaces forEach + map.
+        const tasksDebug = isDebugEnabled('tasks');
+        const results: CalendarTask[] = new Array(list.length);
+        for (let i = 0; i < list.length; i++) {
+          const task = list[i];
+          if (tasksDebug) {
+            debug.log('tasks', `CalendarTask/fetch [${i}]`, {
+              id: task.id,
+              uid: task.uid,
+              '@type': task['@type'],
+              title: task.title,
+              due: task.due,
+              start: task.start,
+              progress: task.progress,
+              showWithoutTime: task.showWithoutTime,
+              calendarIds: task.calendarIds,
+            });
+          }
+          results[i] = { ...task, '@type': 'Task' as const };
+        }
         debug.log('tasks', 'CalendarTask/fetch complete,', results.length, 'tasks');
         debug.groupEnd();
         return results;
@@ -4610,8 +4622,11 @@ export class JMAPClient implements IJMAPClient {
 
     const tasks: CalendarTask[] = [];
     const calendarIdSet = calendarIds ? new Set(calendarIds) : null;
+    const tasksDebug = isDebugEnabled('tasks');
 
-    allObjects.forEach((obj) => {
+    // Was `.forEach`; for-of removes the callback-call overhead per object,
+    // and the per-object debug payload is gated behind a single boolean.
+    for (const obj of allObjects) {
       const type = obj['@type'];
       const isExplicitTask = typeof type === 'string' && type.toLowerCase() === 'task';
       // CalDAV-created tasks (e.g. Thunderbird) may lack @type or have @type
@@ -4626,18 +4641,20 @@ export class JMAPClient implements IJMAPClient {
         || ('percentComplete' in obj);
       const isCalDavTask = type !== 'Event' && hasTaskFields;
 
-      debug.log('tasks', 'CalendarTask/fallback scan', {
-        id: obj.id,
-        '@type': type,
-        title: obj.title,
-        hasProgress: 'progress' in obj,
-        progress: obj.progress,
-        due: obj.due,
-        isExplicitTask,
-        isCalDavTask,
-      });
+      if (tasksDebug) {
+        debug.log('tasks', 'CalendarTask/fallback scan', {
+          id: obj.id,
+          '@type': type,
+          title: obj.title,
+          hasProgress: 'progress' in obj,
+          progress: obj.progress,
+          due: obj.due,
+          isExplicitTask,
+          isCalDavTask,
+        });
+      }
 
-      if (!isExplicitTask && !isCalDavTask) return;
+      if (!isExplicitTask && !isCalDavTask) continue;
 
       // Filter by calendar if requested. `for...in` + early-return on
       // match avoids the per-task `Object.keys` array allocation.
@@ -4649,27 +4666,30 @@ export class JMAPClient implements IJMAPClient {
             if (calendarIdSet.has(id)) { anyMatch = true; break; }
           }
           if (!anyMatch) {
-            debug.log('tasks', 'CalendarTask/fallback skipping task (not in requested calendars)', obj.id);
-            return;
+            if (tasksDebug) debug.log('tasks', 'CalendarTask/fallback skipping task (not in requested calendars)', obj.id);
+            continue;
           }
         }
       }
 
       tasks.push({ ...obj, '@type': 'Task' as const } as CalendarTask);
-    });
+    }
 
     debug.log('tasks', 'CalendarTask/fallback detected', tasks.length, 'tasks');
-    tasks.forEach((t, i) => {
-      debug.log('tasks', `CalendarTask/fallback [${i}]`, {
-        id: t.id,
-        uid: t.uid,
-        title: t.title,
-        due: t.due,
-        progress: t.progress,
-        showWithoutTime: t.showWithoutTime,
-        calendarIds: t.calendarIds,
-      });
-    });
+    if (tasksDebug) {
+      for (let i = 0; i < tasks.length; i++) {
+        const t = tasks[i];
+        debug.log('tasks', `CalendarTask/fallback [${i}]`, {
+          id: t.id,
+          uid: t.uid,
+          title: t.title,
+          due: t.due,
+          progress: t.progress,
+          showWithoutTime: t.showWithoutTime,
+          calendarIds: t.calendarIds,
+        });
+      }
+    }
 
     return tasks;
   }

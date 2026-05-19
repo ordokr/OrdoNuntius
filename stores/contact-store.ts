@@ -502,12 +502,15 @@ export const useContactStore = create<ContactStore>()(
         const group = contacts.find(c => c.id === groupId);
         if (!group?.members) return [];
         // Sets give O(1) membership checks. Was O(M × K) with two
-        // Array.includes per contact; now O(M + K).
-        const memberKeys = new Set(
-          Object.keys(group.members).filter(k => group.members![k])
-        );
+        // Array.includes per contact; now O(M + K). Single for...in walk
+        // builds both sets in one pass — no Object.keys allocation, no
+        // .filter intermediate, no second walk over memberKeys to normalize.
+        const memberKeys = new Set<string>();
         const normalizedKeys = new Set<string>();
-        for (const k of memberKeys) {
+        const members = group.members;
+        for (const k in members) {
+          if (!members[k]) continue;
+          memberKeys.add(k);
           normalizedKeys.add(k.startsWith('urn:uuid:') ? k.slice(9) : k);
         }
         return contacts.filter(c => {

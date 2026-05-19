@@ -970,7 +970,10 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
       if (!email) return;
 
       const isUnread = !email.keywords?.$seen;
-      const currentMailboxIds = email.mailboxIds ? Object.keys(email.mailboxIds) : [];
+      // Set instead of Object.keys + .includes — O(1) lookup vs O(K) per
+      // mailbox iteration, and skips materializing the keys array.
+      const currentMailboxIds = new Set<string>();
+      if (email.mailboxIds) for (const id in email.mailboxIds) currentMailboxIds.add(id);
 
       const { selectedMailbox, mailboxes } = get();
       const currentMailbox = mailboxes.find(mb => mb.id === selectedMailbox);
@@ -983,7 +986,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
 
       set((state) => {
         const updatedMailboxes = state.mailboxes.map(mailbox => {
-          if (currentMailboxIds.includes(mailbox.id)) {
+          if (currentMailboxIds.has(mailbox.id)) {
             return {
               ...mailbox,
               totalEmails: Math.max(0, mailbox.totalEmails - 1),
@@ -1040,11 +1043,18 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
           if (!byAccount.has(acct)) byAccount.set(acct, []);
           byAccount.get(acct)!.push(e.id);
         }
-        await Promise.all(Array.from(byAccount.entries()).map(async ([acct, ids]) => {
-          const acctClient = acct === '__default__' ? client : useAuthStore.getState().getClientForAccount(acct);
-          if (!acctClient) return;
-          await acctClient.batchMoveEmails(ids, jmapDestId);
-        }));
+        // Iterate the Map directly — Array.from(...).map(async) just to fan
+        // out into promises forces a tuple array; for-of pushes Promises
+        // straight into the array with no intermediate allocation.
+        const promises: Promise<void>[] = [];
+        for (const [acct, ids] of byAccount) {
+          promises.push((async () => {
+            const acctClient = acct === '__default__' ? client : useAuthStore.getState().getClientForAccount(acct);
+            if (!acctClient) return;
+            await acctClient.batchMoveEmails(ids, jmapDestId);
+          })());
+        }
+        await Promise.all(promises);
       } else {
         const currentMailbox = mailboxes.find(mb => mb.id === selectedMailbox);
         const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
@@ -1211,11 +1221,14 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
           emailsByAccount.get(acctId)!.push(emailId);
         }
 
-        const promises = Array.from(emailsByAccount.entries()).map(async ([acctId, ids]) => {
-          const acctClient = acctId === '__default__' ? client : useAuthStore.getState().getClientForAccount(acctId);
-          if (!acctClient) return;
-          await acctClient.batchMarkAsRead(ids, read);
-        });
+        const promises: Promise<void>[] = [];
+        for (const [acctId, ids] of emailsByAccount) {
+          promises.push((async () => {
+            const acctClient = acctId === '__default__' ? client : useAuthStore.getState().getClientForAccount(acctId);
+            if (!acctClient) return;
+            await acctClient.batchMarkAsRead(ids, read);
+          })());
+        }
         await Promise.allSettled(promises);
       } else {
         await client.batchMarkAsRead(emailIdsArray, read);
@@ -1301,17 +1314,22 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
         acctId === '__default__' ? client : useAuthStore.getState().getClientForAccount(acctId);
 
       if (forceDestroy) {
-        const promises = Array.from(emailsByAccount.entries()).map(async ([acctId, ids]) => {
-          const acctClient = getClient(acctId);
-          if (!acctClient) return;
-          await acctClient.batchDeleteEmails(ids);
-        });
+        const promises: Promise<void>[] = [];
+        for (const [acctId, ids] of emailsByAccount) {
+          promises.push((async () => {
+            const acctClient = getClient(acctId);
+            if (!acctClient) return;
+            await acctClient.batchDeleteEmails(ids);
+          })());
+        }
         await Promise.allSettled(promises);
       } else {
         // Move to trash per account.
         const failedAccounts: string[] = [];
         const movedEmailIds = new Set<string>();
-        const promises = Array.from(emailsByAccount.entries()).map(async ([acctId, ids]) => {
+        const promises: Promise<void>[] = [];
+        for (const [acctId, ids] of emailsByAccount) {
+          promises.push((async () => {
           const acctClient = getClient(acctId);
           if (!acctClient) {
             failedAccounts.push(acctId);
@@ -1328,8 +1346,9 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
           }
           const trashId = trashMailbox.originalId || trashMailbox.id;
           await acctClient.batchMoveEmails(ids, trashId, trashMailbox.accountId);
-          ids.forEach(id => movedEmailIds.add(id));
-        });
+          for (const id of ids) movedEmailIds.add(id);
+          })());
+        }
         await Promise.allSettled(promises);
 
         if (failedAccounts.length > 0 && movedEmailIds.size === 0) {
@@ -1451,11 +1470,14 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
           emailsByAccount.get(acctId)!.push(emailId);
         }
 
-        const promises = Array.from(emailsByAccount.entries()).map(async ([acctId, ids]) => {
-          const acctClient = acctId === '__default__' ? client : useAuthStore.getState().getClientForAccount(acctId);
-          if (!acctClient) return;
-          await acctClient.batchMoveEmails(ids, toMailboxId);
-        });
+        const promises: Promise<void>[] = [];
+        for (const [acctId, ids] of emailsByAccount) {
+          promises.push((async () => {
+            const acctClient = acctId === '__default__' ? client : useAuthStore.getState().getClientForAccount(acctId);
+            if (!acctClient) return;
+            await acctClient.batchMoveEmails(ids, toMailboxId);
+          })());
+        }
         await Promise.allSettled(promises);
       } else {
         await client.batchMoveEmails(emailIdsArray, toMailboxId);

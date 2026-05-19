@@ -7,7 +7,7 @@
  * Reference: MS-OXTNEF / MS-TNEF specification.
  */
 
-import { debug } from '@/lib/debug';
+import { debug, isDebugEnabled } from '@/lib/debug';
 
 // TNEF signature
 const TNEF_SIGNATURE = 0x223E9F78;
@@ -285,9 +285,14 @@ export function parseTnef(data: Uint8Array): TnefResult {
       } else if (attrID === attMAPIProps) {
         const props = parseMAPIProps(attrData);
         debug.log('email', '  → Parsed', props.size, 'MAPI properties from message');
-        props.forEach((val, propID) => {
-          debug.log('email', '    MAPI prop 0x' + propID.toString(16).toUpperCase(), 'type=0x' + val.type.toString(16), 'value=' + (val.value instanceof Uint8Array ? val.value.byteLength + ' bytes' : val.value));
-        });
+        // Per-prop debug string formatting is expensive — gate behind a
+        // single boolean check so we don't burn CPU formatting payloads
+        // that debug.log will discard.
+        if (isDebugEnabled('email')) {
+          for (const [propID, val] of props) {
+            debug.log('email', '    MAPI prop 0x' + propID.toString(16).toUpperCase(), 'type=0x' + val.type.toString(16), 'value=' + (val.value instanceof Uint8Array ? val.value.byteLength + ' bytes' : val.value));
+          }
+        }
 
         // HTML body
         const htmlProp = props.get(PR_BODY_HTML);
@@ -338,9 +343,11 @@ export function parseTnef(data: Uint8Array): TnefResult {
       } else if (attrID === attAttachment && curAttach) {
         const props = parseMAPIProps(attrData);
         debug.log('email', '  → Parsed', props.size, 'MAPI properties from attachment');
-        props.forEach((val, propID) => {
-          debug.log('email', '    MAPI prop 0x' + propID.toString(16).toUpperCase(), 'type=0x' + val.type.toString(16), 'value=' + (val.value instanceof Uint8Array ? val.value.byteLength + ' bytes' : val.value));
-        });
+        if (isDebugEnabled('email')) {
+          for (const [propID, val] of props) {
+            debug.log('email', '    MAPI prop 0x' + propID.toString(16).toUpperCase(), 'type=0x' + val.type.toString(16), 'value=' + (val.value instanceof Uint8Array ? val.value.byteLength + ' bytes' : val.value));
+          }
+        }
 
         const longName = props.get(PR_ATTACH_LONG_FILENAME);
         if (longName?.value instanceof Uint8Array) {

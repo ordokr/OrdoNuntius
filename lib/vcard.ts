@@ -905,18 +905,20 @@ export function detectDuplicates(
     }
   }
 
-  incoming.forEach((card, idx) => {
-    if (card.emails) {
-      const emails = card.emails;
-      for (const k in emails) {
-        const match = existingEmails.get(emails[k].address.toLowerCase());
-        if (match) {
-          dupes.set(idx, match);
-          return;
-        }
+  // for-loop instead of `.forEach` — drops the per-card callback call and
+  // lets the inner `continue` jump straight to the next index after a hit.
+  for (let idx = 0; idx < incoming.length; idx++) {
+    const card = incoming[idx];
+    if (!card.emails) continue;
+    const emails = card.emails;
+    for (const k in emails) {
+      const match = existingEmails.get(emails[k].address.toLowerCase());
+      if (match) {
+        dupes.set(idx, match);
+        break;
       }
     }
-  });
+  }
 
   return dupes;
 }
