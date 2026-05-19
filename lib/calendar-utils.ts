@@ -200,45 +200,70 @@ export function buildWeekSegments(events: CalendarEvent[], weekDays: Date[]): Ca
   return packWeekSegments(buildWeekSegmentsRaw(events, weekDays));
 }
 
+// Pure full-day bounds check, hoisted out of buildTimedFullDayWeekSegments so
+// the inner per-day loop doesn't allocate a fresh closure per event. Takes
+// pre-computed dayStart/nextDayStart so callers can hoist startOfDay/addDays
+// out of the inner loop.
+function isFullDayAt(
+  dayStart: Date,
+  nextDayStart: Date,
+  eventStart: Date,
+  eventEnd: Date,
+): boolean {
+  if (eventEnd <= dayStart || eventStart >= nextDayStart) return false;
+  const clippedStart = eventStart > dayStart ? eventStart : dayStart;
+  const clippedEnd = eventEnd < nextDayStart ? eventEnd : nextDayStart;
+  const startMinutes = Math.max(0, Math.floor((clippedStart.getTime() - dayStart.getTime()) / 60000));
+  const endMinutes = Math.min(1440, Math.ceil((clippedEnd.getTime() - dayStart.getTime()) / 60000));
+  return startMinutes === 0 && endMinutes === 1440;
+}
+
 export function buildTimedFullDayWeekSegments(events: CalendarEvent[], weekDays: Date[]): CalendarWeekSegment[] {
   if (weekDays.length === 0) return [];
 
+  // Pre-compute dayStart/nextDayStart per visible weekDay ONCE. These are
+  // constant across all events — the previous form called startOfDay +
+  // addDays per (event × day), allocating ~14N Date objects per render
+  // (7 days × 2 Dates per call × N events). Now we pay 14 Date allocations
+  // total for the visible week, plus 2 boundary Date allocations per
+  // segment for the continuesBefore/continuesAfter probes.
+  const dayBounds: { dayStart: Date; nextDayStart: Date }[] = new Array(weekDays.length);
+  for (let i = 0; i < weekDays.length; i++) {
+    const dayStart = startOfDay(weekDays[i]);
+    dayBounds[i] = { dayStart, nextDayStart: addDays(dayStart, 1) };
+  }
+
   // Direct loop + push. Was `events.flatMap(event => { ...; return segments; })`
   // which allocated a per-event inner array AND the outer flatMap array.
-  // Per-event hoist: parseISO eventStart/eventEnd ONCE per event (was
-  // re-parsed inside every `isTimedEventFullDayOnDate(event, day)` call —
-  // up to 9 times per event for 7-day weeks + 2 boundary probes).
-  // Inline the bounds check via a closure capturing the pre-parsed dates.
-  // For 100 events × 9 probes that's ~1800 parseISO calls dropped per render.
+  // Per-event hoist: parseISO eventStart/eventEnd ONCE per event.
   const rawSegments: CalendarWeekSegment[] = [];
   for (const event of events) {
     if (event.showWithoutTime) continue;
     const eventStart = getEventStartDate(event);
     const eventEnd = getEventEndDate(event);
-    const isFullDay = (day: Date): boolean => {
-      const dayStart = startOfDay(day);
-      const nextDayStart = addDays(dayStart, 1);
-      if (eventEnd <= dayStart || eventStart >= nextDayStart) return false;
-      const clippedStart = eventStart > dayStart ? eventStart : dayStart;
-      const clippedEnd = eventEnd < nextDayStart ? eventEnd : nextDayStart;
-      const startMinutes = Math.max(0, Math.floor((clippedStart.getTime() - dayStart.getTime()) / 60000));
-      const endMinutes = Math.min(1440, Math.ceil((clippedEnd.getTime() - dayStart.getTime()) / 60000));
-      return startMinutes === 0 && endMinutes === 1440;
-    };
     let rangeStart = -1;
     let previousIndex = -1;
     const pushSegment = (startIndex: number, endIndex: number) => {
+      // Boundary probes (one day before week / after week) still need a
+      // fresh startOfDay+addDays since they're outside the pre-computed
+      // dayBounds. Two Date allocations per segment is fine — segments
+      // are far fewer than events.
+      const beforeDay = addDays(weekDays[startIndex], -1);
+      const beforeStart = startOfDay(beforeDay);
+      const afterDay = addDays(weekDays[endIndex], 1);
+      const afterStart = startOfDay(afterDay);
       rawSegments.push({
         event,
         startIndex,
         span: endIndex - startIndex + 1,
         row: -1,
-        continuesBefore: isFullDay(addDays(weekDays[startIndex], -1)),
-        continuesAfter: isFullDay(addDays(weekDays[endIndex], 1)),
+        continuesBefore: isFullDayAt(beforeStart, addDays(beforeStart, 1), eventStart, eventEnd),
+        continuesAfter: isFullDayAt(afterStart, addDays(afterStart, 1), eventStart, eventEnd),
       });
     };
     for (let i = 0; i < weekDays.length; i++) {
-      if (!isFullDay(weekDays[i])) continue;
+      const { dayStart, nextDayStart } = dayBounds[i];
+      if (!isFullDayAt(dayStart, nextDayStart, eventStart, eventEnd)) continue;
       if (rangeStart === -1) {
         rangeStart = i;
       } else if (i !== previousIndex + 1) {
