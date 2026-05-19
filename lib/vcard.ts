@@ -206,6 +206,21 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
   const id = `import-${generateUUID()}`;
   const card: ContactCard = { id, addressBookIds: {} };
 
+  // Running counters replace the previous `Object.keys(card.X).length` lookups
+  // (one Array allocation per property write). Across a 5000-contact import
+  // with ~10 multi-value properties each, this saves ~500k array allocations.
+  let emailIdx = 0;
+  let phoneIdx = 0;
+  let orgIdx = 0;
+  let addrIdx = 0;
+  let noteIdx = 0;
+  let mediaIdx = 0;
+  let titleIdx = 0;
+  let onlineIdx = 0;
+  let annivIdx = 0;
+  let keyIdx = 0;
+  let langIdx = 0;
+
   for (const [fullKey, values] of Object.entries(raw)) {
     const semiIdx = fullKey.indexOf(";");
     const propName = (semiIdx > 0 ? fullKey.substring(0, semiIdx) : fullKey).toUpperCase();
@@ -255,8 +270,7 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
 
         case "EMAIL": {
           if (!card.emails) card.emails = {};
-          const idx = Object.keys(card.emails).length;
-          card.emails[`e${idx}`] = {
+          card.emails[`e${emailIdx++}`] = {
             address: val,
             contexts: typeToContext(params.TYPE),
           };
@@ -265,8 +279,7 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
 
         case "TEL": {
           if (!card.phones) card.phones = {};
-          const idx = Object.keys(card.phones).length;
-          card.phones[`p${idx}`] = {
+          card.phones[`p${phoneIdx++}`] = {
             number: val,
             contexts: typeToContext(params.TYPE),
             features: typeToPhoneFeatures(params.TYPE),
@@ -277,8 +290,7 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
         case "ORG": {
           if (!card.organizations) card.organizations = {};
           const orgParts = val.split(";").filter(Boolean);
-          const idx = Object.keys(card.organizations).length;
-          card.organizations[`o${idx}`] = {
+          card.organizations[`o${orgIdx++}`] = {
             name: orgParts[0],
             units: orgParts.slice(1).map(u => ({ name: u })),
           };
@@ -288,8 +300,7 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
         case "ADR": {
           if (!card.addresses) card.addresses = {};
           const adrParts = val.split(";");
-          const idx = Object.keys(card.addresses).length;
-          card.addresses[`a${idx}`] = {
+          card.addresses[`a${addrIdx++}`] = {
             street: adrParts[2] || undefined,
             locality: adrParts[3] || undefined,
             region: adrParts[4] || undefined,
@@ -302,8 +313,7 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
 
         case "NOTE": {
           if (!card.notes) card.notes = {};
-          const idx = Object.keys(card.notes).length;
-          card.notes[`n${idx}`] = { note: val };
+          card.notes[`n${noteIdx++}`] = { note: val };
           break;
         }
 
@@ -334,20 +344,19 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
 
         case "PHOTO": {
           if (!card.media) card.media = {};
-          const idx = Object.keys(card.media).length;
           const encoding = params.ENCODING?.toUpperCase();
           const mediaType = params.TYPE || params.MEDIATYPE || "";
           if (encoding === "B" || encoding === "BASE64") {
             // Inline base64 photo - construct a data URI
             const mime = mediaType.includes("/") ? mediaType : mediaType ? `image/${mediaType.toLowerCase()}` : "image/jpeg";
-            card.media[`m${idx}`] = {
+            card.media[`m${mediaIdx++}`] = {
               kind: "photo",
               uri: `data:${mime};base64,${rawValue}`,
               mediaType: mime,
             };
           } else if (val.startsWith("data:") || val.startsWith("http://") || val.startsWith("https://")) {
             // URI value (data URI or URL)
-            card.media[`m${idx}`] = {
+            card.media[`m${mediaIdx++}`] = {
               kind: "photo",
               uri: val,
               mediaType: mediaType.includes("/") ? mediaType : undefined,
@@ -358,22 +367,19 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
 
         case "TITLE": {
           if (!card.titles) card.titles = {};
-          const idx = Object.keys(card.titles).length;
-          card.titles[`t${idx}`] = { name: val, kind: "title" };
+          card.titles[`t${titleIdx++}`] = { name: val, kind: "title" };
           break;
         }
 
         case "ROLE": {
           if (!card.titles) card.titles = {};
-          const idx = Object.keys(card.titles).length;
-          card.titles[`t${idx}`] = { name: val, kind: "role" };
+          card.titles[`t${titleIdx++}`] = { name: val, kind: "role" };
           break;
         }
 
         case "URL": {
           if (!card.onlineServices) card.onlineServices = {};
-          const idx = Object.keys(card.onlineServices).length;
-          card.onlineServices[`u${idx}`] = {
+          card.onlineServices[`u${onlineIdx++}`] = {
             uri: val,
             contexts: typeToContext(params.TYPE),
             label: params.TYPE?.toLowerCase() === "home" || params.TYPE?.toLowerCase() === "work" ? undefined : params.TYPE,
@@ -384,7 +390,6 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
         case "IMPP":
         case "X-SOCIALPROFILE": {
           if (!card.onlineServices) card.onlineServices = {};
-          const idx = Object.keys(card.onlineServices).length;
           const svc: ContactOnlineService = {
             uri: val,
             contexts: typeToContext(params.TYPE),
@@ -398,29 +403,30 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
             }
           }
           if (params["X-USER"]) svc.user = params["X-USER"];
-          card.onlineServices[`u${idx}`] = svc;
+          card.onlineServices[`u${onlineIdx++}`] = svc;
           break;
         }
 
         case "BDAY": {
           if (!card.anniversaries) card.anniversaries = {};
           card.anniversaries.a0 = { kind: "birth", date: val };
+          // BDAY hardcodes a0; reserve the slot so later ANNIVERSARY/DEATHDATE
+          // don't overwrite it (matches original Object.keys-based behavior).
+          if (annivIdx === 0) annivIdx = 1;
           break;
         }
 
         case "ANNIVERSARY":
         case "X-ANNIVERSARY": {
           if (!card.anniversaries) card.anniversaries = {};
-          const idx = Object.keys(card.anniversaries).length;
-          card.anniversaries[`a${idx}`] = { kind: "wedding", date: val };
+          card.anniversaries[`a${annivIdx++}`] = { kind: "wedding", date: val };
           break;
         }
 
         case "DEATHDATE":
         case "X-DEATHDATE": {
           if (!card.anniversaries) card.anniversaries = {};
-          const idx = Object.keys(card.anniversaries).length;
-          card.anniversaries[`a${idx}`] = { kind: "death", date: val };
+          card.anniversaries[`a${annivIdx++}`] = { kind: "death", date: val };
           break;
         }
 
@@ -435,8 +441,7 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
 
         case "KEY": {
           if (!card.cryptoKeys) card.cryptoKeys = {};
-          const idx = Object.keys(card.cryptoKeys).length;
-          card.cryptoKeys[`k${idx}`] = {
+          card.cryptoKeys[`k${keyIdx++}`] = {
             uri: val,
             contexts: typeToContext(params.TYPE),
           };
@@ -454,8 +459,7 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
 
         case "LANG": {
           if (!card.preferredLanguages) card.preferredLanguages = {};
-          const idx = Object.keys(card.preferredLanguages).length;
-          card.preferredLanguages[`l${idx}`] = {
+          card.preferredLanguages[`l${langIdx++}`] = {
             language: val,
             contexts: typeToContext(params.TYPE),
           };
@@ -471,24 +475,26 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
           break;
 
         case "GEO": {
-          // Store GEO as coordinates on the first address, or create one
+          // Store GEO as coordinates on the first address, or create one.
+          // Counter approach: addresses always pushed as a0, a1, ..., so the
+          // first key is `a0` whenever the map is non-empty.
           if (!card.addresses) card.addresses = {};
-          if (Object.keys(card.addresses).length === 0) {
+          if (addrIdx === 0) {
             card.addresses.a0 = { coordinates: val };
+            addrIdx = 1;
           } else {
-            const firstKey = Object.keys(card.addresses)[0];
-            card.addresses[firstKey].coordinates = val;
+            card.addresses.a0.coordinates = val;
           }
           break;
         }
 
         case "TZ": {
           if (!card.addresses) card.addresses = {};
-          if (Object.keys(card.addresses).length === 0) {
+          if (addrIdx === 0) {
             card.addresses.a0 = { timeZone: val };
+            addrIdx = 1;
           } else {
-            const firstKey = Object.keys(card.addresses)[0];
-            card.addresses[firstKey].timeZone = val;
+            card.addresses.a0.timeZone = val;
           }
           break;
         }
@@ -511,18 +517,17 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
 
         case "LOGO": {
           if (!card.media) card.media = {};
-          const idx = Object.keys(card.media).length;
           const encoding = params.ENCODING?.toUpperCase();
           const mediaType = params.TYPE || params.MEDIATYPE || "";
           if (encoding === "B" || encoding === "BASE64") {
             const mime = mediaType.includes("/") ? mediaType : mediaType ? `image/${mediaType.toLowerCase()}` : "image/png";
-            card.media[`m${idx}`] = {
+            card.media[`m${mediaIdx++}`] = {
               kind: "logo",
               uri: `data:${mime};base64,${rawValue}`,
               mediaType: mime,
             };
           } else if (val.startsWith("data:") || val.startsWith("http://") || val.startsWith("https://")) {
-            card.media[`m${idx}`] = {
+            card.media[`m${mediaIdx++}`] = {
               kind: "logo",
               uri: val,
               mediaType: mediaType.includes("/") ? mediaType : undefined,
@@ -533,18 +538,17 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
 
         case "SOUND": {
           if (!card.media) card.media = {};
-          const idx = Object.keys(card.media).length;
           const encoding = params.ENCODING?.toUpperCase();
           const mediaType = params.TYPE || params.MEDIATYPE || "";
           if (encoding === "B" || encoding === "BASE64") {
             const mime = mediaType.includes("/") ? mediaType : mediaType ? `audio/${mediaType.toLowerCase()}` : "audio/ogg";
-            card.media[`m${idx}`] = {
+            card.media[`m${mediaIdx++}`] = {
               kind: "sound",
               uri: `data:${mime};base64,${rawValue}`,
               mediaType: mime,
             };
           } else if (val.startsWith("data:") || val.startsWith("http://") || val.startsWith("https://")) {
-            card.media[`m${idx}`] = {
+            card.media[`m${mediaIdx++}`] = {
               kind: "sound",
               uri: val,
               mediaType: mediaType.includes("/") ? mediaType : undefined,
@@ -554,14 +558,14 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
         }
 
         case "LABEL": {
-          // Mailing label (v2.1/3.0) - store as fullAddress on last/new address
+          // Mailing label (v2.1/3.0) - store as fullAddress on last/new address.
+          // Counter approach: last key is `a${addrIdx - 1}` if any address exists.
           if (!card.addresses) card.addresses = {};
-          const addrKeys = Object.keys(card.addresses);
-          if (addrKeys.length > 0) {
-            const lastKey = addrKeys[addrKeys.length - 1];
-            card.addresses[lastKey].fullAddress = val;
+          if (addrIdx > 0) {
+            card.addresses[`a${addrIdx - 1}`].fullAddress = val;
           } else {
             card.addresses.a0 = { fullAddress: val, contexts: typeToContext(params.TYPE) };
+            addrIdx = 1;
           }
           break;
         }
@@ -586,7 +590,7 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
   }
 
   const hasName = card.name && (card.name.components?.length ?? 0) > 0 || !!card.name?.full;
-  const hasEmail = card.emails && Object.keys(card.emails).length > 0;
+  const hasEmail = emailIdx > 0;
   if (!hasName && !hasEmail && card.kind !== "group") return null;
 
   return card;
