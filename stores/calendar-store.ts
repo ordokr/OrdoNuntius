@@ -282,9 +282,9 @@ export const useCalendarStore = create<CalendarStore>()(
           const cleanEvent = sanitizeOutgoingCalendarEventData({ ...event });
           if (event.calendarIds) {
             const remapped: Record<string, boolean> = {};
-            const calendars = get().calendars;
-            const calById = new Map<string, typeof calendars[number]>();
-            for (const c of calendars) calById.set(c.id, c);
+            // Reuse the module-level WeakMap-cached lookup so back-to-back
+            // create/update calls in the same fetch don't each rebuild the map.
+            const calById = calendarByIdLookup(get().calendars);
             for (const calId in event.calendarIds) {
               const cal = calById.get(calId);
               if (cal?.isShared && cal.originalId) {
@@ -398,9 +398,7 @@ export const useCalendarStore = create<CalendarStore>()(
           const cleanUpdates = sanitizeOutgoingCalendarEventData({ ...updates });
           if (cleanUpdates.calendarIds) {
             const remapped: Record<string, boolean> = {};
-            const calendars = get().calendars;
-            const calById = new Map<string, typeof calendars[number]>();
-            for (const c of calendars) calById.set(c.id, c);
+            const calById = calendarByIdLookup(get().calendars);
             for (const calId in cleanUpdates.calendarIds) {
               const cal = calById.get(calId);
               remapped[cal?.originalId || calId] = cleanUpdates.calendarIds[calId];
