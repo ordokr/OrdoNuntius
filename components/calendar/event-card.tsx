@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, type CSSProperties, type DragEvent } from "react";
+import React, { memo, useCallback, useState, type CSSProperties, type DragEvent } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
@@ -69,7 +69,7 @@ function createEventDragPreview(title: string, timeRange: string, color: string)
   return el;
 }
 
-export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onMouseLeave, onContextMenu, isSelected, draggable: isDraggable, continuesBefore = false, continuesAfter = false, className, style }: EventCardProps) {
+function EventCardImpl({ event, calendar, variant, onClick, onMouseEnter, onMouseLeave, onContextMenu, isSelected, draggable: isDraggable, continuesBefore = false, continuesAfter = false, className, style }: EventCardProps) {
   const t = useTranslations("calendar");
   const [isBeingDragged, setIsBeingDragged] = useState(false);
   const color = getEventColor(event, calendar);
@@ -217,5 +217,12 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
     </button>
   );
 }
+
+// Rendered per visible event tile in calendar month/week/day views —
+// memo skips the render when only an unrelated piece of parent state
+// changed (selection, viewport, etc). Explicit generic param keeps
+// callback-prop inference at usage sites (without it, Next's turbopack
+// build typecheck loses parameter types through MemoExoticComponent).
+export const EventCard: React.MemoExoticComponent<(props: EventCardProps) => React.JSX.Element> = memo(EventCardImpl);
 
 export { parseDuration, getEventColor, sanitizeColor };
