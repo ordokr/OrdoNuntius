@@ -14,6 +14,21 @@ const BREAKPOINTS = {
 
 const getMediaQueryServerSnapshot = () => false;
 
+// Module-level MediaQueryList cache. window.matchMedia returns the SAME
+// MQL object for the same query, but we still pay the lookup cost on every
+// getSnapshot call (called on every render of every component that uses a
+// media query). With useIsMobile / useIsDesktop / useIsTablet sprinkled
+// across the layout these add up — cache the lookup.
+const _mqlCache = new Map<string, MediaQueryList>();
+function getMql(query: string): MediaQueryList {
+  let mql = _mqlCache.get(query);
+  if (!mql) {
+    mql = window.matchMedia(query);
+    _mqlCache.set(query, mql);
+  }
+  return mql;
+}
+
 /**
  * SSR-safe media query hook. On SSR and the first hydration pass we report
  * `false`; on all subsequent client renders (including client-side navigation
@@ -23,7 +38,7 @@ const getMediaQueryServerSnapshot = () => false;
 export function useMediaQuery(query: string): boolean {
   const subscribe = useCallback(
     (callback: () => void) => {
-      const mq = window.matchMedia(query);
+      const mq = getMql(query);
       mq.addEventListener("change", callback);
       return () => mq.removeEventListener("change", callback);
     },
@@ -31,7 +46,7 @@ export function useMediaQuery(query: string): boolean {
   );
 
   const getSnapshot = useCallback(
-    () => window.matchMedia(query).matches,
+    () => getMql(query).matches,
     [query],
   );
 
@@ -59,20 +74,25 @@ export function useDeviceDetection() {
 }
 
 /**
- * Convenience hooks for specific breakpoints
+ * Convenience hooks for specific breakpoints. Query strings are
+ * module-level constants so callers don't re-build them per render
+ * (matters because useMediaQuery's useCallback deps key off the
+ * string identity to skip resubscribing).
  */
+const QUERY_MOBILE = `(max-width: ${BREAKPOINTS.md - 1}px)`;
+const QUERY_TABLET = `(min-width: ${BREAKPOINTS.md}px) and (max-width: ${BREAKPOINTS.lg - 1}px)`;
+const QUERY_DESKTOP = `(min-width: ${BREAKPOINTS.lg}px)`;
+
 export function useIsMobile() {
-  return useMediaQuery(`(max-width: ${BREAKPOINTS.md - 1}px)`);
+  return useMediaQuery(QUERY_MOBILE);
 }
 
 export function useIsTablet() {
-  return useMediaQuery(
-    `(min-width: ${BREAKPOINTS.md}px) and (max-width: ${BREAKPOINTS.lg - 1}px)`
-  );
+  return useMediaQuery(QUERY_TABLET);
 }
 
 export function useIsDesktop() {
-  return useMediaQuery(`(min-width: ${BREAKPOINTS.lg}px)`);
+  return useMediaQuery(QUERY_DESKTOP);
 }
 
 export function useBreakpoint(breakpoint: keyof typeof BREAKPOINTS) {
