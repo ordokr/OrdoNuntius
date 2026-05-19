@@ -508,10 +508,16 @@ export function EmailComposer({
   const canSmimeSign = !!smimeKeyRecord;
   const canSmimeEncrypt = useMemo(() => {
     if (!smimeKeyRecord) return false;
-    const toAddrs = to.split(',').map(e => e.trim()).filter(Boolean);
-    const ccAddrs = cc.split(',').map(e => e.trim()).filter(Boolean);
-    const bccAddrs = bcc.split(',').map(e => e.trim()).filter(Boolean);
-    const allRecipients = [...toAddrs, ...ccAddrs, ...bccAddrs];
+    // Single push loop across all three recipient fields. Was 3×
+    // `.split.map.filter` (9 intermediate arrays) plus a 3-spread concat.
+    // Now: 1 array.
+    const allRecipients: string[] = [];
+    for (const field of [to, cc, bcc]) {
+      for (const part of field.split(',')) {
+        const t = part.trim();
+        if (t) allRecipients.push(t);
+      }
+    }
     if (allRecipients.length === 0) return false;
     const { missing } = smimeStore.getRecipientCerts(allRecipients);
     return missing.length === 0;
