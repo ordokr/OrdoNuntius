@@ -6,7 +6,7 @@ import { X, Plus, ChevronDown, ChevronRight, User, Building, MapPin, Globe, Cake
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
+import { cn, splitTrimmed } from "@/lib/utils";
 import type { ContactCard, ContactOnlineService, ContactAnniversary, ContactPersonalInfo, AddressBook, AnniversaryDate, PartialDate, ContactAddress, ContactMedia } from "@/lib/jmap/types";
 
 interface EmailEntry {
@@ -1058,9 +1058,7 @@ function CategoryComboBox({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Parse current keywords from comma-separated string
-  const currentKeywords = useMemo(() => {
-    return keywordsStr.split(",").map(k => k.trim()).filter(Boolean);
-  }, [keywordsStr]);
+  const currentKeywords = useMemo(() => splitTrimmed(keywordsStr), [keywordsStr]);
 
   // Suggestions: existing keywords not already selected
   const suggestions = useMemo(() => {

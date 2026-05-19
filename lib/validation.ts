@@ -1,3 +1,5 @@
+import { splitTrimmed } from './utils';
+
 /**
  * RFC 5322 compliant email validation with security enhancements
  */
@@ -39,7 +41,7 @@ export function validateEmailList(csv: string): {
     return { valid: true, invalidEmails: [] };
   }
 
-  const emails = csv.split(',').map(e => e.trim()).filter(Boolean);
+  const emails = splitTrimmed(csv);
   const invalid = emails.filter(e => !isValidEmail(e));
 
   return {
