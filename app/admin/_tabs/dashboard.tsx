@@ -71,8 +71,18 @@ export function DashboardTab() {
     }
     if (policyRes?.ok) {
       const policy = await policyRes.json();
-      const restrictionCount = policy.restrictions ? Object.keys(policy.restrictions).length : 0;
-      const disabledGates = policy.features ? Object.values(policy.features).filter((v: unknown) => !v).length : 0;
+      // Count via for...in — skips the keys/values array allocations and
+      // the throwaway .filter intermediate for a simple count.
+      let restrictionCount = 0;
+      if (policy.restrictions) {
+        for (const _ in policy.restrictions) restrictionCount++;
+      }
+      let disabledGates = 0;
+      if (policy.features) {
+        for (const k in policy.features) {
+          if (!policy.features[k]) disabledGates++;
+        }
+      }
       setPolicyRuleCount(restrictionCount + disabledGates);
     }
     if (telemetryRes?.ok) {

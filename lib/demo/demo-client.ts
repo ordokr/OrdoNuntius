@@ -679,11 +679,18 @@ export class DemoJMAPClient implements IJMAPClient {
   }
 
   async getCalendarEvents(calendarIds?: string[]): Promise<CalendarEvent[]> {
-    let events = [...this.data.calendarEvents];
-    if (calendarIds?.length) {
-      events = events.filter(e => calendarIds.some(cid => e.calendarIds[cid]));
+    // Was O(E × C) — `.some(cid => e.calendarIds[cid])` walked the full
+    // calendarIds array per event. Set membership flips it to O(E) with
+    // for...in over the per-event calendarIds Record.
+    if (!calendarIds?.length) return this.data.calendarEvents.slice();
+    const idSet = new Set(calendarIds);
+    const out: CalendarEvent[] = [];
+    for (const e of this.data.calendarEvents) {
+      for (const k in e.calendarIds) {
+        if (e.calendarIds[k] && idSet.has(k)) { out.push(e); break; }
+      }
     }
-    return events;
+    return out;
   }
 
   async getCalendarEvent(id: string): Promise<CalendarEvent | null> {
@@ -767,11 +774,19 @@ export class DemoJMAPClient implements IJMAPClient {
   // ── Calendar Tasks ────────────────────────────────────────────
 
   async getCalendarTasks(calendarIds?: string[]): Promise<CalendarTask[]> {
-    let tasks = this.data.calendarTasks || [];
-    if (calendarIds) {
-      tasks = tasks.filter(t => Object.keys(t.calendarIds).some(id => calendarIds.includes(id)));
+    // O(T × C) → O(T): Set membership + for...in over the per-task
+    // calendarIds Record (was Object.keys allocation per task + nested
+    // .some + .includes scan).
+    const tasks = this.data.calendarTasks || [];
+    if (!calendarIds) return tasks.slice();
+    const idSet = new Set(calendarIds);
+    const out: CalendarTask[] = [];
+    for (const t of tasks) {
+      for (const k in t.calendarIds) {
+        if (idSet.has(k)) { out.push(t); break; }
+      }
     }
-    return [...tasks];
+    return out;
   }
 
   async createCalendarTask(task: Partial<CalendarTask>): Promise<CalendarTask> {

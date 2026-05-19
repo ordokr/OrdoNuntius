@@ -1585,8 +1585,17 @@ function handleCalendarEventQuery(args: MethodArgs, callId: string): MethodResul
   const filter = args.filter as Record<string, unknown> | undefined;
   let filtered = [...calendarEvents];
   if (filter?.inCalendars) {
+    // Set membership + for...in flips this from O(E × C) to O(E).
     const calIds = filter.inCalendars as string[];
-    filtered = filtered.filter((e) => calIds.some((cid) => (e.calendarIds as Record<string, boolean>)[cid]));
+    const idSet = new Set(calIds);
+    const next: typeof filtered = [];
+    for (const e of filtered) {
+      const eCalendarIds = e.calendarIds as Record<string, boolean>;
+      for (const k in eCalendarIds) {
+        if (eCalendarIds[k] && idSet.has(k)) { next.push(e); break; }
+      }
+    }
+    filtered = next;
   }
   const ids = filtered.map((e) => e.id);
   return ['CalendarEvent/query', { accountId: ACCOUNT_ID, queryState: nextState(), ids, total: ids.length, position: 0, canCalculateChanges: false }, callId];
