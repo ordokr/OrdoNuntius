@@ -748,12 +748,8 @@ function applyFontSize(size: FontSize) {
   root.style.setProperty('--font-size-base', sizeMap[size]);
 }
 
-function applyDensity(density: Density) {
-  if (typeof document === 'undefined') return;
-
-  const root = document.documentElement;
-
-  const densityValues = {
+// Hoisted to module scope — was re-allocated on every applyDensity call.
+const DENSITY_VALUES = {
     'extra-compact': {
       '--list-item-height': 'auto',
       '--density-item-py': '2px',
@@ -786,11 +782,16 @@ function applyDensity(density: Density) {
       '--density-card-p': '20px',
       '--density-sidebar-py': '6px',
     },
-  };
+  } as const;
 
-  const values = densityValues[density];
-  for (const [prop, val] of Object.entries(values)) {
-    root.style.setProperty(prop, val);
+function applyDensity(density: Density) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  const values = DENSITY_VALUES[density];
+  // for...in over the small static record (6 keys) avoids the
+  // `Object.entries` array alloc on every density-change.
+  for (const prop in values) {
+    root.style.setProperty(prop, values[prop as keyof typeof values]);
   }
 }
 
