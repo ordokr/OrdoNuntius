@@ -12,15 +12,18 @@ export function groupEmailsByThread(emails: Email[], disableThreading = false): 
     return [];
   }
 
-  // Group emails by threadId (or by message ID when threading is disabled)
+  // Group emails by threadId (or by message ID when threading is disabled).
+  // Single Map.get per iteration (was `has + get` doing two lookups per email).
   const threadMap = new Map<string, Email[]>();
 
   for (const email of emails) {
     const threadId = disableThreading ? email.id : email.threadId;
-    if (!threadMap.has(threadId)) {
-      threadMap.set(threadId, []);
+    let arr = threadMap.get(threadId);
+    if (!arr) {
+      arr = [];
+      threadMap.set(threadId, arr);
     }
-    threadMap.get(threadId)!.push(email);
+    arr.push(email);
   }
 
   // Convert to ThreadGroup array
@@ -29,12 +32,15 @@ export function groupEmailsByThread(emails: Email[], disableThreading = false): 
   for (const [threadId, threadEmails] of threadMap) {
     // Sort emails by receivedAt descending (newest first). Decorate-sort-
     // undecorate: parse each receivedAt once (O(n)) instead of twice per
-    // comparison (O(n log n)). For long threads this halves the date work
-    // and is consequential for sortThreadGroups below with N > 1000.
-    const sortedEmails = threadEmails
-      .map(e => ({ e, ms: new Date(e.receivedAt).getTime() }))
-      .sort((a, b) => b.ms - a.ms)
-      .map(x => x.e);
+    // comparison (O(n log n)). Pre-sized arrays drop the two .map()
+    // intermediates per thread.
+    const decorated: { e: Email; ms: number }[] = new Array(threadEmails.length);
+    for (let i = 0; i < threadEmails.length; i++) {
+      decorated[i] = { e: threadEmails[i], ms: new Date(threadEmails[i].receivedAt).getTime() };
+    }
+    decorated.sort((a, b) => b.ms - a.ms);
+    const sortedEmails: Email[] = new Array(decorated.length);
+    for (let i = 0; i < decorated.length; i++) sortedEmails[i] = decorated[i].e;
 
     const latestEmail = sortedEmails[0];
 
@@ -77,11 +83,16 @@ export function groupEmailsByThread(emails: Email[], disableThreading = false): 
 export function sortThreadGroups(groups: ThreadGroup[]): ThreadGroup[] {
   // Schwartzian transform: parse each latestEmail.receivedAt once instead
   // of twice per comparison. With 1000 thread groups, this is the
-  // difference between ~1000 Date parses and ~20000.
-  return groups
-    .map(g => ({ g, ms: new Date(g.latestEmail.receivedAt).getTime() }))
-    .sort((a, b) => b.ms - a.ms)
-    .map(x => x.g);
+  // difference between ~1000 Date parses and ~20000. Pre-sized arrays
+  // drop the two .map() intermediates.
+  const decorated: { g: ThreadGroup; ms: number }[] = new Array(groups.length);
+  for (let i = 0; i < groups.length; i++) {
+    decorated[i] = { g: groups[i], ms: new Date(groups[i].latestEmail.receivedAt).getTime() };
+  }
+  decorated.sort((a, b) => b.ms - a.ms);
+  const out: ThreadGroup[] = new Array(decorated.length);
+  for (let i = 0; i < decorated.length; i++) out[i] = decorated[i].g;
+  return out;
 }
 
 /**
