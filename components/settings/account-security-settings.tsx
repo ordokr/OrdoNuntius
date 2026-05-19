@@ -8,6 +8,7 @@ import { Shield, Key, Smartphone, Lock, Trash2, Plus, Eye, EyeOff, Copy, Check, 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SettingsSection, SettingItem, ToggleSwitch } from './settings-section';
+import { useShallow } from 'zustand/react/shallow';
 import { useAccountSecurityStore, type AppPasswordInfo, type ApiKeyInfo, type AppCredentialInput } from '@/stores/account-security-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { toast } from '@/stores/toast-store';
@@ -15,7 +16,8 @@ import { cn } from '@/lib/utils';
 
 function PasswordChangeSection() {
   const t = useTranslations('settings.security');
-  const { changePassword, isSaving } = useAccountSecurityStore();
+  const changePassword = useAccountSecurityStore(s => s.changePassword);
+  const isSaving = useAccountSecurityStore(s => s.isSaving);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -126,7 +128,12 @@ function PasswordChangeSection() {
 
 function DisplayNameSection() {
   const t = useTranslations('settings.security');
-  const { displayName, updateDisplayName, isSaving, isLoadingPrincipal } = useAccountSecurityStore();
+  const { displayName, updateDisplayName, isSaving, isLoadingPrincipal } = useAccountSecurityStore(useShallow(s => ({
+    displayName: s.displayName,
+    updateDisplayName: s.updateDisplayName,
+    isSaving: s.isSaving,
+    isLoadingPrincipal: s.isLoadingPrincipal,
+  })));
   const [name, setName] = useState(displayName);
   const [saved, setSaved] = useState(false);
 
@@ -188,7 +195,13 @@ function generateTotp(accountLabel: string): { totp: OTPAuth.TOTP; url: string }
 
 function TotpSection() {
   const t = useTranslations('settings.security');
-  const { otpEnabled, enableTotp, disableTotp, isSaving, isLoadingAuth } = useAccountSecurityStore();
+  const { otpEnabled, enableTotp, disableTotp, isSaving, isLoadingAuth } = useAccountSecurityStore(useShallow(s => ({
+    otpEnabled: s.otpEnabled,
+    enableTotp: s.enableTotp,
+    disableTotp: s.disableTotp,
+    isSaving: s.isSaving,
+    isLoadingAuth: s.isLoadingAuth,
+  })));
   const client = useAuthStore(s => s.client);
 
   const [setupUrl, setSetupUrl] = useState<string | null>(null);
@@ -400,7 +413,10 @@ interface CredentialSectionProps {
 function CredentialSection({ icon: Icon, i18nNamespace, entries, onCreate, onRemove }: CredentialSectionProps) {
   const t = useTranslations('settings.security');
   const tk = (key: string) => t(`${i18nNamespace}.${key}`);
-  const { isSaving, isLoadingAuth } = useAccountSecurityStore();
+  const { isSaving, isLoadingAuth } = useAccountSecurityStore(useShallow(s => ({
+    isSaving: s.isSaving,
+    isLoadingAuth: s.isLoadingAuth,
+  })));
   const [showAdd, setShowAdd] = useState(false);
   const [newDescription, setNewDescription] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
@@ -541,7 +557,11 @@ function CredentialSection({ icon: Icon, i18nNamespace, entries, onCreate, onRem
 }
 
 function AppPasswordsSection() {
-  const { appPasswords, createAppPassword, removeAppPassword } = useAccountSecurityStore();
+  const { appPasswords, createAppPassword, removeAppPassword } = useAccountSecurityStore(useShallow(s => ({
+    appPasswords: s.appPasswords,
+    createAppPassword: s.createAppPassword,
+    removeAppPassword: s.removeAppPassword,
+  })));
   return (
     <CredentialSection
       icon={Smartphone}
@@ -554,7 +574,11 @@ function AppPasswordsSection() {
 }
 
 function ApiKeysSection() {
-  const { apiKeys, createApiKey, removeApiKey } = useAccountSecurityStore();
+  const { apiKeys, createApiKey, removeApiKey } = useAccountSecurityStore(useShallow(s => ({
+    apiKeys: s.apiKeys,
+    createApiKey: s.createApiKey,
+    removeApiKey: s.removeApiKey,
+  })));
   return (
     <CredentialSection
       icon={Terminal}
@@ -568,7 +592,8 @@ function ApiKeysSection() {
 
 function EncryptionSection() {
   const t = useTranslations('settings.security');
-  const { encryptionType, isLoadingCrypto } = useAccountSecurityStore();
+  const encryptionType = useAccountSecurityStore(s => s.encryptionType);
+  const isLoadingCrypto = useAccountSecurityStore(s => s.isLoadingCrypto);
 
   if (isLoadingCrypto) {
     return (
@@ -639,8 +664,15 @@ function EmailClientSection() {
 
 export function AccountSecuritySettings() {
   const t = useTranslations('settings.security');
-  const { isStalwart, isProbing, probe, fetchAll, fetchAuthInfo } = useAccountSecurityStore();
-  const { isAuthenticated, authMode } = useAuthStore();
+  const { isStalwart, isProbing, probe, fetchAll, fetchAuthInfo } = useAccountSecurityStore(useShallow(s => ({
+    isStalwart: s.isStalwart,
+    isProbing: s.isProbing,
+    probe: s.probe,
+    fetchAll: s.fetchAll,
+    fetchAuthInfo: s.fetchAuthInfo,
+  })));
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated);
+  const authMode = useAuthStore(s => s.authMode);
   const isOAuth = authMode === 'oauth';
 
   useEffect(() => {

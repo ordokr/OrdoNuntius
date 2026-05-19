@@ -16,11 +16,9 @@ export function ContactsSettings() {
   const t = useTranslations("contacts");
   const tSettings = useTranslations("settings.contacts");
   const client = useAuthStore(s => s.client);
-  const {
-    contacts,
-    supportsSync,
-    importContacts,
-  } = useContactStore();
+  const contacts = useContactStore(s => s.contacts);
+  const supportsSync = useContactStore(s => s.supportsSync);
+  const importContacts = useContactStore(s => s.importContacts);
   const groupContactsByLetter = useSettingsStore((s) => s.groupContactsByLetter);
   const updateSetting = useSettingsStore((s) => s.updateSetting);
   const [showImport, setShowImport] = useState(false);

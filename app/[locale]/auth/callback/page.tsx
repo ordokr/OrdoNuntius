@@ -14,7 +14,8 @@ function OAuthCallbackInner() {
   const params = useParams();
   const searchParams = useSearchParams();
   const t = useTranslations("login");
-  const { loginWithOAuth, loginWithServerSso } = useAuthStore();
+  const loginWithOAuth = useAuthStore(s => s.loginWithOAuth);
+  const loginWithServerSso = useAuthStore(s => s.loginWithServerSso);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

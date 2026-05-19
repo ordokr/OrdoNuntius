@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Book, Pencil, Share2, Tag, Users } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { useContactStore } from "@/stores/contact-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
@@ -71,7 +72,15 @@ export function AddressBookManagementSettings() {
   const tContacts = useTranslations("contacts");
   const tSettings = useTranslations("settings.contacts");
   const client = useAuthStore(s => s.client);
-  const { addressBooks, contacts, supportsSync, fetchAddressBooks, renameAddressBook, shareAddressBook, renameKeyword } = useContactStore();
+  const { addressBooks, contacts, supportsSync, fetchAddressBooks, renameAddressBook, shareAddressBook, renameKeyword } = useContactStore(useShallow(s => ({
+    addressBooks: s.addressBooks,
+    contacts: s.contacts,
+    supportsSync: s.supportsSync,
+    fetchAddressBooks: s.fetchAddressBooks,
+    renameAddressBook: s.renameAddressBook,
+    shareAddressBook: s.shareAddressBook,
+    renameKeyword: s.renameKeyword,
+  })));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingKeyword, setEditingKeyword] = useState<string | null>(null);
   const [sharingId, setSharingId] = useState<string | null>(null);

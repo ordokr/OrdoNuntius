@@ -115,7 +115,14 @@ export default function LoginPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const isAddAccountMode = searchParams.get("mode") === "add-account";
-  const { login, loginDemo, isLoading, error, clearError, isAuthenticated } = useAuthStore();
+  const { login, loginDemo, isLoading, error, clearError, isAuthenticated } = useAuthStore(useShallow(s => ({
+    login: s.login,
+    loginDemo: s.loginDemo,
+    isLoading: s.isLoading,
+    error: s.error,
+    clearError: s.clearError,
+    isAuthenticated: s.isAuthenticated,
+  })));
   const { theme, setTheme, initializeTheme } = useThemeStore(useShallow((s) => ({ theme: s.theme, setTheme: s.setTheme, initializeTheme: s.initializeTheme })));
   const { appName, jmapServerUrl: configuredServerUrl, oauthEnabled, oauthOnly, oauthClientId: globalOauthClientId, oauthIssuerUrl: globalOauthIssuerUrl, rememberMeEnabled, devMode, demoMode, loginLogoLightUrl, loginLogoDarkUrl, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError, autoSsoEnabled, embeddedMode: _embeddedMode, allowCustomJmapEndpoint, jmapServers, jmapServerAutoPickByDomain } = useConfig();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);

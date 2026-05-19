@@ -6,6 +6,7 @@ import { SettingsSection, ToggleSwitch } from "./settings-section";
 import { Button } from "@/components/ui/button";
 import { FilterRuleModal } from "@/components/filters/filter-rule-modal";
 import { SieveEditorModal } from "@/components/filters/sieve-editor-modal";
+import { useShallow } from "zustand/react/shallow";
 import { useFilterStore } from "@/stores/filter-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
@@ -155,7 +156,26 @@ export function FilterSettings() {
     setRawScript,
     resetToVisualBuilder,
     validateScript,
-  } = useFilterStore();
+  } = useFilterStore(useShallow(s => ({
+    rules: s.rules,
+    isLoading: s.isLoading,
+    isSaving: s.isSaving,
+    error: s.error,
+    isSupported: s.isSupported,
+    isOpaque: s.isOpaque,
+    rawScript: s.rawScript,
+    vacationSettings: s.vacationSettings,
+    fetchFilters: s.fetchFilters,
+    saveFilters: s.saveFilters,
+    addRule: s.addRule,
+    updateRule: s.updateRule,
+    deleteRule: s.deleteRule,
+    reorderRules: s.reorderRules,
+    toggleRule: s.toggleRule,
+    setRawScript: s.setRawScript,
+    resetToVisualBuilder: s.resetToVisualBuilder,
+    validateScript: s.validateScript,
+  })));
 
   const vacationEnabled = useVacationStore((s) => s.isEnabled) || vacationSettings?.isEnabled;
 
