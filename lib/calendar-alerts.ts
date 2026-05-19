@@ -119,7 +119,10 @@ export function getPendingAlerts(
     }
     const calendar = firstCalId ? calById.get(firstCalId) ?? null : null;
 
-    for (const [alertId, alert] of Object.entries(alerts)) {
+    // for...in over the alerts Record avoids the Object.entries
+    // tuples-array allocation. Runs per event in the alert-scan loop.
+    for (const alertId in alerts) {
+      const alert = alerts[alertId];
       if (alert.action !== 'display') continue;
       if (alert.acknowledged) continue;
 
@@ -188,7 +191,10 @@ export function getPendingTaskAlerts(
     for (const k in task.calendarIds) { firstCalId = k; break; }
     const calendar = firstCalId ? calById.get(firstCalId) ?? null : null;
 
-    for (const [alertId, alert] of Object.entries(task.alerts)) {
+    // Same for...in conversion as the event-alerts path above.
+    const taskAlerts = task.alerts;
+    for (const alertId in taskAlerts) {
+      const alert = taskAlerts[alertId];
       if (alert.action !== 'display') continue;
       if (alert.acknowledged) continue;
 

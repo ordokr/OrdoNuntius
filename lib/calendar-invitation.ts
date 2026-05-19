@@ -580,7 +580,10 @@ export function findParticipantByEmail(
   if (!event.participants || !email) return null;
 
   const lowerEmail = email.toLowerCase();
-  for (const [id, p] of Object.entries(event.participants)) {
+  // for...in over the participants Record drops the tuples-array allocation.
+  const participants = event.participants;
+  for (const id in participants) {
+    const p = participants[id];
     if (p.email?.toLowerCase() === lowerEmail) {
       return { id, participant: p };
     }

@@ -123,7 +123,12 @@ export function generateBirthdayEvents(
   for (const contact of contacts) {
     if (!contact.anniversaries) continue;
 
-    for (const [key, anniversary] of Object.entries(contact.anniversaries)) {
+    // for...in over the anniversaries Record drops the tuples-array
+    // allocation. Runs per contact in the birthday-scan pass — for 5000
+    // contacts that's 5000 throwaway arrays.
+    const anniversaries = contact.anniversaries;
+    for (const key in anniversaries) {
+      const anniversary = anniversaries[key];
       if (anniversary.kind !== 'birth') continue;
 
       const parsed = parseBirthdayDate(anniversary.date);
