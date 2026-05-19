@@ -92,9 +92,14 @@ export function CalendarSidebarPanel({
     return Array.from(groups.values());
   }, [calendars]);
 
-  const getSubscriptionForCalendar = (calendarId: string) => {
-    return icalSubscriptions.find(s => s.calendarId === calendarId);
-  };
+  // O(1) calendar→subscription lookup. Was `.find(s => s.calendarId === ...)`
+  // per calendar render — for an account with many subscription calendars
+  // that's O(N×M) per render. Built once per icalSubscriptions change.
+  const subscriptionByCalendarId = useMemo(() => {
+    const m = new Map<string, typeof icalSubscriptions[number]>();
+    for (const s of icalSubscriptions) m.set(s.calendarId, s);
+    return m;
+  }, [icalSubscriptions]);
 
   const handleRefreshSubscription = async (subId: string) => {
     if (!client) return;
@@ -149,7 +154,7 @@ export function CalendarSidebarPanel({
           {isSubscriptionCalendar(cal.id) && (
             <>
               <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-              {refreshingSubId === getSubscriptionForCalendar(cal.id)?.id && (
+              {refreshingSubId && refreshingSubId === subscriptionByCalendarId.get(cal.id)?.id && (
                 <RefreshCw className="w-3 h-3 text-muted-foreground flex-shrink-0 animate-spin" />
               )}
             </>
@@ -173,7 +178,7 @@ export function CalendarSidebarPanel({
     if (!cal) return null;
 
     if (isSubscriptionCalendar(cal.id)) {
-      const sub = getSubscriptionForCalendar(cal.id);
+      const sub = subscriptionByCalendarId.get(cal.id);
       if (!sub || !client) return null;
       return (
         <ContextMenu ref={menuRef} isOpen={contextMenu.isOpen} position={contextMenu.position} onClose={closeContextMenu}>
