@@ -87,7 +87,15 @@ export default function CalendarPage() {
     refreshAllSubscriptions, icalSubscriptions,
   } = useCalendarStore();
   const { firstDayOfWeek, timeFormat, showWeekNumbers, enableCalendarTasks, showTasksOnCalendar, calendarHoverPreview, showBirthdayCalendar, birthdayCalendarColor, updateSetting } = useSettingsStore();
-  const taskStore = useTaskStore();
+  // Was `useTaskStore()` subscribing to the whole store — any task
+  // mutation re-rendered the entire calendar page including non-task
+  // views (month/week/day). Now we subscribe granularly so the page only
+  // re-renders when one of these specific slices changes. Actions are
+  // accessed via getState() in callbacks.
+  const tasks = useTaskStore(state => state.tasks);
+  const taskFilter = useTaskStore(state => state.filter);
+  const taskShowCompleted = useTaskStore(state => state.showCompleted);
+  const selectedTaskId = useTaskStore(state => state.selectedTaskId);
   const fetchTasksFn = useTaskStore(state => state.fetchTasks);
   const { identities } = useIdentityStore();
   const contacts = useContactStore((s) => s.contacts);
@@ -443,21 +451,22 @@ export default function CalendarPage() {
 
   const handleSaveTask = useCallback(async (data: Partial<import("@/lib/jmap/types").CalendarTask>) => {
     if (!client) return;
+    const s = useTaskStore.getState();
     if (editTask) {
-      await taskStore.updateTask(client, editTask.id, data);
+      await s.updateTask(client, editTask.id, data);
     } else {
-      await taskStore.createTask(client, data);
+      await s.createTask(client, data);
     }
     setShowTaskModal(false);
     setEditTask(null);
-  }, [client, editTask, taskStore]);
+  }, [client, editTask]);
 
   const handleDeleteTask = useCallback(async (id: string) => {
     if (!client) return;
-    await taskStore.deleteTask(client, id);
+    await useTaskStore.getState().deleteTask(client, id);
     setShowTaskModal(false);
     setEditTask(null);
-  }, [client, taskStore]);
+  }, [client]);
 
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1158,8 +1167,8 @@ export default function CalendarPage() {
               timeFormat={timeFormat}
               isMobile={isMobile}
               pendingPreview={pendingPreview}
-              tasks={enableCalendarTasks && showTasksOnCalendar ? taskStore.tasks : undefined}
-              onToggleTaskComplete={(task) => { if (client) taskStore.toggleTaskComplete(client, task); }}
+              tasks={enableCalendarTasks && showTasksOnCalendar ? tasks : undefined}
+              onToggleTaskComplete={(task) => { if (client) useTaskStore.getState().toggleTaskComplete(client, task); }}
             />
           );
         case "day":
@@ -1177,8 +1186,8 @@ export default function CalendarPage() {
               timeFormat={timeFormat}
               isMobile={isMobile}
               pendingPreview={pendingPreview}
-              tasks={enableCalendarTasks && showTasksOnCalendar ? taskStore.tasks : undefined}
-              onToggleTaskComplete={(task) => { if (client) taskStore.toggleTaskComplete(client, task); }}
+              tasks={enableCalendarTasks && showTasksOnCalendar ? tasks : undefined}
+              onToggleTaskComplete={(task) => { if (client) useTaskStore.getState().toggleTaskComplete(client, task); }}
             />
           );
         case "agenda":
@@ -1198,24 +1207,24 @@ export default function CalendarPage() {
           return (
             <div className="flex flex-col h-full">
               <TaskToolbar
-                filter={taskStore.filter}
-                showCompleted={taskStore.showCompleted}
-                onFilterChange={taskStore.setFilter}
-                onShowCompletedChange={taskStore.setShowCompleted}
+                filter={taskFilter}
+                showCompleted={taskShowCompleted}
+                onFilterChange={useTaskStore.getState().setFilter}
+                onShowCompletedChange={useTaskStore.getState().setShowCompleted}
                 onCreateTask={openCreateTaskModal}
               />
               <TaskListView
-                tasks={taskStore.tasks}
+                tasks={tasks}
                 calendars={calendars}
                 selectedCalendarIds={selectedCalendarIds}
-                filter={taskStore.filter}
-                showCompleted={taskStore.showCompleted}
+                filter={taskFilter}
+                showCompleted={taskShowCompleted}
                 onSelectTask={openEditTaskModal}
-                onToggleComplete={(task) => { if (client) taskStore.toggleTaskComplete(client, task); }}
-                selectedTaskId={taskStore.selectedTaskId}
+                onToggleComplete={(task) => { if (client) useTaskStore.getState().toggleTaskComplete(client, task); }}
+                selectedTaskId={selectedTaskId}
                 onQuickCreate={(title) => {
                   if (client) {
-                    taskStore.createTask(client, { "@type": "Task", title, progress: "needs-action", calendarIds: { [calendars[0]?.id ?? ""]: true } });
+                    useTaskStore.getState().createTask(client, { "@type": "Task", title, progress: "needs-action", calendarIds: { [calendars[0]?.id ?? ""]: true } });
                   }
                 }}
               />
