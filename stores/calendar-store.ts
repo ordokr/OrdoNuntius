@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import type { Calendar, CalendarEvent, CalendarParticipant, CalendarRights } from '@/lib/jmap/types';
-import { debug } from '@/lib/debug';
+import { debug, isDebugEnabled } from '@/lib/debug';
 import { normalizeAllDayDuration } from '@/lib/calendar-utils';
 import { parseDuration } from '@/components/calendar/event-card';
 import { sanitizeOutgoingCalendarEventData } from '@/lib/calendar-event-normalization';
@@ -253,37 +253,50 @@ export const useCalendarStore = create<CalendarStore>()(
           if (event.originalCalendarIds) {
             cleanEvent.calendarIds = event.originalCalendarIds;
           }
-          debug.log('calendar', 'Calendar createEvent request', {
-            event: getStoreEventDebugSnapshot(cleanEvent),
-            sendSchedulingMessages,
-            targetAccountId,
-            requestedCalendarIds: event.calendarIds,
-            serverCalendarIds: cleanEvent.calendarIds,
-            currentDateRange: get().dateRange,
-            selectedCalendarIds: get().selectedCalendarIds,
-          });
+          // Guard request-payload snapshot behind isDebugEnabled —
+          // getStoreEventDebugSnapshot allocates a 17-field object per call.
+          if (isDebugEnabled('calendar')) {
+            debug.log('calendar', 'Calendar createEvent request', {
+              event: getStoreEventDebugSnapshot(cleanEvent),
+              sendSchedulingMessages,
+              targetAccountId,
+              requestedCalendarIds: event.calendarIds,
+              serverCalendarIds: cleanEvent.calendarIds,
+              currentDateRange: get().dateRange,
+              selectedCalendarIds: get().selectedCalendarIds,
+            });
+          }
           const created = await client.createCalendarEvent(cleanEvent, sendSchedulingMessages, targetAccountId);
           const mappedCreated = mapServerEventToStoreEvent(created, get().calendars, targetAccountId);
           const selectedCalendarIds = get().selectedCalendarIds;
-          const createdCalendarIds = Object.keys(mappedCreated.calendarIds || {});
-          const isVisible = createdCalendarIds.some((calendarId) => selectedCalendarIds.includes(calendarId));
+          // O(1) selectedCalendarIds membership via Set; was .includes()
+          // per createdCalendarId. Also drops the Object.keys array.
+          const selectedSet = new Set(selectedCalendarIds);
+          let isVisible = false;
+          if (mappedCreated.calendarIds) {
+            for (const id in mappedCreated.calendarIds) {
+              if (selectedSet.has(id)) { isVisible = true; break; }
+            }
+          }
           const currentDateRange = get().dateRange;
           const inCurrentDateRange = currentDateRange
             ? mappedCreated.start >= currentDateRange.start && mappedCreated.start <= currentDateRange.end
             : null;
 
-          debug.log('calendar', 'Calendar createEvent response', {
-            created: getStoreEventDebugSnapshot(created),
-            mappedCreated: getStoreEventDebugSnapshot(mappedCreated),
-            isVisible,
-            currentDateRange,
-            inCurrentDateRange,
-          });
+          if (isDebugEnabled('calendar')) {
+            debug.log('calendar', 'Calendar createEvent response', {
+              created: getStoreEventDebugSnapshot(created),
+              mappedCreated: getStoreEventDebugSnapshot(mappedCreated),
+              isVisible,
+              currentDateRange,
+              inCurrentDateRange,
+            });
+          }
 
           if (!isVisible) {
             debug.warn('calendar', 'Created event is hidden by current calendar filters', {
               selectedCalendarIds,
-              createdCalendarIds,
+              createdCalendarIds: mappedCreated.calendarIds ? Object.keys(mappedCreated.calendarIds) : [],
             });
           }
 
@@ -324,14 +337,16 @@ export const useCalendarStore = create<CalendarStore>()(
           const storeEvent = get().events.find(e => e.id === id);
           const realId = storeEvent?.originalId || id;
           const targetAccountId = storeEvent?.accountId;
-          debug.log('calendar', 'Calendar updateEvent', {
-            storeId: id,
-            realId,
-            uid: storeEvent?.uid,
-            recurrenceId: storeEvent?.recurrenceId,
-            targetAccountId,
-            updateKeys: Object.keys(updates),
-          });
+          if (isDebugEnabled('calendar')) {
+            debug.log('calendar', 'Calendar updateEvent', {
+              storeId: id,
+              realId,
+              uid: storeEvent?.uid,
+              recurrenceId: storeEvent?.recurrenceId,
+              targetAccountId,
+              updateKeys: Object.keys(updates),
+            });
+          }
           // Remap namespaced calendarIds back to original IDs. Same Map
           // + for...in pattern as createEvent above.
           const cleanUpdates = sanitizeOutgoingCalendarEventData({ ...updates });
