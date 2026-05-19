@@ -924,27 +924,34 @@ export const useContactStore = create<ContactStore>()(
 
       importContacts: async (client, contacts) => {
         const { supportsSync } = get();
-        let imported = 0;
 
-        for (const contact of contacts) {
-          try {
-            if (client && supportsSync) {
-              const { id: _id, ...data } = contact;
-              const created = await client.createContact(data);
-              set((state) => ({ contacts: [...state.contacts, created] }));
-            } else {
-              const localContact: ContactCard = {
-                ...contact,
-                id: `local-${generateUUID()}`,
-              };
-              set((state) => ({ contacts: [...state.contacts, localContact] }));
-            }
-            imported++;
-          } catch (error) {
-            console.error('Failed to import contact:', error);
-          }
+        // Local-only path: synchronous batch insert — no network, so one
+        // single set with all of them.
+        if (!client || !supportsSync) {
+          const localBatch: ContactCard[] = contacts.map(c => ({
+            ...c,
+            id: `local-${generateUUID()}`,
+          }));
+          set((state) => ({ contacts: [...state.contacts, ...localBatch] }));
+          return localBatch.length;
         }
 
+        // Server-sync path: was N sequential `client.createContact()`
+        // calls — importing a 200-contact vCard took 200 × RTT. Each
+        // create is independent so fan-out + allSettled. Each success
+        // appends to the contacts array, preserving the per-create
+        // incremental UI update.
+        const settled = await Promise.allSettled(contacts.map(async (contact) => {
+          const { id: _id, ...data } = contact;
+          const created = await client.createContact(data);
+          set((state) => ({ contacts: [...state.contacts, created] }));
+          return created;
+        }));
+        let imported = 0;
+        for (const r of settled) {
+          if (r.status === 'fulfilled') imported++;
+          else console.error('Failed to import contact:', r.reason);
+        }
         return imported;
       },
     });

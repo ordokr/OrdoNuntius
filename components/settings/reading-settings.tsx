@@ -86,21 +86,30 @@ export function ReadingSettings() {
       const yearMailboxes = new Map<string, { id: string; originalId?: string }>();
       const monthMailboxes = new Map<string, { id: string }>(); // key: "year/month"
       const uniqueYears = Array.from(new Set(targets.map((t) => t.year)));
-      for (const year of uniqueYears) {
-        const ym = await ensureFolder(year, archiveId);
-        yearMailboxes.set(year, ym);
-      }
+
+      // Was N sequential `ensureFolder(year, ...)` calls — each one its
+      // own JMAP RTT. Years are independent; parallelize. Archive-by-month
+      // of a multi-year inbox used to spend `(years + months) × RTT`
+      // before any move; now `2 × RTT` total (one for years, one for
+      // months after they resolve).
+      const yearResults = await Promise.all(
+        uniqueYears.map(async (year) => [year, await ensureFolder(year, archiveId)] as const),
+      );
+      for (const [year, ym] of yearResults) yearMailboxes.set(year, ym);
+
       if (archiveMode !== 'year') {
         const uniqueMonths = Array.from(new Set(
           targets.map((t) => `${t.year}/${t.month}`)
         ));
-        for (const key of uniqueMonths) {
-          const [year, month] = key.split('/');
-          const ym = yearMailboxes.get(year)!;
-          const yearId = ym.originalId || ym.id;
-          const mm = await ensureFolder(month, yearId);
-          monthMailboxes.set(key, mm);
-        }
+        const monthResults = await Promise.all(
+          uniqueMonths.map(async (key) => {
+            const [year, month] = key.split('/');
+            const ym = yearMailboxes.get(year)!;
+            const yearId = ym.originalId || ym.id;
+            return [key, await ensureFolder(month, yearId)] as const;
+          }),
+        );
+        for (const [key, mm] of monthResults) monthMailboxes.set(key, mm);
       }
 
       // Pass 3: bucket email IDs by destination mailbox id, then fire

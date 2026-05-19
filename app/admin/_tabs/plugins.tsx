@@ -188,23 +188,15 @@ export function PluginsTab() {
       setMessage({ type: 'success', text: 'All plugins are already enabled' });
       return;
     }
-    let failed = 0;
-    for (const p of disabled) {
-      const res = await apiFetch('/api/admin/plugins', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: p.id, enabled: true }),
-      });
-      if (!res.ok) failed++;
-    }
+    // N sequential PATCH → 1 RTT via Promise.allSettled. Same pattern
+    // as themes.tsx forceEnableAll/forceDisableAll. For 20 plugins at
+    // baseline admin RTT this saves ~4s.
+    const failed = await batchTogglePlugins(disabled, true);
     setPlugins(prev => prev.map(p => failed === 0 ? { ...p, enabled: true } : p));
-    if (failed === 0) {
-      await fetchPlugins();
-      setMessage({ type: 'success', text: `All ${disabled.length} plugin(s) enabled` });
-    } else {
-      await fetchPlugins();
-      setMessage({ type: 'error', text: `${failed} plugin(s) failed to enable` });
-    }
+    await fetchPlugins();
+    setMessage(failed === 0
+      ? { type: 'success', text: `All ${disabled.length} plugin(s) enabled` }
+      : { type: 'error', text: `${failed} plugin(s) failed to enable` });
   }
 
   async function forceDisableAll() {
@@ -214,22 +206,26 @@ export function PluginsTab() {
       setMessage({ type: 'success', text: 'All plugins are already disabled' });
       return;
     }
-    let failed = 0;
-    for (const p of enabled) {
-      const res = await apiFetch('/api/admin/plugins', {
+    const failed = await batchTogglePlugins(enabled, false);
+    await fetchPlugins();
+    setMessage(failed === 0
+      ? { type: 'success', text: `All ${enabled.length} plugin(s) disabled` }
+      : { type: 'error', text: `${failed} plugin(s) failed to disable` });
+  }
+
+  async function batchTogglePlugins(targets: typeof plugins, enabled: boolean): Promise<number> {
+    const results = await Promise.allSettled(
+      targets.map(p => apiFetch('/api/admin/plugins', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: p.id, enabled: false }),
-      });
-      if (!res.ok) failed++;
+        body: JSON.stringify({ id: p.id, enabled }),
+      })),
+    );
+    let failed = 0;
+    for (const r of results) {
+      if (r.status === 'rejected' || !r.value.ok) failed++;
     }
-    if (failed === 0) {
-      await fetchPlugins();
-      setMessage({ type: 'success', text: `All ${enabled.length} plugin(s) disabled` });
-    } else {
-      await fetchPlugins();
-      setMessage({ type: 'error', text: `${failed} plugin(s) failed to disable` });
-    }
+    return failed;
   }
 
   async function deletePlugin(id: string, name: string) {

@@ -734,14 +734,18 @@ export function EmailComposer({
   const addFiles = useCallback(async (files: File[]) => {
     if (!client || files.length === 0) return;
 
-    // Let plugins veto each upload before it's queued.
-    const allowedFiles: File[] = [];
-    for (const file of files) {
-      const ok = await emailHooks.onBeforeAttachmentUpload.intercept({
+    // Let plugins veto each upload before it's queued. Each intercept
+    // is independent — parallelize. Was N sequential per-file plugin
+    // checks (relevant when a plugin does any IO during intercept).
+    const checks = await Promise.all(files.map(file =>
+      emailHooks.onBeforeAttachmentUpload.intercept({
         name: file.name,
         type: file.type || 'application/octet-stream',
         size: file.size,
-      });
+      }).then(ok => ({ file, ok })),
+    ));
+    const allowedFiles: File[] = [];
+    for (const { file, ok } of checks) {
       if (ok) allowedFiles.push(file);
     }
     if (allowedFiles.length === 0) return;
