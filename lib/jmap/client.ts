@@ -2133,7 +2133,15 @@ export class JMAPClient implements IJMAPClient {
     envelopeMailFrom?: string
   ): Promise<void> {
     const emailId = `send-${Date.now()}`;
-    const mailboxes = await this.getMailboxes();
+    // Mailboxes + identities are independent reads — fire them in
+    // parallel. Was 2 sequential awaits; now they overlap. getMailboxes
+    // is often cached but Identity/get is always a wire request.
+    const [mailboxes, identityResponse] = await Promise.all([
+      this.getMailboxes(),
+      this.request([
+        ["Identity/get", { accountId: this.accountId }, "0"]
+      ]),
+    ]);
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
     if (!sentMailbox) {
       throw new Error('No sent mailbox found');
@@ -2146,9 +2154,6 @@ export class JMAPClient implements IJMAPClient {
     let finalIdentityId = identityId;
     let identityReplyTo: EmailAddress[] | undefined;
     {
-      const identityResponse = await this.request([
-        ["Identity/get", { accountId: this.accountId }, "0"]
-      ]);
 
       if (!finalIdentityId) {
         finalIdentityId = this.accountId;
@@ -2492,7 +2497,14 @@ export class JMAPClient implements IJMAPClient {
       return;
     }
 
-    const mailboxes = await this.getMailboxes();
+    // Mailboxes + identities are independent — fire in parallel. Was 2
+    // sequential RTTs at the top of every iMIP send.
+    const [mailboxes, identityResponse] = await Promise.all([
+      this.getMailboxes(),
+      this.request([
+        ["Identity/get", { accountId: this.accountId }, "0"]
+      ]),
+    ]);
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
     if (!sentMailbox) {
       throw new Error('No sent mailbox found');
@@ -2502,15 +2514,15 @@ export class JMAPClient implements IJMAPClient {
       throw new Error('No drafts mailbox found');
     }
 
-    // Find the organizer participant
-    const organizerEntry = Object.values(event.participants).find(p => p.roles?.owner);
+    // Find the organizer participant. for...in over the participants
+    // record drops the per-call Object.values allocation.
+    let organizerEntry: typeof event.participants[string] | undefined;
+    for (const k in event.participants) {
+      if (event.participants[k].roles?.owner) { organizerEntry = event.participants[k]; break; }
+    }
     const organizerEmail = organizerEntry?.email || organizerEntry?.sendTo?.imip?.replace('mailto:', '') || this.username;
     const organizerName = organizerEntry?.name || '';
 
-    // Resolve identity
-    const identityResponse = await this.request([
-      ["Identity/get", { accountId: this.accountId }, "0"]
-    ]);
     let identityId = this.accountId;
     if (identityResponse.methodResponses?.[0]?.[0] === "Identity/get") {
       const identities = (identityResponse.methodResponses[0][1].list || []) as { id: string; email: string }[];
@@ -2665,7 +2677,14 @@ export class JMAPClient implements IJMAPClient {
       debug.warn('calendar', 'sendImipCancellation called on non-cancelled event, status:', event.status);
     }
 
-    const mailboxes = await this.getMailboxes();
+    // Mailboxes + identities are independent — parallelize. Same fix as
+    // sendEmail / sendImipInvitation above.
+    const [mailboxes, identityResponse] = await Promise.all([
+      this.getMailboxes(),
+      this.request([
+        ["Identity/get", { accountId: this.accountId }, "0"]
+      ]),
+    ]);
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
     if (!sentMailbox) {
       throw new Error('No sent mailbox found');
@@ -2675,13 +2694,13 @@ export class JMAPClient implements IJMAPClient {
       throw new Error('No drafts mailbox found');
     }
 
-    const organizerEntry = Object.values(event.participants).find(p => p.roles?.owner);
+    let organizerEntry: typeof event.participants[string] | undefined;
+    for (const k in event.participants) {
+      if (event.participants[k].roles?.owner) { organizerEntry = event.participants[k]; break; }
+    }
     const organizerEmail = organizerEntry?.email || organizerEntry?.sendTo?.imip?.replace('mailto:', '') || this.username;
     const organizerName = organizerEntry?.name || '';
 
-    const identityResponse = await this.request([
-      ["Identity/get", { accountId: this.accountId }, "0"]
-    ]);
     let identityId = this.accountId;
     if (identityResponse.methodResponses?.[0]?.[0] === "Identity/get") {
       const identities = (identityResponse.methodResponses[0][1].list || []) as { id: string; email: string }[];
