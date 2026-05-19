@@ -950,7 +950,16 @@ export function EmailViewer({
   const [smimeUnlockDialogOpen, setSmimeUnlockDialogOpen] = useState(false);
   const [smimeUnlockTargetId, setSmimeUnlockTargetId] = useState<string | null>(null);
   const [smimeUnlockError, setSmimeUnlockError] = useState<string | null>(null);
-  const smimeStore = useSmimeStore();
+  // Granular selectors instead of whole-store subscription. The previous
+  // `useSmimeStore()` form re-rendered the viewer on EVERY S/MIME store
+  // mutation (any cert import, any unlock, any settings toggle anywhere
+  // in the app) — and worse, the S/MIME processing effect listed the
+  // whole `smimeStore` object in its dep array, which churned on every
+  // set() call and re-triggered decrypt/verify needlessly.
+  const smimeAutoImportSignerCerts = useSmimeStore(s => s.autoImportSignerCerts);
+  const smimeKeyRecords = useSmimeStore(s => s.keyRecords);
+  const smimeUnlockedDecryptionKeys = useSmimeStore(s => s.unlockedDecryptionKeys);
+  const smimeUnlockedLegacyDecryptionKeys = useSmimeStore(s => s.unlockedLegacyDecryptionKeys);
 
   // TNEF (winmail.dat) support
   const [tnefHtml, setTnefHtml] = useState<string | null>(null);
@@ -972,7 +981,7 @@ export function EmailViewer({
 
   // Ensure S/MIME key records are loaded from IndexedDB
   useLayoutEffect(() => {
-    smimeStore.load(activeAccountId ?? undefined);
+    useSmimeStore.getState().load(activeAccountId ?? undefined);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAccountId]);
 
@@ -1260,14 +1269,14 @@ export function EmailViewer({
     }
 
     try {
-      await smimeStore.unlockKey(smimeUnlockTargetId, passphrase);
+      await useSmimeStore.getState().unlockKey(smimeUnlockTargetId, passphrase);
       setSmimeUnlockDialogOpen(false);
       setSmimeUnlockTargetId(null);
       setSmimeUnlockError(null);
     } catch (error) {
       setSmimeUnlockError(error instanceof Error ? error.message : 'Unlock failed');
     }
-  }, [smimeStore, smimeUnlockTargetId]);
+  }, [smimeUnlockTargetId]);
 
   // S/MIME detection and processing
   useEffect(() => {
@@ -1594,7 +1603,9 @@ export function EmailViewer({
 
         if (detection.type === 'enveloped-data') {
           // Encrypted message
-            const { keyRecords, unlockedDecryptionKeys, unlockedLegacyDecryptionKeys } = smimeStore;
+            const keyRecords = smimeKeyRecords;
+            const unlockedDecryptionKeys = smimeUnlockedDecryptionKeys;
+            const unlockedLegacyDecryptionKeys = smimeUnlockedLegacyDecryptionKeys;
             smimeDebug('[S/MIME] decrypt attempt:', {
               keyRecordCount: keyRecords.length,
               unlockedKeyCount: unlockedDecryptionKeys.size,
@@ -1700,11 +1711,11 @@ export function EmailViewer({
                   decryptionSuccess: true,
                 });
                 // Auto-import signer cert if enabled
-                if (smimeStore.autoImportSignerCerts && verifyResult.status.signatureValid && verifyResult.status.signerCert) {
-                  const existing = smimeStore.getPublicCertForEmail(verifyResult.status.signerCert.email);
+                if (smimeAutoImportSignerCerts && verifyResult.status.signatureValid && verifyResult.status.signerCert) {
+                  const existing = useSmimeStore.getState().getPublicCertForEmail(verifyResult.status.signerCert.email);
                   if (!existing) {
                     try {
-                      await smimeStore.importPublicCert(verifyResult.status.signerCert.certificate, 'signed-email');
+                      await useSmimeStore.getState().importPublicCert(verifyResult.status.signerCert.certificate, 'signed-email');
                       smimeDebug('[S/MIME] auto-imported signer cert:', { email: verifyResult.status.signerCert.email, fingerprint: verifyResult.status.signerCert.fingerprint });
                     } catch (importErr) {
                       smimeError('[S/MIME] auto-import signer cert failed:', importErr);
@@ -1813,11 +1824,11 @@ export function EmailViewer({
             setSmimeDecryptedAttachments((parsed.attachments ?? []) as PostalMimeAttachment[]);
             setSmimeStatus(result.status);
             // Auto-import signer cert if enabled
-            if (smimeStore.autoImportSignerCerts && result.status.signatureValid && result.status.signerCert) {
-              const existing = smimeStore.getPublicCertForEmail(result.status.signerCert.email);
+            if (smimeAutoImportSignerCerts && result.status.signatureValid && result.status.signerCert) {
+              const existing = useSmimeStore.getState().getPublicCertForEmail(result.status.signerCert.email);
               if (!existing) {
                 try {
-                  await smimeStore.importPublicCert(result.status.signerCert.certificate, 'signed-email');
+                  await useSmimeStore.getState().importPublicCert(result.status.signerCert.certificate, 'signed-email');
                   smimeDebug('[S/MIME] auto-imported signer cert:', { email: result.status.signerCert.email, fingerprint: result.status.signerCert.fingerprint });
                 } catch (importErr) {
                   smimeError('[S/MIME] auto-import signer cert failed:', importErr);
@@ -1856,11 +1867,10 @@ export function EmailViewer({
     email,
     client,
     prepareSmimeUnlock,
-    smimeStore.autoImportSignerCerts,
-    smimeStore.keyRecords,
-    smimeStore.unlockedDecryptionKeys,
-    smimeStore.unlockedLegacyDecryptionKeys,
-    smimeStore,
+    smimeAutoImportSignerCerts,
+    smimeKeyRecords,
+    smimeUnlockedDecryptionKeys,
+    smimeUnlockedLegacyDecryptionKeys,
   ]);
 
   // TNEF (winmail.dat) detection and processing
