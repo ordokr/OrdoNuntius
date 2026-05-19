@@ -474,11 +474,15 @@ export const useFileStore = create<FileState>((set, get) => ({
     const { client, resources, recentFiles, refresh } = get();
     if (!client) return;
 
+    // O(names × resources) → O(names + resources) via a name-indexed Map.
+    const byName = new Map<string, FileResource>();
+    for (const r of resources) byName.set(r.name, r);
+
     const idsToDelete: string[] = [];
     let allNodes: FileNode[] | null = null;
 
     for (const name of names) {
-      const resource = resources.find(r => r.name === name);
+      const resource = byName.get(name);
       if (!resource) continue;
       idsToDelete.push(resource.id);
 
@@ -617,17 +621,25 @@ export const useFileStore = create<FileState>((set, get) => ({
     const { client, resources, refresh } = get();
     if (!client) return;
 
-    const targetResource = resources.find(r => r.name === targetFolder && r.isDirectory);
-    if (!targetResource) return;
+    // O(names + resources) lookup + parallel JMAP updates (each item
+    // targets a unique source id + unique destination path, no
+    // contention). Was N sequential RTTs.
+    const byName = new Map<string, FileResource>();
+    for (const r of resources) byName.set(r.name, r);
+    const targetResource = byName.get(targetFolder);
+    if (!targetResource || !targetResource.isDirectory) return;
 
-    const entries: UndoAction['entries'] = [];
-    for (const name of names) {
-      const resource = resources.find(r => r.name === name);
-      if (!resource) continue;
-      const newServerName = targetResource.serverName + PATH_SEP + resource.name;
-      await client.updateFileNode(resource.id, { name: newServerName });
-      entries.push({ id: resource.id, from: { name: resource.serverName }, to: { name: newServerName } });
-    }
+    type Entry = UndoAction['entries'][number];
+    const settled = await Promise.allSettled(
+      names.map((name): Promise<Entry | null> => {
+        const resource = byName.get(name);
+        if (!resource) return Promise.resolve(null);
+        const newServerName = targetResource.serverName + PATH_SEP + resource.name;
+        return client.updateFileNode(resource.id, { name: newServerName })
+          .then(() => ({ id: resource.id, from: { name: resource.serverName }, to: { name: newServerName } }));
+      }),
+    );
+    const entries: Entry[] = settled.flatMap(r => r.status === 'fulfilled' && r.value ? [r.value] : []);
     set({
       selectedResources: new Set(),
       lastAction: { type: 'move', entries, sourceParentId: null },
@@ -644,14 +656,22 @@ export const useFileStore = create<FileState>((set, get) => ({
     // e.g. "folder∕sub∕" → "folder∕", "folder∕" → ""
     const parentPrefix = prefix.slice(0, prefix.lastIndexOf(PATH_SEP, prefix.length - 2) + 1);
 
-    const entries: UndoAction['entries'] = [];
-    for (const name of names) {
-      const resource = resources.find(r => r.name === name);
-      if (!resource) continue;
-      const newServerName = parentPrefix + resource.name;
-      await client.updateFileNode(resource.id, { name: newServerName });
-      entries.push({ id: resource.id, from: { name: resource.serverName }, to: { name: newServerName } });
-    }
+    // Same O(names + resources) lookup + parallel JMAP updates as
+    // moveToFolder.
+    const byName = new Map<string, FileResource>();
+    for (const r of resources) byName.set(r.name, r);
+
+    type Entry = UndoAction['entries'][number];
+    const settled = await Promise.allSettled(
+      names.map((name): Promise<Entry | null> => {
+        const resource = byName.get(name);
+        if (!resource) return Promise.resolve(null);
+        const newServerName = parentPrefix + resource.name;
+        return client.updateFileNode(resource.id, { name: newServerName })
+          .then(() => ({ id: resource.id, from: { name: resource.serverName }, to: { name: newServerName } }));
+      }),
+    );
+    const entries: Entry[] = settled.flatMap(r => r.status === 'fulfilled' && r.value ? [r.value] : []);
     set({
       selectedResources: new Set(),
       lastAction: { type: 'move', entries, sourceParentId: null },

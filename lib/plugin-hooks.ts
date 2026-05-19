@@ -529,16 +529,16 @@ const allHookGroups = [
 
 export function removeAllPluginHooks(pluginId: string): void {
   for (const group of allHookGroups) {
-    for (const bus of Object.values(group)) {
-      (bus as HookBus<never>).removePlugin(pluginId);
+    for (const k in group) {
+      (group[k as keyof typeof group] as HookBus<never>).removePlugin(pluginId);
     }
   }
 }
 
 export function clearAllHooks(): void {
   for (const group of allHookGroups) {
-    for (const bus of Object.values(group)) {
-      (bus as HookBus<never>).clear();
+    for (const k in group) {
+      (group[k as keyof typeof group] as HookBus<never>).clear();
     }
   }
 }
