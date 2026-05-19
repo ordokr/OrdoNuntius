@@ -272,7 +272,13 @@ export function formatSnapTime(minutes: number, timeFormat: "12h" | "24h"): stri
 }
 
 export function getPrimaryCalendarId(event: Pick<CalendarEvent, 'calendarIds'>): string | undefined {
-  return Object.keys(event.calendarIds || {})[0];
+  // Zero-allocation first-key pick — was `Object.keys(...)[0]` which
+  // built the full keys-array just to take index 0. Called per event
+  // during calendar list rendering.
+  const ids = event.calendarIds;
+  if (!ids) return undefined;
+  for (const k in ids) return k;
+  return undefined;
 }
 
 export function formatIsoInTimeZone(date: Date, timeZone: string): string {

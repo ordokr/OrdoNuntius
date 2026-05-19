@@ -78,7 +78,9 @@ export function getEffectiveAlerts(
   }
 
   if (!event.calendarIds) return null;
-  const calendarId = Object.keys(event.calendarIds)[0];
+  // Zero-allocation first-key pick.
+  let calendarId: string | undefined;
+  for (const k in event.calendarIds) { calendarId = k; break; }
   if (!calendarId) return null;
 
   const calendar = calendars.find(c => c.id === calendarId);
@@ -101,12 +103,21 @@ export function getPendingAlerts(
   now: number
 ): PendingAlert[] {
   const pending: PendingAlert[] = [];
+  // O(1) calendar lookup by id — was N × `.find()` per event.
+  const calById = new Map<string, Calendar>();
+  for (const c of calendars) calById.set(c.id, c);
 
   for (const event of events) {
     const alerts = getEffectiveAlerts(event, calendars);
     if (!alerts) continue;
 
-    const calendar = calendars.find(c => c.id === Object.keys(event.calendarIds)[0]) ?? null;
+    // First-key pick from event.calendarIds without allocating a keys
+    // array, then O(1) calendar lookup.
+    let firstCalId: string | undefined;
+    if (event.calendarIds) {
+      for (const k in event.calendarIds) { firstCalId = k; break; }
+    }
+    const calendar = firstCalId ? calById.get(firstCalId) ?? null : null;
 
     for (const [alertId, alert] of Object.entries(alerts)) {
       if (alert.action !== 'display') continue;
@@ -166,12 +177,16 @@ export function getPendingTaskAlerts(
   now: number
 ): PendingTaskAlert[] {
   const pending: PendingTaskAlert[] = [];
+  const calById = new Map<string, Calendar>();
+  for (const c of calendars) calById.set(c.id, c);
 
   for (const task of tasks) {
     if (!task.alerts) continue;
     if (task.progress === 'completed' || task.progress === 'cancelled') continue;
 
-    const calendar = calendars.find(c => c.id === Object.keys(task.calendarIds)[0]) ?? null;
+    let firstCalId: string | undefined;
+    for (const k in task.calendarIds) { firstCalId = k; break; }
+    const calendar = firstCalId ? calById.get(firstCalId) ?? null : null;
 
     for (const [alertId, alert] of Object.entries(task.alerts)) {
       if (alert.action !== 'display') continue;
