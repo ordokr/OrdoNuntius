@@ -978,10 +978,15 @@ export class JMAPClient implements IJMAPClient {
         const rawEmails = (getResponse.list || []) as Email[];
         // Sort client-side as safety net - some servers may not honour
         // the query sort for large mailboxes without additional filters.
-        // Schwartzian: decorate-once on receivedAt.
-        const decorated = rawEmails.map(e => ({ e, ms: new Date(e.receivedAt).getTime() }));
+        // Schwartzian: decorate-once on receivedAt. Pre-sized arrays drop
+        // the two .map() intermediates.
+        const decorated: { e: Email; ms: number }[] = new Array(rawEmails.length);
+        for (let i = 0; i < rawEmails.length; i++) {
+          decorated[i] = { e: rawEmails[i], ms: new Date(rawEmails[i].receivedAt).getTime() };
+        }
         decorated.sort((a, b) => b.ms - a.ms);
-        const emails = decorated.map(d => d.e);
+        const emails: Email[] = new Array(decorated.length);
+        for (let i = 0; i < decorated.length; i++) emails[i] = decorated[i].e;
         const total = queryResponse?.total || 0;
         const hasMore = computeHasMore(position, emails.length, total, limit);
 
@@ -1750,9 +1755,14 @@ export class JMAPClient implements IJMAPClient {
       const queryResponse = response.methodResponses?.[0]?.[1];
       const rawEmails = (response.methodResponses?.[1]?.[1]?.list || []) as Email[];
       // Schwartzian: parse each receivedAt once instead of N log N times.
-      const decorated = rawEmails.map(e => ({ e, ms: new Date(e.receivedAt).getTime() }));
+      // Pre-sized arrays drop the two .map() intermediates.
+      const decorated: { e: Email; ms: number }[] = new Array(rawEmails.length);
+      for (let i = 0; i < rawEmails.length; i++) {
+        decorated[i] = { e: rawEmails[i], ms: new Date(rawEmails[i].receivedAt).getTime() };
+      }
       decorated.sort((a, b) => b.ms - a.ms);
-      const emails = decorated.map(d => d.e);
+      const emails: Email[] = new Array(decorated.length);
+      for (let i = 0; i < decorated.length; i++) emails[i] = decorated[i].e;
       const total = queryResponse?.total || 0;
       const hasMore = computeHasMore(position, emails.length, total, limit);
 
@@ -1790,9 +1800,14 @@ export class JMAPClient implements IJMAPClient {
 
       const queryResponse = response.methodResponses?.[0]?.[1];
       const rawEmails = (response.methodResponses?.[1]?.[1]?.list || []) as Email[];
-      const decorated = rawEmails.map(e => ({ e, ms: new Date(e.receivedAt).getTime() }));
+      // Pre-sized Schwartzian: drops two .map() intermediates.
+      const decorated: { e: Email; ms: number }[] = new Array(rawEmails.length);
+      for (let i = 0; i < rawEmails.length; i++) {
+        decorated[i] = { e: rawEmails[i], ms: new Date(rawEmails[i].receivedAt).getTime() };
+      }
       decorated.sort((a, b) => b.ms - a.ms);
-      const emails = decorated.map(d => d.e);
+      const emails: Email[] = new Array(decorated.length);
+      for (let i = 0; i < decorated.length; i++) emails[i] = decorated[i].e;
       const total = queryResponse?.total || 0;
       const hasMore = computeHasMore(position, emails.length, total, limit);
 
@@ -1865,10 +1880,16 @@ export class JMAPClient implements IJMAPClient {
           namespaceMailboxIds(emails, accountId);
         }
 
-        // Schwartzian: parse each receivedAt once, sort by ms.
-        const decorated = emails.map(e => ({ e, ms: new Date(e.receivedAt).getTime() }));
+        // Schwartzian: parse each receivedAt once, sort by ms. Pre-sized
+        // arrays drop the two `.map(...)` intermediate allocations.
+        const decorated: { e: Email; ms: number }[] = new Array(emails.length);
+        for (let i = 0; i < emails.length; i++) {
+          decorated[i] = { e: emails[i], ms: new Date(emails[i].receivedAt).getTime() };
+        }
         decorated.sort((a, b) => b.ms - a.ms);
-        return decorated.map(d => d.e);
+        const out: Email[] = new Array(decorated.length);
+        for (let i = 0; i < decorated.length; i++) out[i] = decorated[i].e;
+        return out;
       }
 
       return [];
