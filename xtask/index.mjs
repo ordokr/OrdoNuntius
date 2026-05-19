@@ -216,6 +216,16 @@ function pack(restArgs = []) {
 
 function release() {
     section("release");
+    // Wipe dist/ BEFORE verify+build runs, not just before pack writes a
+    // new tarball. Why: if dist/ has a prior 80MB tarball when next build
+    // executes, Next.js traces it into .next/standalone/dist/, and pack
+    // then bundles that traced copy inside its own tarball — recursive
+    // 80MB → 160MB → 320MB → ... bloat across deploy cycles. Wiping
+    // here guarantees next build sees an empty dist/. The
+    // `outputFileTracingExcludes` config in next.config.ts is a
+    // defense-in-depth backup, but the empirical evidence is that
+    // `output: "standalone"` arbitrary-root-copies sidestep it.
+    rmSync(DIST, { recursive: true, force: true });
     verify();
     build();
     checkBundleBudget();

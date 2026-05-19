@@ -35,16 +35,23 @@ import { useCalendarStore } from "@/stores/calendar-store";
 // allocated two strings per email per push and didn't short-circuit on
 // size mismatch. Email.keywords typically holds 0-6 entries so this is
 // dominated by the size check.
+//
+// Walk `a` once: compare each value against `b` (b[k] is undefined when b
+// lacks k → mismatch). Then count `b` to confirm same size. Drops both
+// `Object.keys` allocations — every push event compares N emails, so the
+// keys-array churn adds up under heavy server activity.
 function keywordsEqual(
   a: Record<string, boolean> = {},
   b: Record<string, boolean> = {},
 ): boolean {
-  const aKeys = Object.keys(a);
-  if (aKeys.length !== Object.keys(b).length) return false;
-  for (const k of aKeys) {
+  let aLen = 0;
+  for (const k in a) {
+    aLen++;
     if (a[k] !== b[k]) return false;
   }
-  return true;
+  let bLen = 0;
+  for (const _ in b) bLen++;
+  return aLen === bLen;
 }
 
 export interface PushSlice {
