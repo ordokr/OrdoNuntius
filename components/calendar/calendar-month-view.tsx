@@ -289,8 +289,8 @@ export function CalendarMonthView({
                         variant="span"
                         continuesBefore={segment.continuesBefore}
                         continuesAfter={segment.continuesAfter}
-                        onClick={(rect) => onSelectEvent(segment.event, rect)}
-                        onMouseEnter={(rect) => onHoverEvent?.(segment.event, rect)}
+                        onClick={onSelectEvent}
+                        onMouseEnter={onHoverEvent}
                         onMouseLeave={onHoverLeave}
                         onContextMenu={onContextMenuEvent}
                         draggable

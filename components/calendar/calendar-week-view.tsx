@@ -272,8 +272,8 @@ export function CalendarWeekView({
                       variant="span"
                       continuesBefore={segment.continuesBefore}
                       continuesAfter={segment.continuesAfter}
-                      onClick={(rect) => onSelectEvent(segment.event, rect)}
-                      onMouseEnter={(rect) => onHoverEvent?.(segment.event, rect)}
+                      onClick={onSelectEvent}
+                      onMouseEnter={onHoverEvent}
                       onMouseLeave={onHoverLeave}
                       onContextMenu={onContextMenuEvent}
                     />
@@ -441,8 +441,8 @@ export function CalendarWeekView({
                           event={ev}
                           calendar={calId ? calendarMap.get(calId) : undefined}
                           variant="block"
-                          onClick={(rect) => onSelectEvent(ev, rect)}
-                          onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
+                          onClick={onSelectEvent}
+                          onMouseEnter={onHoverEvent}
                           onMouseLeave={onHoverLeave}
                           onContextMenu={onContextMenuEvent}
                           draggable

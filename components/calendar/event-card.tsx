@@ -14,8 +14,12 @@ interface EventCardProps {
   event: CalendarEvent;
   calendar?: Calendar;
   variant: "chip" | "block" | "span";
-  onClick?: (anchorRect: DOMRect) => void;
-  onMouseEnter?: (anchorRect: DOMRect) => void;
+  // Receive the event so callers can pass a stable callback. Was
+  // `(rect) => onSelectEvent(segment.event, rect)` — fresh closure per
+  // EventCard per render, defeating the React.memo wrapper for every
+  // visible event tile.
+  onClick?: (event: CalendarEvent, anchorRect: DOMRect) => void;
+  onMouseEnter?: (event: CalendarEvent, anchorRect: DOMRect) => void;
   onMouseLeave?: () => void;
   onContextMenu?: (e: React.MouseEvent, event: CalendarEvent) => void;
   isSelected?: boolean;
@@ -125,8 +129,8 @@ function EventCardImpl({ event, calendar, variant, onClick, onMouseEnter, onMous
   if (variant === "chip") {
     return (
       <button
-        onClick={(e) => { e.stopPropagation(); onClick?.(e.currentTarget.getBoundingClientRect()); }}
-        onMouseEnter={(e) => onMouseEnter?.(e.currentTarget.getBoundingClientRect())}
+        onClick={(e) => { e.stopPropagation(); onClick?.(event, e.currentTarget.getBoundingClientRect()); }}
+        onMouseEnter={(e) => onMouseEnter?.(event, e.currentTarget.getBoundingClientRect())}
         onMouseLeave={() => onMouseLeave?.()}
         onContextMenu={handleContextMenu}
         aria-label={ariaLabel}
@@ -153,8 +157,8 @@ function EventCardImpl({ event, calendar, variant, onClick, onMouseEnter, onMous
   if (variant === "span") {
     return (
       <button
-        onClick={(e) => { e.stopPropagation(); onClick?.(e.currentTarget.getBoundingClientRect()); }}
-        onMouseEnter={(e) => onMouseEnter?.(e.currentTarget.getBoundingClientRect())}
+        onClick={(e) => { e.stopPropagation(); onClick?.(event, e.currentTarget.getBoundingClientRect()); }}
+        onMouseEnter={(e) => onMouseEnter?.(event, e.currentTarget.getBoundingClientRect())}
         onMouseLeave={() => onMouseLeave?.()}
         onContextMenu={handleContextMenu}
         aria-label={ariaLabel}
@@ -183,8 +187,8 @@ function EventCardImpl({ event, calendar, variant, onClick, onMouseEnter, onMous
 
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); onClick?.(e.currentTarget.getBoundingClientRect()); }}
-      onMouseEnter={(e) => onMouseEnter?.(e.currentTarget.getBoundingClientRect())}
+      onClick={(e) => { e.stopPropagation(); onClick?.(event, e.currentTarget.getBoundingClientRect()); }}
+      onMouseEnter={(e) => onMouseEnter?.(event, e.currentTarget.getBoundingClientRect())}
       onMouseLeave={() => onMouseLeave?.()}
       onContextMenu={handleContextMenu}
       aria-label={ariaLabel}

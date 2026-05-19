@@ -167,8 +167,8 @@ export function CalendarDayView({
                       event={ev}
                       calendar={calId ? calendarMap.get(calId) : undefined}
                       variant="chip"
-                      onClick={(rect) => onSelectEvent(ev, rect)}
-                      onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
+                      onClick={onSelectEvent}
+                      onMouseEnter={onHoverEvent}
                       onMouseLeave={onHoverLeave}
                       onContextMenu={onContextMenuEvent}
                     />
@@ -285,8 +285,8 @@ export function CalendarDayView({
                     event={ev}
                     calendar={calId ? calendarMap.get(calId) : undefined}
                     variant="block"
-                    onClick={(rect) => onSelectEvent(ev, rect)}
-                    onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
+                    onClick={onSelectEvent}
+                    onMouseEnter={onHoverEvent}
                     onMouseLeave={onHoverLeave}
                     onContextMenu={onContextMenuEvent}
                     draggable
