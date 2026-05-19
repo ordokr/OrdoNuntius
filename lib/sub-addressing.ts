@@ -50,7 +50,14 @@ export function parseSubAddress(
   email: string,
   delimiter: string = DEFAULT_SUB_ADDRESS_DELIMITER,
 ): ParsedAddress {
-  const [localPart, domain] = email.split('@');
+  // Avoid `email.split('@')` — allocates a 2-element array every call. With
+  // sub-address parsing happening per email row + per recipient, the
+  // throwaway arrays add up. `indexOf` + `slice` does the same work with
+  // no array allocation. Mirrors split('@') semantics when '@' is absent:
+  // localPart = the whole string, domain = ''.
+  const atIdx = email.indexOf('@');
+  const localPart = atIdx === -1 ? email : email.slice(0, atIdx);
+  const domain = atIdx === -1 ? '' : email.slice(atIdx + 1);
 
   if (!localPart || !domain) {
     return {
@@ -95,7 +102,10 @@ export function generateSubAddress(
   tag: string,
   delimiter: string = DEFAULT_SUB_ADDRESS_DELIMITER,
 ): string {
-  const [localPart, domain] = baseEmail.split('@');
+  const atIdx = baseEmail.indexOf('@');
+  if (atIdx === -1) return baseEmail;
+  const localPart = baseEmail.slice(0, atIdx);
+  const domain = baseEmail.slice(atIdx + 1);
 
   if (!localPart || !domain || !tag) {
     return baseEmail;
@@ -121,8 +131,12 @@ export function generateSubAddress(
  * Extract domain from recipient email for tag suggestions
  */
 export function extractDomain(email: string): string | null {
-  const match = email.match(/@([^@]+)$/);
-  return match ? match[1].toLowerCase() : null;
+  // lastIndexOf + slice avoids the per-call RegExp.exec allocation that
+  // `email.match(/@([^@]+)$/)` does — and there is at most one `@` in any
+  // RFC-compliant address, so the simpler walk gives the same result.
+  const at = email.lastIndexOf('@');
+  if (at === -1 || at === email.length - 1) return null;
+  return email.slice(at + 1).toLowerCase();
 }
 
 /**
