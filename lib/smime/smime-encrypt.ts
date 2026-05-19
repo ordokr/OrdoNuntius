@@ -73,8 +73,13 @@ function deduplicateCerts(certs: ArrayBuffer[]): ArrayBuffer[] {
   return result;
 }
 
+// Pre-computed byte → hex lookup. Avoids the Array.from(bytes).map().join()
+// chain (two N-sized intermediate arrays per call).
+const HEX_PAIRS = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
+
 function arrayBufferToHex(buf: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  const bytes = new Uint8Array(buf);
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) hex += HEX_PAIRS[bytes[i]];
+  return hex;
 }

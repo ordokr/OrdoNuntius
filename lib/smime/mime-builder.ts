@@ -148,11 +148,13 @@ export function buildMimeMessage(input: MimeMessageInput): Uint8Array {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+// Pre-computed byte → hex lookup. Same rationale as smime-verify toHex.
+const HEX_PAIRS = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
+
 function generateBoundary(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
-  const hex = Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) hex += HEX_PAIRS[bytes[i]];
   return `----=_Part_${hex}`;
 }
 

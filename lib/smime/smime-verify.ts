@@ -209,11 +209,20 @@ function extractSignerCertificate(signedData: pkijs.SignedData): pkijs.Certifica
   return null;
 }
 
+// Pre-computed byte → hex lookup. `Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')`
+// allocated two N-sized intermediate arrays per call. Lookup-table walk is
+// allocation-free except for the final string concatenation.
+const HEX_PAIRS = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
+
 function toHex(buffer: ArrayBuffer | ArrayBufferView): string {
   const bytes = buffer instanceof ArrayBuffer
     ? new Uint8Array(buffer)
     : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) {
+    hex += HEX_PAIRS[bytes[i]];
+  }
+  return hex;
 }
 
 function arraysEqual(a: Uint8Array, b: Uint8Array): boolean {
