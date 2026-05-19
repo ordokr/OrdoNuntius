@@ -510,16 +510,23 @@ export function FileBrowser({
     return map;
   }, [resources]);
 
-  // Build breadcrumb segments
-  const breadcrumbs = currentPath === '/'
-    ? [{ name: t("breadcrumb_root"), path: '/' }]
-    : [
-        { name: t("breadcrumb_root"), path: '/' },
-        ...currentPath.split('/').filter(Boolean).map((segment, i, arr) => ({
-          name: segment,
-          path: '/' + arr.slice(0, i + 1).join('/'),
-        })),
-      ];
+  // Build breadcrumb segments. Memoized so it doesn't rebuild on every
+  // render. Single-pass O(N) accumulator replaces the O(N²) chain
+  // `split('/').filter(Boolean).map((seg, i, arr) => arr.slice(0, i+1)
+  // .join('/'))` — the per-segment slice+join walked the previous segments
+  // again for each segment.
+  const breadcrumbs = useMemo(() => {
+    const root = { name: t("breadcrumb_root"), path: '/' };
+    if (currentPath === '/') return [root];
+    const out: { name: string; path: string }[] = [root];
+    let path = '';
+    for (const segment of currentPath.split('/')) {
+      if (!segment) continue;
+      path += '/' + segment;
+      out.push({ name: segment, path });
+    }
+    return out;
+  }, [currentPath, t]);
 
   const handleNavigateUp = useCallback(() => {
     if (currentPath === '/') return;

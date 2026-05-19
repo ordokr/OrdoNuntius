@@ -84,15 +84,15 @@ export function FolderTreeSidebar({ currentPath, onNavigate, listByParentId, wid
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 
-  // Auto-expand along the current path when navigating
+  // Auto-expand along the current path when navigating. Single-pass
+  // incremental path build replaces `segments.slice(0, i + 1).join("/")`
+  // per segment which was O(N²) in path depth.
   useEffect(() => {
     if (currentPath === "/") return;
-    const segments = currentPath.split("/").filter(Boolean);
-
-    // Walk down the path and expand + load each ancestor
     let ancestorPath = "";
-    for (let i = 0; i < segments.length; i++) {
-      ancestorPath = "/" + segments.slice(0, i + 1).join("/");
+    for (const segment of currentPath.split("/")) {
+      if (!segment) continue;
+      ancestorPath += "/" + segment;
       const folderId = pathToIdRef.current.get(ancestorPath);
       if (folderId) {
         setExpandedIds(prev => {
