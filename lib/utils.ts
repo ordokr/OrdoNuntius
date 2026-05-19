@@ -233,21 +233,22 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
     debug.log('jmap', `[Mailbox Tree] After deduplication: ${deduplicated.length} mailboxes (removed ${mailboxes.length - deduplicated.length})`);
   }
 
-  // Separate own and shared mailboxes
-  const ownMailboxes = deduplicated.filter(mb => !mb.isShared);
-  const sharedMailboxes = deduplicated.filter(mb => mb.isShared);
-
+  // Single-pass partition + node creation. Was: two `.filter()` walks
+  // (own/shared) AND a separate `.forEach()` to populate the mailboxMap.
+  // Three walks → one. The first-pass "create node" loop populates own +
+  // mailboxMap atomically.
+  const ownMailboxes: Mailbox[] = [];
+  const sharedMailboxes: Mailbox[] = [];
   const mailboxMap = new Map<string, MailboxNode>();
+  for (const mailbox of deduplicated) {
+    if (mailbox.isShared) {
+      sharedMailboxes.push(mailbox);
+    } else {
+      ownMailboxes.push(mailbox);
+      mailboxMap.set(mailbox.id, { ...mailbox, children: [], depth: 0 });
+    }
+  }
   const rootMailboxes: MailboxNode[] = [];
-
-  // First pass: create nodes for own mailboxes
-  ownMailboxes.forEach(mailbox => {
-    mailboxMap.set(mailbox.id, {
-      ...mailbox,
-      children: [],
-      depth: 0
-    });
-  });
 
   // Helper to recursively recalculate depths after tree is built
   const recalculateDepths = (nodes: MailboxNode[], baseDepth: number) => {
@@ -261,7 +262,7 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
 
   // Second pass: build tree structure for own mailboxes
   const orphanedMailboxes: { id: string; name: string; parentId: string }[] = [];
-  ownMailboxes.forEach(mailbox => {
+  for (const mailbox of ownMailboxes) {
     const node = mailboxMap.get(mailbox.id)!;
 
     if (mailbox.parentId && mailboxMap.has(mailbox.parentId)) {
@@ -274,7 +275,7 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
       }
       rootMailboxes.push(node);
     }
-  });
+  }
 
   if (orphanedMailboxes.length > 0) {
     debug.warn('jmap', `[Mailbox Tree] ${orphanedMailboxes.length} orphaned mailbox(es) moved to root level (missing parent):`,
@@ -306,13 +307,15 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
   if (sharedMailboxes.length > 0) {
     // Group shared mailboxes by account
     const accountGroups = new Map<string, Mailbox[]>();
-    sharedMailboxes.forEach(mb => {
+    for (const mb of sharedMailboxes) {
       const accountId = mb.accountId || 'unknown';
-      if (!accountGroups.has(accountId)) {
-        accountGroups.set(accountId, []);
+      let group = accountGroups.get(accountId);
+      if (!group) {
+        group = [];
+        accountGroups.set(accountId, group);
       }
-      accountGroups.get(accountId)!.push(mb);
-    });
+      group.push(mb);
+    }
 
     accountGroups.forEach((accountMailboxes, accountId) => {
       // Create nodes for this account's mailboxes
@@ -345,14 +348,22 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
       // an extra indent level. (GitHub #151)
       recalculateDepths(accountRootNodes, 0);
 
-      // Create virtual account folder node at top level (depth 0)
+      // Create virtual account folder node at top level (depth 0).
+      // Fuse the two `.reduce()` walks (totalEmails + unreadEmails) into
+      // one pass — was 2 walks of accountMailboxes producing two sums.
       const accountName = accountMailboxes[0]?.accountName || accountId;
+      let accountTotal = 0;
+      let accountUnread = 0;
+      for (const mb of accountMailboxes) {
+        accountTotal += mb.totalEmails;
+        accountUnread += mb.unreadEmails;
+      }
       const accountNode: MailboxNode = {
         id: `shared-account-${accountId}`,
         name: accountName,
         sortOrder: 1000, // After all own folders
-        totalEmails: accountMailboxes.reduce((sum, mb) => sum + mb.totalEmails, 0),
-        unreadEmails: accountMailboxes.reduce((sum, mb) => sum + mb.unreadEmails, 0),
+        totalEmails: accountTotal,
+        unreadEmails: accountUnread,
         totalThreads: 0,
         unreadThreads: 0,
         myRights: {
