@@ -44,6 +44,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useVacationStore } from "@/stores/vacation-store";
 import { useSettingsStore, KEYWORD_PALETTE, KeywordDefinition } from "@/stores/settings-store";
 import { useEmailStore } from "@/stores/email-store";
+import { mailboxByIdLookup } from "@/stores/email-slices/_helpers";
 import { toast } from "@/stores/toast-store";
 import { debug } from "@/lib/debug";
 import { AccountSwitcher } from "./account-switcher";
@@ -862,7 +863,7 @@ export function Sidebar({
   } = useContextMenu<MailboxContextTarget>();
 
   const handleMailboxContextMenu = (e: React.MouseEvent, node: MailboxNode) => {
-    const mailbox = mailboxes.find(mb => mb.id === node.id);
+    const mailbox = mailboxByIdLookup(mailboxes).get(node.id);
     if (!mailbox) return;
     openMailboxContextMenu(e, { kind: "mailbox", mailbox, hasChildren: node.children.length > 0 });
   };

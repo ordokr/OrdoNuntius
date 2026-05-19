@@ -74,6 +74,7 @@ import { toast } from "@/stores/toast-store";
 import { useDeviceDetection } from "@/hooks/use-media-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
+import { mailboxByIdLookup } from "@/stores/email-slices/_helpers";
 import { useThemeStore } from "@/stores/theme-store";
 import { EmailIdentityBadge } from "./email-identity-badge";
 import { UnsubscribeBanner } from "./unsubscribe-banner";
@@ -3072,7 +3073,7 @@ export function EmailViewer({
       if (!file) return;
       try {
         const { selectedMailbox, mailboxes, fetchEmails } = useEmailStore.getState();
-        const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+        const mailbox = mailboxByIdLookup(mailboxes).get(selectedMailbox);
         const mailboxId = mailbox?.originalId || selectedMailbox;
         if (!mailboxId) {
           toast.error(tNotifications('import_email_error'));
