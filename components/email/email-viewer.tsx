@@ -982,7 +982,6 @@ export function EmailViewer({
   // Ensure S/MIME key records are loaded from IndexedDB
   useLayoutEffect(() => {
     useSmimeStore.getState().load(activeAccountId ?? undefined);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAccountId]);
 
   // Build mailbox tree for move-to dropdown
