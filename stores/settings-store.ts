@@ -535,15 +535,18 @@ export const useSettingsStore = create<SettingsState>()(
             settings.protocolOpenMode = settings.protocolMailtoOpenMode;
           }
 
-          // Apply settings
-          Object.keys(settings).forEach((key) => {
-            if (key in DEFAULT_SETTINGS) {
-              if (key === 'subAddressDelimiter' && !isValidSubAddressDelimiter(settings[key])) {
-                return;
-              }
-              set({ [key]: settings[key] });
-            }
-          });
+          // Apply settings — batch into one set() call. The previous loop
+          // did `set({ [key]: value })` per key, triggering ~30 separate
+          // zustand notify cycles (one per setting). Each cycle re-runs
+          // every subscriber's shallow-compare. Build the patch first,
+          // then issue one update. Also drops the Object.keys array.
+          const updates: Record<string, unknown> = {};
+          for (const key in settings) {
+            if (!(key in DEFAULT_SETTINGS)) continue;
+            if (key === 'subAddressDelimiter' && !isValidSubAddressDelimiter(settings[key])) continue;
+            updates[key] = settings[key];
+          }
+          set(updates);
 
           // Apply visual settings
           applyFontSize(get().fontSize);
