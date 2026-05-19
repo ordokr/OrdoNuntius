@@ -533,9 +533,9 @@ export const useCalendarStore = create<CalendarStore>()(
                 language: p.language,
                 links: p.links,
               };
-              Object.keys(participant).forEach(k => {
+              for (const k in participant) {
                 if (participant[k] === undefined || participant[k] === null) delete participant[k];
-              });
+              }
               cleanParticipants[key] = participant as unknown as CalendarParticipant;
             }
           }
@@ -567,10 +567,10 @@ export const useCalendarStore = create<CalendarStore>()(
             alerts: src.alerts,
             participants: cleanParticipants,
           };
-          Object.keys(data).forEach(k => {
+          for (const k in data) {
             const v = (data as Record<string, unknown>)[k];
             if (v === undefined || v === null) delete (data as Record<string, unknown>)[k];
-          });
+          }
           prepared.push(data);
         }
 

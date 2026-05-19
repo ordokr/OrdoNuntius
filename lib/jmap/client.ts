@@ -4503,12 +4503,19 @@ export class JMAPClient implements IJMAPClient {
 
       if (!isExplicitTask && !isCalDavTask) return;
 
-      // Filter by calendar if requested
+      // Filter by calendar if requested. `for...in` + early-return on
+      // match avoids the per-task `Object.keys` array allocation.
       if (calendarIdSet) {
         const objCalendarIds = obj.calendarIds as Record<string, boolean> | undefined;
-        if (objCalendarIds && !Object.keys(objCalendarIds).some(id => calendarIdSet.has(id))) {
-          debug.log('tasks', 'CalendarTask/fallback skipping task (not in requested calendars)', obj.id);
-          return;
+        if (objCalendarIds) {
+          let anyMatch = false;
+          for (const id in objCalendarIds) {
+            if (calendarIdSet.has(id)) { anyMatch = true; break; }
+          }
+          if (!anyMatch) {
+            debug.log('tasks', 'CalendarTask/fallback skipping task (not in requested calendars)', obj.id);
+            return;
+          }
         }
       }
 

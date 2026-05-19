@@ -575,56 +575,19 @@ const HOOK_PERMISSIONS: Record<string, Permission> = {
   onNavigate: 'ui:observe', onRouteEnter: 'ui:observe', onRouteLeave: 'ui:observe',
 };
 
-// Map hook names â†’ actual HookBus instances
+// Map hook names → actual HookBus instances. The spread form is the
+// shorter equivalent of `Object.fromEntries(Object.entries(x))` — each
+// hook group is already a plain object literal, so the entries-then-
+// fromEntries roundtrip just rebuilds it. Spread does the same in one
+// step (saves 2 array allocs per hook group at module init).
 const HOOK_BUSES: Record<string, { register: (pluginId: string, handler: (...args: unknown[]) => unknown, order?: number) => Disposable }> = {
-  // Email
-  ...Object.fromEntries(Object.entries(emailHooks)),
-  // Calendar
-  ...Object.fromEntries(Object.entries(calendarHooks)),
-  // Calendar Form
-  ...Object.fromEntries(Object.entries(calendarFormHooks)),
-  // Contacts
-  ...Object.fromEntries(Object.entries(contactHooks)),
-  // Files
-  ...Object.fromEntries(Object.entries(fileHooks)),
-  // Auth
-  ...Object.fromEntries(Object.entries(authHooks)),
-  // Settings
-  ...Object.fromEntries(Object.entries(settingsHooks)),
-  // Identity
-  ...Object.fromEntries(Object.entries(identityHooks)),
-  // Filters
-  ...Object.fromEntries(Object.entries(filterHooks)),
-  // Tasks
-  ...Object.fromEntries(Object.entries(taskHooks)),
-  // Templates
-  ...Object.fromEntries(Object.entries(templateHooks)),
-  // S/MIME
-  ...Object.fromEntries(Object.entries(smimeHooks)),
-  // Vacation
-  ...Object.fromEntries(Object.entries(vacationHooks)),
-  // UI
-  ...Object.fromEntries(Object.entries(uiHooks)),
-  // Theme
-  ...Object.fromEntries(Object.entries(themeHooks)),
-  // Toast
-  ...Object.fromEntries(Object.entries(toastHooks)),
-  // Drag & Drop
-  ...Object.fromEntries(Object.entries(dragDropHooks)),
-  // Keyboard
-  ...Object.fromEntries(Object.entries(keyboardHooks)),
-  // App Lifecycle
-  ...Object.fromEntries(Object.entries(appLifecycleHooks)),
-  // Account Security
-  ...Object.fromEntries(Object.entries(accountSecurityHooks)),
-  // Sidebar Apps
-  ...Object.fromEntries(Object.entries(sidebarAppHooks)),
-  // Avatar
-  ...Object.fromEntries(Object.entries(avatarHooks)),
-  // Render
-  ...Object.fromEntries(Object.entries(renderHooks)),
-  // Router
-  ...Object.fromEntries(Object.entries(routerHooks)),
+  ...emailHooks, ...calendarHooks, ...calendarFormHooks, ...contactHooks,
+  ...fileHooks, ...authHooks, ...settingsHooks, ...identityHooks,
+  ...filterHooks, ...taskHooks, ...templateHooks, ...smimeHooks,
+  ...vacationHooks, ...uiHooks, ...themeHooks, ...toastHooks,
+  ...dragDropHooks, ...keyboardHooks, ...appLifecycleHooks,
+  ...accountSecurityHooks, ...sidebarAppHooks, ...avatarHooks,
+  ...renderHooks, ...routerHooks,
 };
 
 // --- Slot registration bridge --------------------------------
