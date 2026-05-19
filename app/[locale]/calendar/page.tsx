@@ -57,7 +57,7 @@ import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { CreateCalendarModal } from "@/components/calendar/create-calendar-modal";
 import { getUserParticipantId } from "@/lib/calendar-participants";
 import { generateBirthdayEvents, createBirthdayCalendar, BIRTHDAY_CALENDAR_ID } from "@/lib/birthday-calendar";
-import { debug } from "@/lib/debug";
+import { debug, isDebugEnabled } from "@/lib/debug";
 import { consumePendingWebcal, hasPendingWebcal, subscribeToPendingWebcal } from "@/lib/protocol-handlers/session";
 import type { ParsedWebcal } from "@/lib/protocol-handlers/webcal";
 
@@ -1028,9 +1028,12 @@ export default function CalendarPage() {
   }, [events, selectedCalendarIds, showBirthdayCalendar, birthdayEvents]);
 
   useEffect(() => {
-    // Same selectedSet + for...in pattern as visibleEvents above. This
-    // runs as a debug-log effect — was the same O(events × cals × selected)
-    // walk + per-event keys-array. Compute once with O(1) lookups.
+    // Guard the entire hidden-events computation behind isDebugEnabled.
+    // Was running .filter + .slice + .map on every events/selectedCalendarIds
+    // change regardless of whether the debug.log would emit. For a 1000-
+    // event view that's 1000 filter ops + payload allocations per change
+    // just to be discarded.
+    if (!isDebugEnabled('calendar')) return;
     const selectedSet = new Set(selectedCalendarIds);
     const hiddenEvents = events.filter((event) => {
       if (!event.start || !event.calendarIds) return true;
