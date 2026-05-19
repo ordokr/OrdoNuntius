@@ -1121,9 +1121,11 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
       const removedEmailIds = new Set(threadEmailIds);
       set((currentState) => {
         const nextSelectedEmail = getNextSelectedEmailAfterRemoval(currentState, removedEmailIds);
-        const nextSelectedEmailIds = new Set(
-          Array.from(currentState.selectedEmailIds).filter(id => !removedEmailIds.has(id))
-        );
+        // Direct Set build skips the Array.from + filter intermediates.
+        const nextSelectedEmailIds = new Set<string>();
+        for (const id of currentState.selectedEmailIds) {
+          if (!removedEmailIds.has(id)) nextSelectedEmailIds.add(id);
+        }
         const nextExpandedThreadIds = new Set(currentState.expandedThreadIds);
         nextExpandedThreadIds.delete(email.threadId);
         const nextThreadEmailsCache = new Map(currentState.threadEmailsCache);
