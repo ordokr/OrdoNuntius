@@ -95,12 +95,21 @@ function firstValueOf<T>(rec: Record<string, T> | undefined): T | undefined {
 
 export function getContactDisplayName(contact: ContactCard): string {
   if (contact.name) {
-    // Try given + surname from components first
-    if (contact.name.components && contact.name.components.length > 0) {
-      const given = contact.name.components.find(c => c.kind === 'given')?.value || '';
-      const surname = contact.name.components.find(c => c.kind === 'surname')?.value || '';
-      const full = [given, surname].filter(Boolean).join(' ');
-      if (full) return full;
+    // Single walk captures both name parts; early-exits when both found.
+    // Was 2× `.find()` over components, each allocating a callback closure
+    // per visited element, plus a 2-element filter+join. Hot enough that
+    // it shows up on every Avatar + every list row.
+    const comps = contact.name.components;
+    if (comps && comps.length > 0) {
+      let given = '';
+      let surname = '';
+      for (const c of comps) {
+        if (c.kind === 'given') { given = c.value; if (surname) break; }
+        else if (c.kind === 'surname') { surname = c.value; if (given) break; }
+      }
+      if (given && surname) return given + ' ' + surname;
+      if (given) return given;
+      if (surname) return surname;
     }
     // Fall back to name.full (RFC 9553 - used by Stalwart and other JMAP servers)
     if (contact.name.full) return contact.name.full;
@@ -475,13 +484,15 @@ export const useContactStore = create<ContactStore>()(
           // allocation cost.
           const idx = getContactSearchIndex(contact);
           const nameMatches = idx.lowerName.includes(lower);
+          // Lazy-once-per-contact display name. Was: getContactDisplayName
+          // called per matching email — runs the components walk + nick/
+          // org/email fallbacks every time, even for the same contact.
+          let displayName: string | undefined;
           for (const e of idx.emails) {
             if (results.length >= MAX_RESULTS) break;
             if (nameMatches || e.lower.includes(lower)) {
-              // Compute the display name lazily — only when we have a hit,
-              // not for every contact we scan past.
-              const name = getContactDisplayName(contact);
-              results.push({ name, email: e.address });
+              if (displayName === undefined) displayName = getContactDisplayName(contact);
+              results.push({ name: displayName, email: e.address });
             }
           }
         }

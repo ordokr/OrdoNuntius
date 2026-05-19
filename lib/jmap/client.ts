@@ -867,39 +867,57 @@ export class JMAPClient implements IJMAPClient {
 
   async getAllMailboxes(): Promise<Mailbox[]> {
     try {
-      const accountIds = Object.keys(this.accounts);
+      // Stable account-id list collected with for...in (no Object.keys
+      // intermediate). Order matters because we use the index to demux
+      // the batched response below.
+      const accountIds: string[] = [];
+      for (const id in this.accounts) accountIds.push(id);
 
       if (accountIds.length === 0) {
         return this.getMailboxes();
       }
 
-      // Fan out per-account Mailbox/get in parallel. The previous serial
-      // loop paid (RTT × number-of-accounts) on every cold load whenever
-      // shared accounts were present — for 3 connected accounts on a
-      // 200ms RTT that's 600ms of avoidable latency at sidebar render.
-      const perAccount = await Promise.all(accountIds.map(async (accountId) => {
+      // Single JMAP request batching every account's Mailbox/get into one
+      // round trip. Was: N parallel HTTP requests (one per account) on
+      // every cold sidebar load. JMAP §3.3 explicitly supports multi-call
+      // batching, so we pay 1 RTT instead of N regardless of connection
+      // multiplexing — and skip N HTTPS handshakes when the browser had to
+      // open new connections (Safari, low-bandwidth mobile).
+      const methodCalls: JMAPMethodCall[] = new Array(accountIds.length);
+      for (let i = 0; i < accountIds.length; i++) {
+        methodCalls[i] = ["Mailbox/get", { accountId: accountIds[i] }, String(i)];
+      }
+      const response = await this.request(methodCalls);
+      const responses = response.methodResponses || [];
+
+      const maxObjects = this.getMaxObjectsInGet();
+      const out: Mailbox[] = [];
+      for (let i = 0; i < accountIds.length; i++) {
+        const accountId = accountIds[i];
         const account = this.accounts[accountId];
         const isPrimary = accountId === this.accountId;
-
-        try {
-          const response = await this.request([
-            ["Mailbox/get", { accountId }, "0"],
-          ]);
-
-          if (response.methodResponses?.[0]?.[0] !== "Mailbox/get") return [];
-          const rawMailboxes = (response.methodResponses[0][1].list || []) as JMAPMailbox[];
-
-          debug.log('jmap', `[JMAP Mailbox] getAllMailboxes: account ${accountId} returned ${rawMailboxes.length} mailboxes (isPrimary: ${isPrimary})`);
-
-          const maxObjects = this.getMaxObjectsInGet();
-          if (rawMailboxes.length >= maxObjects) {
-            debug.warn('jmap',
-              `[JMAP Mailbox] Account ${accountId}: response contains ${rawMailboxes.length} mailboxes which equals maxObjectsInGet (${maxObjects}). ` +
-              `Some mailboxes may be missing.`
-            );
+        const resp = responses[i];
+        if (!resp || resp[0] !== "Mailbox/get") {
+          if (resp?.[0] === "error") {
+            console.error(`Failed to fetch mailboxes for account ${accountId}:`, resp[1]);
           }
+          continue;
+        }
 
-          return rawMailboxes.map((mb) => ({
+        const rawMailboxes = (resp[1].list || []) as JMAPMailbox[];
+
+        debug.log('jmap', `[JMAP Mailbox] getAllMailboxes: account ${accountId} returned ${rawMailboxes.length} mailboxes (isPrimary: ${isPrimary})`);
+
+        if (rawMailboxes.length >= maxObjects) {
+          debug.warn('jmap',
+            `[JMAP Mailbox] Account ${accountId}: response contains ${rawMailboxes.length} mailboxes which equals maxObjectsInGet (${maxObjects}). ` +
+            `Some mailboxes may be missing.`
+          );
+        }
+
+        const accountName = account?.name || (isPrimary ? this.username : accountId);
+        for (const mb of rawMailboxes) {
+          out.push({
             id: isPrimary ? mb.id : `${accountId}:${mb.id}`,
             originalId: mb.id,
             name: mb.name,
@@ -913,16 +931,13 @@ export class JMAPClient implements IJMAPClient {
             myRights: mb.myRights || DEFAULT_MAILBOX_RIGHTS,
             isSubscribed: mb.isSubscribed ?? true,
             accountId,
-            accountName: account?.name || (isPrimary ? this.username : accountId),
+            accountName,
             isShared: !isPrimary,
-          }) as Mailbox);
-        } catch (error) {
-          console.error(`Failed to fetch mailboxes for account ${accountId}:`, error);
-          return [];
+          } as Mailbox);
         }
-      }));
+      }
 
-      return perAccount.flat();
+      return out;
     } catch (error) {
       console.error("Failed to fetch all mailboxes:", error);
       return this.getMailboxes();
@@ -3828,30 +3843,39 @@ export class JMAPClient implements IJMAPClient {
       const primaryId = this.getCalendarsAccountId();
       const accountIds = this.getCalendarCapableAccountIds();
 
-      // Parallel per-account fetch (cold calendar sidebar render).
-      const settled = await Promise.allSettled(accountIds.map(async (accountId) => {
-        const isPrimary = accountId === primaryId;
-        const account = this.accounts[accountId];
-        const response = await this.request([
-          ["Calendar/get", { accountId, properties: CALENDAR_PROPERTIES }, "0"]
-        ], this.calendarUsing());
-        if (response.methodResponses?.[0]?.[0] !== "Calendar/get") return [];
-        const rawCalendars = (response.methodResponses[0][1].list || []) as Calendar[];
-        return rawCalendars.map((cal) => ({
-          ...cal,
-          id: isPrimary ? cal.id : `${accountId}:${cal.id}`,
-          originalId: cal.id,
-          accountId,
-          accountName: account?.name || (isPrimary ? this.username : accountId),
-          isShared: !isPrimary,
-        }));
-      }));
+      // Single batched JMAP request — was N parallel HTTP requests, one per
+      // account. Same RTT savings as getAllMailboxes: 1 RTT instead of N
+      // for the cold calendar sidebar render. Errors are demuxed per-method
+      // so one bad account doesn't poison the rest.
+      const methodCalls: JMAPMethodCall[] = new Array(accountIds.length);
+      for (let i = 0; i < accountIds.length; i++) {
+        methodCalls[i] = ["Calendar/get", { accountId: accountIds[i], properties: CALENDAR_PROPERTIES }, String(i)];
+      }
+      const response = await this.request(methodCalls, this.calendarUsing());
+      const responses = response.methodResponses || [];
 
       const allCalendars: Calendar[] = [];
-      for (let i = 0; i < settled.length; i++) {
-        const r = settled[i];
-        if (r.status === 'fulfilled') allCalendars.push(...r.value);
-        else console.error(`Failed to fetch calendars for account ${accountIds[i]}:`, r.reason);
+      for (let i = 0; i < accountIds.length; i++) {
+        const accountId = accountIds[i];
+        const resp = responses[i];
+        if (!resp || resp[0] !== "Calendar/get") {
+          if (resp?.[0] === "error") console.error(`Failed to fetch calendars for account ${accountId}:`, resp[1]);
+          continue;
+        }
+        const isPrimary = accountId === primaryId;
+        const account = this.accounts[accountId];
+        const accountName = account?.name || (isPrimary ? this.username : accountId);
+        const rawCalendars = (resp[1].list || []) as Calendar[];
+        for (const cal of rawCalendars) {
+          allCalendars.push({
+            ...cal,
+            id: isPrimary ? cal.id : `${accountId}:${cal.id}`,
+            originalId: cal.id,
+            accountId,
+            accountName,
+            isShared: !isPrimary,
+          });
+        }
       }
       return allCalendars;
     } catch (error) {
