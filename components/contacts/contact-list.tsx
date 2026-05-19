@@ -155,71 +155,115 @@ export function ContactList({
     const locLower = filters.location.trim().toLowerCase();
     const domainLower = filters.emailDomain.trim().toLowerCase().replace(/^@/, "");
 
+    // Each contact-filter pass previously allocated 6 Object.values arrays
+    // (emails, phones, orgs, titles, addresses, anniversaries) UPFRONT
+    // before any filter ran. For a 5000-contact list that's 30k throwaway
+    // arrays per keystroke. Walk each Record with for...in inline where
+    // actually needed, and break early on the first match for presence
+    // checks. Helpers: `hasAny` (any key in record) lifted out for clarity.
+    const hasAny = (r: Record<string, unknown> | null | undefined) => {
+      if (!r) return false;
+      for (const _ in r) return true;
+      return false;
+    };
     return contacts.filter((c) => {
-      const emails = c.emails ? Object.values(c.emails) : [];
-      const phones = c.phones ? Object.values(c.phones) : [];
-      const orgs = c.organizations ? Object.values(c.organizations) : [];
-      const titles = c.titles ? Object.values(c.titles) : [];
-      const addresses = c.addresses ? Object.values(c.addresses) : [];
-      const anniversaries = c.anniversaries ? Object.values(c.anniversaries) : [];
-
-      if (!matchTri(emails.length > 0, filters.hasEmail)) return false;
-      if (!matchTri(phones.length > 0, filters.hasPhone)) return false;
+      if (!matchTri(hasAny(c.emails), filters.hasEmail)) return false;
+      if (!matchTri(hasAny(c.phones), filters.hasPhone)) return false;
       if (!matchTri(!!getContactPhotoUri(c), filters.hasPhoto)) return false;
 
       if (orgLower) {
-        const match = orgs.some((o) => {
-          if (o.name?.toLowerCase().includes(orgLower)) return true;
-          if (o.units?.some((u) => u.name?.toLowerCase().includes(orgLower))) return true;
-          return false;
-        });
+        let match = false;
+        const orgs = c.organizations;
+        if (orgs) {
+          for (const k in orgs) {
+            const o = orgs[k];
+            if (o.name?.toLowerCase().includes(orgLower)) { match = true; break; }
+            if (o.units?.some((u) => u.name?.toLowerCase().includes(orgLower))) { match = true; break; }
+          }
+        }
         if (!match) return false;
       }
 
       if (jobLower) {
-        if (!titles.some((ti) => ti.name?.toLowerCase().includes(jobLower))) return false;
+        let match = false;
+        const titles = c.titles;
+        if (titles) {
+          for (const k in titles) {
+            if (titles[k].name?.toLowerCase().includes(jobLower)) { match = true; break; }
+          }
+        }
+        if (!match) return false;
       }
 
       if (locLower) {
-        const match = addresses.some((a) => {
-          const parts: string[] = [];
-          if (a.full) parts.push(a.full);
-          if (a.fullAddress) parts.push(a.fullAddress);
-          if (a.locality) parts.push(a.locality);
-          if (a.region) parts.push(a.region);
-          if (a.country) parts.push(a.country);
-          if (a.postcode) parts.push(a.postcode);
-          if (a.street) parts.push(a.street);
-          if (a.components) {
-            for (const comp of a.components) {
-              if (comp.value) parts.push(comp.value);
+        let match = false;
+        const addresses = c.addresses;
+        if (addresses) {
+          outer:
+          for (const k in addresses) {
+            const a = addresses[k];
+            // Inline includes checks against each field instead of
+            // building a parts[] array per address.
+            if (a.full?.toLowerCase().includes(locLower)) { match = true; break; }
+            if (a.fullAddress?.toLowerCase().includes(locLower)) { match = true; break; }
+            if (a.locality?.toLowerCase().includes(locLower)) { match = true; break; }
+            if (a.region?.toLowerCase().includes(locLower)) { match = true; break; }
+            if (a.country?.toLowerCase().includes(locLower)) { match = true; break; }
+            if (a.postcode?.toLowerCase().includes(locLower)) { match = true; break; }
+            if (a.street?.toLowerCase().includes(locLower)) { match = true; break; }
+            if (a.components) {
+              for (const comp of a.components) {
+                if (comp.value?.toLowerCase().includes(locLower)) { match = true; break outer; }
+              }
             }
           }
-          return parts.some((p) => p.toLowerCase().includes(locLower));
-        });
+        }
         if (!match) return false;
       }
 
       if (domainLower) {
-        const match = emails.some((e) => {
-          const at = e.address?.toLowerCase().split("@");
-          return at && at.length > 1 && at[1].includes(domainLower);
-        });
+        let match = false;
+        const emails = c.emails;
+        if (emails) {
+          for (const k in emails) {
+            const at = emails[k].address?.toLowerCase().split("@");
+            if (at && at.length > 1 && at[1].includes(domainLower)) { match = true; break; }
+          }
+        }
         if (!match) return false;
       }
 
       if (filters.birthdayMonth !== null) {
         const target = filters.birthdayMonth;
-        const match = anniversaries.some((a) => a.kind === "birth" && getAnniversaryMonth(a.date) === target);
+        let match = false;
+        const anniversaries = c.anniversaries;
+        if (anniversaries) {
+          for (const k in anniversaries) {
+            const a = anniversaries[k];
+            if (a.kind === "birth" && getAnniversaryMonth(a.date) === target) { match = true; break; }
+          }
+        }
         if (!match) return false;
       }
 
       if (!lower) return true;
       const name = getContactDisplayName(c).toLowerCase();
       if (name.includes(lower)) return true;
-      if (emails.some((e) => e.address?.toLowerCase().includes(lower))) return true;
-      if (phones.some((p) => p.number?.toLowerCase().includes(lower))) return true;
-      if (orgs.some((o) => o.name?.toLowerCase().includes(lower))) return true;
+      if (c.emails) {
+        for (const k in c.emails) {
+          if (c.emails[k].address?.toLowerCase().includes(lower)) return true;
+        }
+      }
+      if (c.phones) {
+        for (const k in c.phones) {
+          if (c.phones[k].number?.toLowerCase().includes(lower)) return true;
+        }
+      }
+      if (c.organizations) {
+        for (const k in c.organizations) {
+          if (c.organizations[k].name?.toLowerCase().includes(lower)) return true;
+        }
+      }
       return false;
     });
   }, [contacts, searchQuery, filters]);
