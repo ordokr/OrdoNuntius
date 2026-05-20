@@ -6,7 +6,10 @@ import { debug, isDebugEnabled } from '@/lib/debug';
 import { normalizeAllDayDuration } from '@/lib/calendar-utils';
 import { parseDuration } from '@/components/calendar/event-card';
 import { sanitizeOutgoingCalendarEventData } from '@/lib/calendar-event-normalization';
-import { expandRecurringEvents } from '@/lib/recurrence-expansion';
+// expandRecurringEvents (~26 KB src) is dynamic-imported at the
+// fetchEvents call site below — only the calendar route needs it,
+// but calendar-store is reachable from the inbox via navigation-rail
+// so the static import shipped it on every cold inbox load.
 import { generateUUID } from '@/lib/utils';
 import { apiFetch } from '@/lib/browser-navigation';
 import { BIRTHDAY_CALENDAR_ID } from '@/lib/birthday-calendar';
@@ -252,7 +255,11 @@ export const useCalendarStore = create<CalendarStore>()(
             else droppedEvents++;
           }
           // Expand recurring events client-side (Stalwart doesn't support
-          // mutations on synthetic IDs from server-side expandRecurrences)
+          // mutations on synthetic IDs from server-side expandRecurrences).
+          // Lazy import: only the calendar route ever calls this path, but
+          // calendar-store is pulled into the inbox bundle through the
+          // navigation rail.
+          const { expandRecurringEvents } = await import('@/lib/recurrence-expansion');
           const events = expandRecurringEvents(validEvents, start, end);
           debug.log('calendar', 'Calendar fetchEvents completed', {
             start,
