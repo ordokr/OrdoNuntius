@@ -37,13 +37,17 @@ const EXT_BY_MIME: Record<string, string> = {
   'image/x-icon': '.ico',
   'image/vnd.microsoft.icon': '.ico',
 };
+// Dedup'd extension list — was rebuilt every request via Object.values.
+const ALL_EXTENSIONS: readonly string[] = ['.svg', '.png', '.jpg', '.webp', '.ico'];
+// Hoisted filename sanitization regex.
+const UNSAFE_FILENAME_CHARS_RE = /[^a-zA-Z0-9._-]/g;
 
 function getBrandingDir(): string {
   return path.join(getConfigDir(), 'branding');
 }
 
 function sanitizeFilename(name: string): string {
-  return path.basename(name).replace(/[^a-zA-Z0-9._-]/g, '_');
+  return path.basename(name).replace(UNSAFE_FILENAME_CHARS_RE, '_');
 }
 
 /**
@@ -100,7 +104,7 @@ export async function POST(request: NextRequest) {
 
     // Remove any existing file for this slot with a different extension so
     // the wizard doesn't leave orphan files behind on re-upload.
-    for (const otherExt of Object.values(EXT_BY_MIME)) {
+    for (const otherExt of ALL_EXTENSIONS) {
       if (otherExt === ext) continue;
       const oldPath = path.join(dir, `${slot}${otherExt}`);
       if (existsSync(oldPath)) {
@@ -147,7 +151,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const dir = getBrandingDir();
-    for (const ext of Object.values(EXT_BY_MIME)) {
+    for (const ext of ALL_EXTENSIONS) {
       const filePath = path.join(dir, `${slot}${ext}`);
       if (existsSync(filePath)) {
         try { await unlink(filePath); } catch { /* ignore */ }

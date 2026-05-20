@@ -4,8 +4,13 @@ import { getStalwartCredentials } from '@/lib/stalwart/credentials';
 
 const ALLOWED_METHODS = new Set(['PROPFIND', 'MKCOL', 'GET', 'PUT', 'DELETE', 'MOVE', 'COPY']);
 
+// Hoisted regexes — all three were rebuilt per request.
+const BACKSLASH_RE = /\\/g;
+const QUERY_HASH_RE = /[?#]/;
+const TRAILING_SLASH_RE = /\/$/;
+
 function normalizeDavRelativePath(rawPath: string): string {
-  const sanitized = rawPath.replace(/\\/g, '/').split(/[?#]/, 1)[0] ?? '';
+  const sanitized = rawPath.replace(BACKSLASH_RE, '/').split(QUERY_HASH_RE, 1)[0] ?? '';
   const segments = sanitized.split('/').filter(Boolean);
 
   return segments.map((segment) => {
@@ -25,7 +30,7 @@ function normalizeDavRelativePath(rawPath: string): string {
 }
 
 function buildDavTargetUrl(baseUrl: string, username: string, rawPath: string): string {
-  const rootUrl = new URL(`${baseUrl.replace(/\/$/, '')}/dav/file/${encodeURIComponent(username)}/`);
+  const rootUrl = new URL(`${baseUrl.replace(TRAILING_SLASH_RE, '')}/dav/file/${encodeURIComponent(username)}/`);
   const relativePath = normalizeDavRelativePath(rawPath);
   return relativePath ? new URL(relativePath, rootUrl).toString() : rootUrl.toString();
 }
@@ -55,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     const davPath = request.headers.get('X-WebDAV-Path') || '/';
-    const baseUrl = creds.serverUrl.replace(/\/$/, '');
+    const baseUrl = creds.serverUrl.replace(TRAILING_SLASH_RE, '');
     const targetUrl = buildDavTargetUrl(baseUrl, creds.username, davPath);
 
     // Build headers for the upstream request

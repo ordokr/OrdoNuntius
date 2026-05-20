@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -24,7 +24,16 @@ function findServerByDomain(servers: PublicJmapServerEntry[], email: string | un
   if (!email || !email.includes("@")) return undefined;
   const domain = email.split("@")[1]?.trim().toLowerCase();
   if (!domain) return undefined;
-  return servers.find((s) => (s.domains ?? []).some((d) => d.toLowerCase() === domain));
+  // Manual loop avoids `(s.domains ?? []).some(...)` allocating a fresh
+  // empty array per server on each keystroke-driven re-render.
+  for (const s of servers) {
+    const ds = s.domains;
+    if (!ds) continue;
+    for (const d of ds) {
+      if (d.toLowerCase() === domain) return s;
+    }
+  }
+  return undefined;
 }
 
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
@@ -136,9 +145,12 @@ export default function LoginPage() {
   const [domainAutoLocked, setDomainAutoLocked] = useState(false);
 
   const hasServerList = jmapServers.length > 0;
-  const selectedServer = hasServerList
-    ? jmapServers.find((s) => s.id === selectedServerId) ?? jmapServers[0]
-    : undefined;
+  // Memo: re-running .find() per render (every keystroke, every setState)
+  // when only jmapServers/selectedServerId can change it.
+  const selectedServer = useMemo(
+    () => hasServerList ? jmapServers.find((s) => s.id === selectedServerId) ?? jmapServers[0] : undefined,
+    [hasServerList, jmapServers, selectedServerId],
+  );
 
   // Effective values: per-server overrides win, then global config.
   const serverUrl = selectedServer?.url || configuredServerUrl;
@@ -410,6 +422,14 @@ export default function LoginPage() {
     setShowThemeMenu(false);
   }, [setTheme]);
 
+  // Memo: cheap but the form re-renders on every input keystroke.
+  // Declared before the configLoading/configError early returns so all
+  // hooks are unconditional (rules-of-hooks).
+  const currentThemeOption = useMemo(
+    () => THEME_OPTIONS.find(o => o.value === theme) || THEME_OPTIONS[2],
+    [theme],
+  );
+
   if (configLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/30">
@@ -625,7 +645,6 @@ export default function LoginPage() {
     setDemoLoading(false);
   };
 
-  const currentThemeOption = THEME_OPTIONS.find(o => o.value === theme) || THEME_OPTIONS[2];
   const CurrentThemeIcon = currentThemeOption.icon;
 
   // Bound once and rendered in both the demo-mode tree and the full-form

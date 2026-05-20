@@ -13,6 +13,10 @@ import JSZip from 'jszip';
 import { MAX_THEME_SIZE } from '@/lib/plugin-types';
 import { sanitizeThemeCSS, validateThemeCSSSafety } from '@/lib/theme-loader';
 
+// Hoisted regex + headers; both were per-request.
+const THEME_ID_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 /**
  * GET /api/admin/themes - List all admin-managed themes
  */
@@ -23,7 +27,7 @@ export async function GET() {
 
     const registry = await getThemeRegistry();
     return NextResponse.json(registry.themes, {
-      headers: { 'Cache-Control': 'no-store' },
+      headers: NO_STORE_HEADERS,
     });
   } catch (error) {
     logger.error('Theme list error', { error: error instanceof Error ? error.message : 'Unknown error' });
@@ -95,7 +99,7 @@ export async function POST(request: NextRequest) {
       errors.push(`Expected type "theme", got "${manifest.type}"`);
     }
 
-    if (manifest.id && typeof manifest.id === 'string' && !/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(manifest.id)) {
+    if (manifest.id && typeof manifest.id === 'string' && !THEME_ID_RE.test(manifest.id)) {
       errors.push('ID must be lowercase alphanumeric with hyphens, min 2 chars');
     }
 

@@ -7,6 +7,14 @@ function getBrandingDir(): string {
   return path.join(getConfigDir(), 'branding');
 }
 
+// Hoisted CSP/cache header object — identical for every served file.
+const SERVE_HEADERS_BASE = {
+  'Cache-Control': 'public, max-age=3600, must-revalidate',
+  'X-Content-Type-Options': 'nosniff',
+  'Content-Security-Policy':
+    "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox",
+} as const;
+
 const MIME_TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
@@ -63,12 +71,9 @@ export async function GET(
     // touch app cookies or storage.
     return new NextResponse(buffer, {
       headers: {
+        ...SERVE_HEADERS_BASE,
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600, must-revalidate',
         'Content-Length': String(buffer.length),
-        'X-Content-Type-Options': 'nosniff',
-        'Content-Security-Policy':
-          "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox",
       },
     });
   } catch {

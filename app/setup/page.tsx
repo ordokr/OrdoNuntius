@@ -89,6 +89,13 @@ const STEPS = [
   { id: 'review', label: 'Review' },
 ] as const;
 
+// Hoisted: ServerStep re-runs its row-validation loop on every keystroke,
+// and isInsecureHttpUrl is called on every render. Module-scope avoids
+// per-call regex compile.
+const SERVER_ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
+const HTTP_SCHEME_RE = /^https?:\/\//i;
+const INSECURE_HTTP_RE = /^http:\/\//i;
+
 export default function SetupWizardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -588,7 +595,7 @@ function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 's
     const id = r.id.trim();
     if (!id) {
       rowErrors.push(`Server #${i + 1}: id is required`);
-    } else if (!/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(id)) {
+    } else if (!SERVER_ID_RE.test(id)) {
       rowErrors.push(`Server #${i + 1}: id must be alphanumeric (with - or _), starting with a letter or digit`);
     } else if (seenIds.has(id)) {
       rowErrors.push(`Server #${i + 1}: id "${id}" is duplicated`);
@@ -598,7 +605,7 @@ function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 's
     const url = r.url.trim();
     if (!url) {
       rowErrors.push(`Server #${i + 1}: url is required`);
-    } else if (!/^https?:\/\//i.test(url)) {
+    } else if (!HTTP_SCHEME_RE.test(url)) {
       rowErrors.push(`Server #${i + 1}: url must start with http:// or https://`);
     }
   }
@@ -1726,7 +1733,7 @@ function hasAnyBranding(c: WizardConfig): boolean {
 }
 
 function isInsecureHttpUrl(url: string): boolean {
-  return /^http:\/\//i.test(url.trim());
+  return INSECURE_HTTP_RE.test(url.trim());
 }
 
 function humanError(e: unknown): string {

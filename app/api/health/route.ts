@@ -5,6 +5,16 @@ import { logger } from '@/lib/logger';
 
 const MEMORY_WARNING_THRESHOLD = 0.85;
 const MEMORY_CRITICAL_THRESHOLD = 0.95;
+// Hoist threshold-as-percent + env-derived metadata once.
+const WARN_PCT = MEMORY_WARNING_THRESHOLD * 100;
+const CRIT_PCT = MEMORY_CRITICAL_THRESHOLD * 100;
+const PKG_VERSION = process.env.npm_package_version || '0.1.0';
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
+} as const;
 
 function getHeapUsagePercent(heapUsed: number, heapTotal: number): number {
   const heapSizeLimit = v8.getHeapStatistics().heap_size_limit;
@@ -55,10 +65,10 @@ export async function GET(request: NextRequest) {
     let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
     const warnings: string[] = [];
 
-    if (heapUsagePercent >= MEMORY_CRITICAL_THRESHOLD * 100) {
+    if (heapUsagePercent >= CRIT_PCT) {
       status = 'degraded';
       warnings.push(`V8 heap usage is very high: ${heapUsagePercent.toFixed(1)}% of heap limit`);
-    } else if (heapUsagePercent >= MEMORY_WARNING_THRESHOLD * 100) {
+    } else if (heapUsagePercent >= WARN_PCT) {
       status = 'degraded';
       warnings.push(`V8 heap usage is high: ${heapUsagePercent.toFixed(1)}% of heap limit`);
     }
@@ -70,7 +80,7 @@ export async function GET(request: NextRequest) {
 
     if (detailed) {
       response.uptime = process.uptime();
-      response.version = process.env.npm_package_version || '0.1.0';
+      response.version = PKG_VERSION;
       response.memory = {
         heapUsed: memUsage.heapUsed,
         heapTotal: memUsage.heapTotal,
@@ -79,7 +89,7 @@ export async function GET(request: NextRequest) {
         external: memUsage.external,
         heapUsagePercent: Number(heapUsagePercent.toFixed(2)),
       };
-      response.environment = process.env.NODE_ENV || 'development';
+      response.environment = NODE_ENV;
       response.nodeVersion = process.version;
 
       if (warnings.length > 0) {
@@ -89,11 +99,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response, {
       status: 200,
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      },
+      headers: NO_CACHE_HEADERS,
     });
 
   } catch (error) {

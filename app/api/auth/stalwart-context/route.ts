@@ -8,6 +8,9 @@ import { recordLogin } from '@/lib/telemetry/login-tracker';
 import { parseJmapServers, resolveTrustedJmapUrl } from '@/lib/admin/jmap-servers';
 import { MAX_ACCOUNT_SLOTS } from '@/lib/account-utils';
 
+// Resolve env once at module load — these never change at runtime.
+const ENV_JMAP_SERVER_URL = process.env.JMAP_SERVER_URL || process.env.NEXT_PUBLIC_JMAP_SERVER_URL || '';
+
 function getSlot(request: NextRequest, bodySlot: unknown): number {
   if (typeof bodySlot === 'number' && bodySlot >= 0 && bodySlot < MAX_ACCOUNT_SLOTS) {
     return bodySlot;
@@ -34,9 +37,7 @@ export async function POST(request: NextRequest) {
     await configManager.ensureLoaded();
     const configuredServerUrl =
       configManager.get<string>('jmapServerUrl', '') ||
-      process.env.JMAP_SERVER_URL ||
-      process.env.NEXT_PUBLIC_JMAP_SERVER_URL ||
-      '';
+      ENV_JMAP_SERVER_URL;
     const allowCustomEndpoint = configManager.get<boolean>('allowCustomJmapEndpoint', false);
     const serverList = parseJmapServers(configManager.get<unknown>('jmapServers', []));
     const trustedUrl = resolveTrustedJmapUrl(serverUrl, configuredServerUrl, serverList);

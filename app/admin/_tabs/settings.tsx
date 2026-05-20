@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Save, RotateCcw, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/browser-navigation';
+import { hasAnyKey } from '@/lib/utils';
 import { JmapServersSection } from './_jmap-servers-section';
 import type { JmapServerEntry } from '@/lib/admin/jmap-servers';
 
@@ -10,6 +11,10 @@ interface ConfigEntry {
   value: unknown;
   source: 'admin' | 'env' | 'default';
 }
+
+// Hoist option arrays for SelectSetting: was allocated fresh every render.
+const LOG_FORMAT_OPTIONS = ['text', 'json'];
+const LOG_LEVEL_OPTIONS = ['error', 'warn', 'info', 'debug'];
 
 export function SettingsTab() {
   const [config, setConfig] = useState<Record<string, ConfigEntry>>({});
@@ -42,7 +47,7 @@ export function SettingsTab() {
   }
 
   async function handleSave() {
-    if (Object.keys(edits).length === 0) return;
+    if (!hasAnyKey(edits)) return;
     setSaving(true);
     setMessage(null);
 
@@ -80,7 +85,11 @@ export function SettingsTab() {
     }
   }
 
-  const hasEdits = Object.keys(edits).length > 0;
+  const hasEdits = hasAnyKey(edits); // for-in early-return, skips keys array alloc
+  // Compute once: was 3 currentValue('jmapServers') invocations in render
+  // (the JmapServersSection prop, the Array.isArray guard, and the length check).
+  const rawJmapServers = currentValue('jmapServers');
+  const jmapServersValue: JmapServerEntry[] = Array.isArray(rawJmapServers) ? rawJmapServers as JmapServerEntry[] : [];
 
   if (loading) {
     return <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">Loading...</div>;
@@ -137,12 +146,12 @@ export function SettingsTab() {
           onRevert={handleRevert}
         />
         <JmapServersSection
-          value={(currentValue('jmapServers') as JmapServerEntry[]) ?? []}
+          value={jmapServersValue}
           source={config.jmapServers?.source}
           onChange={(next) => handleChange('jmapServers', next)}
           onRevert={() => handleRevert('jmapServers')}
         />
-        {Array.isArray(currentValue('jmapServers')) && (currentValue('jmapServers') as JmapServerEntry[]).length > 0 && (
+        {jmapServersValue.length > 0 && (
           <div className="px-4 py-2.5 bg-amber-50 dark:bg-amber-950/30 border-l-2 border-amber-400 dark:border-amber-600">
             <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
               <strong>CORS warning:</strong> Each JMAP server must allow this webmail's origin in its <code className="text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded">Access-Control-Allow-Origin</code> header, or browser requests will be blocked.
@@ -152,8 +161,8 @@ export function SettingsTab() {
       </SettingsSection>
 
       <SettingsSection title="Logging">
-        <SelectSetting label="Log Format" configKey="logFormat" value={currentValue('logFormat') as string} source={config.logFormat?.source} options={['text', 'json']} onChange={handleChange} onRevert={handleRevert} />
-        <SelectSetting label="Log Level" configKey="logLevel" value={currentValue('logLevel') as string} source={config.logLevel?.source} options={['error', 'warn', 'info', 'debug']} onChange={handleChange} onRevert={handleRevert} />
+        <SelectSetting label="Log Format" configKey="logFormat" value={currentValue('logFormat') as string} source={config.logFormat?.source} options={LOG_FORMAT_OPTIONS} onChange={handleChange} onRevert={handleRevert} />
+        <SelectSetting label="Log Level" configKey="logLevel" value={currentValue('logLevel') as string} source={config.logLevel?.source} options={LOG_LEVEL_OPTIONS} onChange={handleChange} onRevert={handleRevert} />
       </SettingsSection>
 
       <SettingsSection title="Settings Sync">

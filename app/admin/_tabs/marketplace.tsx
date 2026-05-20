@@ -38,6 +38,10 @@ interface SearchResult {
 
 type TypeFilter = 'all' | 'plugin' | 'theme';
 
+// Hoist the filter tabs: was `(['all', 'plugin', 'theme'] as const)` literal
+// allocated in JSX on every render.
+const TYPE_FILTERS: ReadonlyArray<TypeFilter> = ['all', 'plugin', 'theme'];
+
 export function MarketplaceTab() {
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,7 +157,7 @@ export function MarketplaceTab() {
           />
         </div>
         <div className="flex items-center gap-1 rounded-md border border-input bg-background p-0.5 self-start sm:self-auto">
-          {(['all', 'plugin', 'theme'] as const).map((t) => (
+          {TYPE_FILTERS.map((t) => (
             <button
               key={t}
               onClick={() => { setTypeFilter(t); setPage(1); }}

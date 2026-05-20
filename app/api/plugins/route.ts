@@ -3,6 +3,9 @@ import { getPluginRegistry, getThemeRegistry } from '@/lib/admin/plugin-registry
 import { listDevPlugins } from '@/lib/admin/plugin-dev';
 import { logger } from '@/lib/logger';
 
+// Hoisted no-store header object shared across responses.
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 /**
  * GET /api/plugins - Public endpoint for clients to discover server-managed plugins & themes
  *
@@ -20,50 +23,44 @@ export async function GET() {
     // Dev plugins win on id collision so a developer can shadow an installed
     // plugin without uninstalling it first.
     const devIds = new Set(devEntries.map(e => e.plugin.id));
-    const installedEnabled = pluginRegistry.plugins.filter(p => p.enabled && !devIds.has(p.id));
 
-    const plugins = [
-      ...devEntries.map(e => ({ ...e.plugin, dev: true })),
-      ...installedEnabled.map(p => ({ ...p, dev: false })),
-    ].map(p => ({
-      id: p.id,
-      name: p.name,
-      version: p.version,
-      author: p.author,
-      description: p.description,
-      type: p.type,
-      permissions: p.permissions,
-      entrypoint: p.entrypoint,
-      forceEnabled: p.forceEnabled || false,
-      // Content hash + updatedAt let clients detect re-uploads even when
-      // the manifest version is unchanged.
-      bundleHash: p.bundleHash,
-      updatedAt: p.updatedAt,
-      // Marks plugins loaded from PLUGIN_DEV_DIR. Surface in UI as a badge.
-      dev: p.dev,
-      // Surface so clients can enforce api.http.fetch origin allowlists.
-      httpOrigins: p.httpOrigins,
-      // Per-user settings schema, captured from the manifest at upload/load
-      // time so the client can render the settings UI without re-parsing.
-      settingsSchema: p.settingsSchema,
-    }));
+    // Single-pass build: was 3 walks (map dev, filter+map installed, outer map projection).
+    const plugins: Array<Record<string, unknown>> = [];
+    for (const e of devEntries) {
+      const p = e.plugin;
+      plugins.push({
+        id: p.id, name: p.name, version: p.version, author: p.author,
+        description: p.description, type: p.type, permissions: p.permissions,
+        entrypoint: p.entrypoint, forceEnabled: p.forceEnabled || false,
+        bundleHash: p.bundleHash, updatedAt: p.updatedAt, dev: true,
+        httpOrigins: p.httpOrigins, settingsSchema: p.settingsSchema,
+      });
+    }
+    for (const p of pluginRegistry.plugins) {
+      if (!p.enabled || devIds.has(p.id)) continue;
+      plugins.push({
+        id: p.id, name: p.name, version: p.version, author: p.author,
+        description: p.description, type: p.type, permissions: p.permissions,
+        entrypoint: p.entrypoint, forceEnabled: p.forceEnabled || false,
+        bundleHash: p.bundleHash, updatedAt: p.updatedAt, dev: false,
+        httpOrigins: p.httpOrigins, settingsSchema: p.settingsSchema,
+      });
+    }
 
-    // Only serve enabled themes
-    const themes = themeRegistry.themes
-      .filter(t => t.enabled)
-      .map(t => ({
-        id: t.id,
-        name: t.name,
-        version: t.version,
-        author: t.author,
-        description: t.description,
-        variants: t.variants,
+    // Single-pass filter+map fusion (was .filter().map()).
+    const themes: Array<Record<string, unknown>> = [];
+    for (const t of themeRegistry.themes) {
+      if (!t.enabled) continue;
+      themes.push({
+        id: t.id, name: t.name, version: t.version, author: t.author,
+        description: t.description, variants: t.variants,
         forceEnabled: t.forceEnabled || false,
-      }));
+      });
+    }
 
     return NextResponse.json(
       { plugins, themes },
-      { headers: { 'Cache-Control': 'no-store' } },
+      { headers: NO_STORE_HEADERS },
     );
   } catch (error) {
     logger.error('Plugin list error', { error: error instanceof Error ? error.message : 'Unknown error' });

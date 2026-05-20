@@ -20,13 +20,19 @@ import {
 import JSZip from 'jszip';
 import { MAX_PLUGIN_SIZE, ALL_PERMISSIONS, ALLOWED_PLUGIN_FILES } from '@/lib/plugin-types';
 
-const SUSPICIOUS_JS_PATTERNS = [
+const SUSPICIOUS_JS_PATTERNS: ReadonlyArray<{ pattern: RegExp; label: string }> = [
   { pattern: /\beval\s*\(/g, label: 'eval()' },
   { pattern: /\bnew\s+Function\s*\(/g, label: 'new Function()' },
   { pattern: /document\.cookie/g, label: 'document.cookie' },
   { pattern: /document\.write/g, label: 'document.write' },
   { pattern: /innerHTML\s*=/g, label: 'innerHTML assignment' },
 ];
+
+// Hoisted: avoid per-request reconstruction of valid sets + headers.
+const VALID_PLUGIN_TYPES = new Set(['ui-extension', 'sidebar-app', 'hook']);
+const VALID_PERMISSIONS = new Set(ALL_PERMISSIONS as readonly string[]);
+const PLUGIN_ID_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
  * GET /api/admin/plugins - List all admin-managed plugins
@@ -50,7 +56,7 @@ export async function GET() {
         .map(p => ({ ...p, dev: false as const })),
     ];
     return NextResponse.json(merged, {
-      headers: { 'Cache-Control': 'no-store' },
+      headers: NO_STORE_HEADERS,
     });
   } catch (error) {
     logger.error('Plugin list error', { error: error instanceof Error ? error.message : 'Unknown error' });
@@ -119,18 +125,16 @@ export async function POST(request: NextRequest) {
     if (!manifest.author || typeof manifest.author !== 'string') errors.push('Missing or invalid "author"');
     if (!manifest.entrypoint || typeof manifest.entrypoint !== 'string') errors.push('Missing or invalid "entrypoint"');
 
-    const validTypes = ['ui-extension', 'sidebar-app', 'hook'];
-    if (!validTypes.includes(manifest.type as string)) {
-      errors.push(`Invalid type. Must be one of: ${validTypes.join(', ')}`);
+    if (!VALID_PLUGIN_TYPES.has(manifest.type as string)) {
+      errors.push('Invalid type. Must be one of: ui-extension, sidebar-app, hook');
     }
 
-    if (manifest.id && typeof manifest.id === 'string' && !/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(manifest.id)) {
+    if (manifest.id && typeof manifest.id === 'string' && !PLUGIN_ID_RE.test(manifest.id)) {
       errors.push('ID must be lowercase alphanumeric with hyphens, min 2 chars');
     }
 
     if (manifest.permissions && Array.isArray(manifest.permissions)) {
-      const validPerms = new Set(ALL_PERMISSIONS as readonly string[]);
-      const unknown = (manifest.permissions as string[]).filter(p => !validPerms.has(p));
+      const unknown = (manifest.permissions as string[]).filter(p => !VALID_PERMISSIONS.has(p));
       if (unknown.length > 0) errors.push(`Unknown permissions: ${unknown.join(', ')}`);
     }
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Puzzle, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 import { apiFetch } from '@/lib/browser-navigation';
+import { hasAnyKey } from '@/lib/utils';
 
 interface ConfigField {
   type: 'string' | 'secret' | 'boolean' | 'number' | 'select';
@@ -175,7 +176,7 @@ export function PluginConfigPanel({ pluginId, onBack }: Props) {
   }
 
   const schema = plugin.configSchema;
-  const hasSchema = schema && Object.keys(schema).length > 0;
+  const hasSchema = hasAnyKey(schema); // for-in early-return, avoids keys array alloc
 
   return (
     <div className="space-y-6">

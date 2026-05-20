@@ -23,6 +23,18 @@ import { sanitizeThemeCSS, validateThemeCSSSafety } from '@/lib/theme-loader';
 // marketplace tab point EXTENSION_DIRECTORY_URL at their own directory.
 const DIRECTORY_URL = process.env.EXTENSION_DIRECTORY_URL || '';
 
+// Hoisted: dangerous-pattern table + valid-permissions Set + headers.
+// Was rebuilt on every install POST.
+const DANGEROUS_JS_PATTERNS: ReadonlyArray<{ pattern: RegExp; label: string }> = [
+  { pattern: /\beval\s*\(/g, label: 'eval()' },
+  { pattern: /\bnew\s+Function\s*\(/g, label: 'new Function()' },
+  { pattern: /document\.cookie/g, label: 'document.cookie' },
+  { pattern: /document\.write/g, label: 'document.write' },
+  { pattern: /innerHTML\s*=/g, label: 'innerHTML assignment' },
+];
+const VALID_PERMISSIONS = new Set(ALL_PERMISSIONS as readonly string[]);
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 /**
  * GET /api/admin/marketplace - Search/browse the extension directory
  * Proxies to the extension directory API
@@ -80,7 +92,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(data, {
-      headers: { 'Cache-Control': 'no-store' },
+      headers: NO_STORE_HEADERS,
     });
   } catch (error) {
     logger.error('Marketplace search error', { error: error instanceof Error ? error.message : 'Unknown error' });
@@ -210,14 +222,7 @@ export async function POST(request: NextRequest) {
 
       const code = await jsFile.async('string');
 
-      // Block plugins with dangerous JS patterns
-      const DANGEROUS_JS_PATTERNS = [
-        { pattern: /\beval\s*\(/g, label: 'eval()' },
-        { pattern: /\bnew\s+Function\s*\(/g, label: 'new Function()' },
-        { pattern: /document\.cookie/g, label: 'document.cookie' },
-        { pattern: /document\.write/g, label: 'document.write' },
-        { pattern: /innerHTML\s*=/g, label: 'innerHTML assignment' },
-      ];
+      // Block plugins with dangerous JS patterns (module-level table).
       const dangerousFindings: string[] = [];
       for (const { pattern, label } of DANGEROUS_JS_PATTERNS) {
         if (pattern.test(code)) dangerousFindings.push(label);
@@ -230,10 +235,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Validate permissions
+      // Validate permissions (hoisted VALID_PERMISSIONS Set).
       const permissions = Array.isArray(manifest.permissions) ? manifest.permissions as string[] : [];
-      const validPerms = new Set(ALL_PERMISSIONS as readonly string[]);
-      const unknownPerms = permissions.filter(p => !validPerms.has(p));
+      const unknownPerms = permissions.filter(p => !VALID_PERMISSIONS.has(p));
 
       const warnings: string[] = [];
       if (unknownPerms.length > 0) {

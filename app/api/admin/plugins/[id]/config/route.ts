@@ -5,6 +5,11 @@ import { getPluginConfig, setPluginConfig, deletePluginConfigKey } from '@/lib/a
 import { requireAdminAuth } from '@/lib/admin/session';
 import { getStalwartCredentials } from '@/lib/stalwart/credentials';
 
+// Hoisted: ID regex used in 3 handlers + key-format regex.
+const PLUGIN_ID_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+const CONFIG_KEY_RE = /^[a-zA-Z0-9._-]+$/;
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 /** Resolve a plugin from the persisted registry first, then PLUGIN_DEV_DIR. */
 async function resolvePlugin(id: string) {
   const registered = await getPlugin(id);
@@ -30,7 +35,7 @@ export async function GET(
   try {
     const { id } = await params;
 
-    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(id)) {
+    if (!PLUGIN_ID_RE.test(id)) {
       return NextResponse.json({ error: 'Invalid plugin ID' }, { status: 400 });
     }
 
@@ -62,7 +67,7 @@ export async function GET(
     }
 
     return NextResponse.json(response, {
-      headers: { 'Cache-Control': 'no-store' },
+      headers: NO_STORE_HEADERS,
     });
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -85,7 +90,7 @@ export async function PUT(
 
     const { id } = await params;
 
-    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(id)) {
+    if (!PLUGIN_ID_RE.test(id)) {
       return NextResponse.json({ error: 'Invalid plugin ID' }, { status: 400 });
     }
 
@@ -106,7 +111,7 @@ export async function PUT(
     }
 
     // Validate key format (alphanumeric, hyphens, underscores, dots)
-    if (!/^[a-zA-Z0-9._-]+$/.test(body.key)) {
+    if (!CONFIG_KEY_RE.test(body.key)) {
       return NextResponse.json({ error: 'Invalid key format' }, { status: 400 });
     }
 
@@ -132,7 +137,7 @@ export async function DELETE(
 
     const { id } = await params;
 
-    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(id)) {
+    if (!PLUGIN_ID_RE.test(id)) {
       return NextResponse.json({ error: 'Invalid plugin ID' }, { status: 400 });
     }
 

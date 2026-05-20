@@ -9,6 +9,10 @@ import { configManager } from '@/lib/admin/config-manager';
 import { hasSessionSecret } from '@/lib/auth/session-secret';
 import { MAX_ACCOUNT_SLOTS } from '@/lib/account-utils';
 
+// Hoisted: trailing-slash regex + env-derived sync flag.
+const TRAILING_SLASH_RE = /\/+$/;
+const ENV_SETTINGS_SYNC_ENABLED = process.env.SETTINGS_SYNC_ENABLED === 'true';
+
 function classifyError(error: unknown): { message: string; status: number } {
   const code = (error as NodeJS.ErrnoException).code;
   const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -51,14 +55,14 @@ function classifyError(error: unknown): { message: string; status: number } {
 
 function isEnabled(): boolean {
   const flagOn =
-    process.env.SETTINGS_SYNC_ENABLED === 'true' ||
+    ENV_SETTINGS_SYNC_ENABLED ||
     configManager.get<boolean>('settingsSyncEnabled', false);
   return flagOn && hasSessionSecret();
 }
 
 /** Strip trailing slashes so differently-formatted URLs still match. */
 function normalizeUrl(url: string): string {
-  return url.replace(/\/+$/, '');
+  return url.replace(TRAILING_SLASH_RE, '');
 }
 
 /**

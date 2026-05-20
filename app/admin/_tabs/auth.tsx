@@ -3,11 +3,17 @@
 import { useEffect, useState } from 'react';
 import { Save, Loader2, RotateCcw, Sparkles } from 'lucide-react';
 import { apiFetch } from '@/lib/browser-navigation';
+import { hasAnyKey } from '@/lib/utils';
 
 interface ConfigEntry {
   value: unknown;
   source: 'admin' | 'env' | 'default';
 }
+
+// Hoist: avoid re-compiling per render and re-allocating literal options.
+const COOKIE_SAMESITE_OPTIONS = ['lax', 'strict', 'none'];
+const ORIGIN_URL_RE = /^https?:\/\/[^/]+$/;
+const TRAILING_SLASH_RE = /\/+$/;
 
 export function AuthTab() {
   const [config, setConfig] = useState<Record<string, ConfigEntry>>({});
@@ -36,7 +42,7 @@ export function AuthTab() {
   }
 
   async function handleSave() {
-    if (Object.keys(edits).length === 0) return;
+    if (!hasAnyKey(edits)) return;
     setSaving(true);
     setMessage(null);
 
@@ -118,10 +124,11 @@ export function AuthTab() {
     }
   }
 
-  const setupOriginValid = /^https?:\/\/[^/]+$/.test(setupOrigin.trim().replace(/\/+$/, ''));
-  const setupIssuerValid = /^https?:\/\/[^/]+$/.test(setupIssuer.trim().replace(/\/+$/, ''));
+  // Hoisted regexes (ORIGIN_URL_RE, TRAILING_SLASH_RE) — was 4 fresh regex literals per render.
+  const setupOriginValid = ORIGIN_URL_RE.test(setupOrigin.trim().replace(TRAILING_SLASH_RE, ''));
+  const setupIssuerValid = ORIGIN_URL_RE.test(setupIssuer.trim().replace(TRAILING_SLASH_RE, ''));
 
-  const hasEdits = Object.keys(edits).length > 0;
+  const hasEdits = hasAnyKey(edits); // for-in early-return, skips keys array alloc
 
   if (loading) {
     return <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">Loading...</div>;
@@ -276,7 +283,7 @@ export function AuthTab() {
       </Section>
 
       <Section title="Session & Security">
-        <Select label="Cookie SameSite" configKey="cookieSameSite" value={currentValue('cookieSameSite') as string} source={config.cookieSameSite?.source} options={['lax', 'strict', 'none']} onChange={handleChange} onRevert={handleRevert} />
+        <Select label="Cookie SameSite" configKey="cookieSameSite" value={currentValue('cookieSameSite') as string} source={config.cookieSameSite?.source} options={COOKIE_SAMESITE_OPTIONS} onChange={handleChange} onRevert={handleRevert} />
         <Text label="Allowed Frame Ancestors" configKey="allowedFrameAncestors" value={currentValue('allowedFrameAncestors') as string} source={config.allowedFrameAncestors?.source} onChange={handleChange} onRevert={handleRevert} placeholder="'none' or https://..." />
         <Text label="Parent Origin" description="For embedded mode communication" configKey="parentOrigin" value={currentValue('parentOrigin') as string} source={config.parentOrigin?.source} onChange={handleChange} onRevert={handleRevert} />
       </Section>

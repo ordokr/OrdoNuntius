@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPluginBundle, getPlugin } from '@/lib/admin/plugin-registry';
 import { getDevPlugin, readDevBundle } from '@/lib/admin/plugin-dev';
 
+// Hoisted ID regex — avoids per-request literal alloc.
+const PLUGIN_ID_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+
 /**
  * GET /api/admin/plugins/[id]/bundle - Serve plugin JS bundle
  *
@@ -16,7 +19,7 @@ export async function GET(
     const { id } = await params;
 
     // Validate ID format to prevent path traversal
-    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(id)) {
+    if (!PLUGIN_ID_RE.test(id)) {
       return NextResponse.json({ error: 'Invalid plugin ID' }, { status: 400 });
     }
 

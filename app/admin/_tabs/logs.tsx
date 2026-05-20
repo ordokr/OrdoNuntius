@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { AuditEntry } from '@/lib/admin/types';
 import { apiFetch } from '@/lib/browser-navigation';
+import { hasAnyKey } from '@/lib/utils';
 
 export function LogsTab() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
@@ -163,7 +164,8 @@ export function LogsTab() {
 }
 
 function formatDetail(detail: Record<string, unknown>): string {
-  if (!detail || Object.keys(detail).length === 0) return '-';
+  // hasAnyKey: for-in early-return called twice per audit row (mobile + desktop).
+  if (!hasAnyKey(detail)) return '-';
   if (detail.reason) return String(detail.reason);
   if (detail.key) return `${detail.key}: ${JSON.stringify(detail.old)} → ${JSON.stringify(detail.new)}`;
   if (detail.changes && Array.isArray(detail.changes)) {

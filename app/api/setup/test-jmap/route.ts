@@ -6,6 +6,9 @@ export const dynamic = 'force-dynamic';
 
 const JMAP_ENDPOINTS = ['/.well-known/jmap', '/jmap/session', '/jmap'];
 const FETCH_TIMEOUT_MS = 5000;
+// Hoisted regexes — were created per call.
+const TRAILING_SLASH_RE = /\/+$/;
+const JMAP_SESSION_RE = /"capabilities"|"apiUrl"|"downloadUrl"|"urn:ietf:params:jmap/i;
 
 /**
  * POST /api/setup/test-jmap - server-side probe of a JMAP server. Mirrors
@@ -45,7 +48,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'invalid_url', message: 'URL must use http or https' });
   }
 
-  const base = raw.replace(/\/+$/, '');
+  const base = raw.replace(TRAILING_SLASH_RE, '');
 
   for (const endpoint of JMAP_ENDPOINTS) {
     const target = base + endpoint;
@@ -100,5 +103,5 @@ export async function POST(request: NextRequest) {
 }
 
 function looksLikeJmapSession(body: string): boolean {
-  return /"capabilities"|"apiUrl"|"downloadUrl"|"urn:ietf:params:jmap/i.test(body);
+  return JMAP_SESSION_RE.test(body);
 }

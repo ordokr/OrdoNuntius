@@ -5,6 +5,7 @@ import { AlertTriangle } from 'lucide-react';
 import { SettingsSection, SettingItem, ToggleSwitch } from '@/components/settings/settings-section';
 import type { AuditEntry } from '@/lib/admin/types';
 import { apiFetch } from '@/lib/browser-navigation';
+import { hasAnyKey } from '@/lib/utils';
 
 interface AdminStatus {
   enabled: boolean;
@@ -214,7 +215,8 @@ export function DashboardTab() {
 }
 
 function formatDetail(detail: Record<string, unknown>): string {
-  if (!detail || Object.keys(detail).length === 0) return '';
+  // hasAnyKey: for-in early-return, skips keys array alloc per audit entry.
+  if (!hasAnyKey(detail)) return '';
   if (detail.key) return `${detail.key}: ${detail.old} → ${detail.new}`;
   if (detail.reason) return String(detail.reason);
   if (detail.changes && Array.isArray(detail.changes)) return `${detail.changes.length} setting(s) changed`;

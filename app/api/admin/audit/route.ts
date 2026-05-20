@@ -3,6 +3,9 @@ import { requireAdminAuth } from '@/lib/admin/session';
 import { readAuditLog } from '@/lib/admin/audit';
 import { logger } from '@/lib/logger';
 
+// Hoisted: shared no-store header object.
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 /**
  * GET /api/admin/audit - Get paginated audit log entries (admin-protected)
  */
@@ -18,7 +21,7 @@ export async function GET(request: NextRequest) {
     const { entries, total } = await readAuditLog(page, limit, action);
 
     return NextResponse.json({ entries, total, page, limit }, {
-      headers: { 'Cache-Control': 'no-store' },
+      headers: NO_STORE_HEADERS,
     });
   } catch (error) {
     logger.error('Audit log read error', { error: error instanceof Error ? error.message : 'Unknown error' });

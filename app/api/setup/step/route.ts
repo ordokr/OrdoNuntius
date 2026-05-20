@@ -13,24 +13,25 @@ export const dynamic = 'force-dynamic';
  * step's PATCH validates against this allowlist so a compromised wizard
  * client can't slip in arbitrary config keys.
  */
-const STEP_KEYS: Record<string, string[]> = {
-  server: [
+// Sets give O(1) membership vs array.includes — was O(n) per key.
+const STEP_KEYS: Record<string, ReadonlySet<string>> = {
+  server: new Set([
     'appName',
     'jmapServerUrl',
     'stalwartFeaturesEnabled',
     'jmapServers',
     'jmapServerAutoPickByDomain',
-  ],
-  auth: [
+  ]),
+  auth: new Set([
     'oauthEnabled',
     'oauthOnly',
     'oauthClientId',
     'oauthClientSecret',
     'oauthIssuerUrl',
-  ],
-  security: ['sessionSecret', 'settingsSyncEnabled'],
-  logging: ['logFormat', 'logLevel'],
-  branding: [
+  ]),
+  security: new Set(['sessionSecret', 'settingsSyncEnabled']),
+  logging: new Set(['logFormat', 'logLevel']),
+  branding: new Set([
     'faviconUrl',
     'appLogoLightUrl',
     'appLogoDarkUrl',
@@ -40,7 +41,7 @@ const STEP_KEYS: Record<string, string[]> = {
     'loginImprintUrl',
     'loginPrivacyPolicyUrl',
     'loginWebsiteUrl',
-  ],
+  ]),
 };
 
 /**
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
 
   const updates: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(values as Record<string, unknown>)) {
-    if (!allowedKeys.includes(key)) {
+    if (!allowedKeys.has(key)) {
       return NextResponse.json({ error: `Key not allowed in step ${step}: ${key}` }, { status: 400 });
     }
     if (!(key in CONFIG_ENV_MAP)) {

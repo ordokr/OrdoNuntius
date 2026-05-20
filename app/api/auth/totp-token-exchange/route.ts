@@ -11,6 +11,13 @@ import { recordLogin } from '@/lib/telemetry/login-tracker';
 import { parseJmapServers, findServerByUrl, findServerById } from '@/lib/admin/jmap-servers';
 import { MAX_ACCOUNT_SLOTS } from '@/lib/account-utils';
 
+// Resolve env once at module load — these never change at runtime.
+const ENV_JMAP_SERVER_URL = process.env.JMAP_SERVER_URL || process.env.NEXT_PUBLIC_JMAP_SERVER_URL || '';
+const ENV_OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID;
+const ENV_OAUTH_CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET;
+const ENV_OAUTH_CLIENT_SECRET_FILE = process.env.OAUTH_CLIENT_SECRET_FILE;
+const FORM_HEADERS = { 'Content-Type': 'application/x-www-form-urlencoded' } as const;
+
 /**
  * Exchange basic auth credentials (with TOTP appended) for OAuth tokens.
  *
@@ -29,7 +36,7 @@ async function tryTokenRequest(
   extraHeaders?: Record<string, string>,
 ): Promise<{ ok: true; tokens: { access_token: string; expires_in?: number; refresh_token?: string } } | { ok: false; status: number; error: string }> {
   try {
-    const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded', ...extraHeaders };
+    const headers: Record<string, string> = { ...FORM_HEADERS, ...extraHeaders };
     const response = await fetch(tokenEndpoint, {
       method: 'POST',
       headers,
@@ -66,7 +73,7 @@ async function findTokenEndpoint(serverUrl: string): Promise<string | null> {
   for (const url of candidates) {
     try {
       // A POST with no body should return 400 (bad request) rather than 404 if the endpoint exists
-      const probe = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'grant_type=probe' });
+      const probe = await fetch(url, { method: 'POST', headers: FORM_HEADERS, body: 'grant_type=probe' });
       if (probe.status !== 404 && probe.status !== 405) {
         return url;
       }
@@ -97,9 +104,7 @@ export async function POST(request: NextRequest) {
     await configManager.ensureLoaded();
     const configuredServerUrl =
       configManager.get<string>('jmapServerUrl', '') ||
-      process.env.JMAP_SERVER_URL ||
-      process.env.NEXT_PUBLIC_JMAP_SERVER_URL ||
-      '';
+      ENV_JMAP_SERVER_URL;
     const allowCustomEndpoint = configManager.get<boolean>('allowCustomJmapEndpoint', false);
     const serverList = parseJmapServers(configManager.get<unknown>('jmapServers', []));
 
@@ -152,11 +157,11 @@ async function attemptAllStrategies(
   const entry = findServerById(serverList, serverId);
   const clientId = entry?.oauth?.clientId
     || configManager.get<string>('oauthClientId', '')
-    || process.env.OAUTH_CLIENT_ID;
+    || ENV_OAUTH_CLIENT_ID;
   const clientSecret = entry?.oauth?.clientSecret
     || configManager.get<string>('oauthClientSecret', '')
-    || process.env.OAUTH_CLIENT_SECRET
-    || readFileEnv(process.env.OAUTH_CLIENT_SECRET_FILE);
+    || ENV_OAUTH_CLIENT_SECRET
+    || readFileEnv(ENV_OAUTH_CLIENT_SECRET_FILE);
   const basicAuth = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
   const attempts: Array<{ strategy: string; error: string }> = [];
 

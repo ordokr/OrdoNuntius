@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { Upload, Trash2, Power, PowerOff, Loader2, Palette, Save, Shield, Lock, LockOpen } from 'lucide-react';
 import type { SettingsPolicy } from '@/lib/admin/types';
 import { DEFAULT_POLICY, DEFAULT_THEME_POLICY } from '@/lib/admin/types';
@@ -36,6 +36,18 @@ export function ThemesTab() {
   const [savingPolicy, setSavingPolicy] = useState(false);
 
   useEffect(() => { fetchThemes(); fetchPolicy(); }, []);
+
+  // useMemo'd lookup Sets: was 4 `.includes()` array scans per render across the
+  // policy and select-options sections. Declared up here before the loading
+  // early-return so hooks are unconditional (rules-of-hooks).
+  const disabledBuiltinSet = useMemo(
+    () => new Set(policy.themePolicy?.disabledBuiltinThemes || []),
+    [policy.themePolicy?.disabledBuiltinThemes],
+  );
+  const disabledAdminSet = useMemo(
+    () => new Set(policy.themePolicy?.disabledThemes || []),
+    [policy.themePolicy?.disabledThemes],
+  );
 
   async function fetchPolicy() {
     try {
@@ -412,7 +424,7 @@ export function ThemesTab() {
                 <option value="">System Default</option>
                 <optgroup label="Built-in">
                   {BUILTIN_THEME_OPTIONS
-                    .filter(t => !(policy.themePolicy?.disabledBuiltinThemes || []).includes(t.id))
+                    .filter(t => !disabledBuiltinSet.has(t.id))
                     .map(t => (
                       <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
@@ -420,7 +432,7 @@ export function ThemesTab() {
                 {themes.length > 0 && (
                   <optgroup label="Admin-deployed">
                     {themes
-                      .filter(t => !(policy.themePolicy?.disabledThemes || []).includes(t.id))
+                      .filter(t => !disabledAdminSet.has(t.id))
                       .map(t => (
                         <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
@@ -434,7 +446,7 @@ export function ThemesTab() {
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Built-in Themes</span>
             <div className="mt-2 space-y-2">
               {BUILTIN_THEME_OPTIONS.map(theme => {
-                const disabled = (policy.themePolicy?.disabledBuiltinThemes || []).includes(theme.id);
+                const disabled = disabledBuiltinSet.has(theme.id);
                 return (
                   <div key={theme.id} className="flex items-center justify-between gap-4">
                     <span className="text-sm text-foreground">{theme.name}</span>
@@ -453,7 +465,7 @@ export function ThemesTab() {
               <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Admin-deployed Themes</span>
               <div className="mt-2 space-y-2">
                 {themes.map(theme => {
-                  const disabled = (policy.themePolicy?.disabledThemes || []).includes(theme.id);
+                  const disabled = disabledAdminSet.has(theme.id);
                   return (
                     <div key={theme.id} className="flex items-center justify-between gap-4">
                       <span className="text-sm text-foreground">{theme.name}</span>

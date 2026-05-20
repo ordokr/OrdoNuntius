@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Save, Loader2, RotateCcw, ImageIcon, Upload, Trash2 } from 'lucide-react';
 import { apiFetch } from '@/lib/browser-navigation';
+import { hasAnyKey } from '@/lib/utils';
 
 interface ConfigEntry {
   value: unknown;
@@ -55,7 +56,7 @@ export function BrandingTab() {
   }
 
   async function handleSave() {
-    if (Object.keys(edits).length === 0) return;
+    if (!hasAnyKey(edits)) return;
     setSaving(true);
     setMessage(null);
 
@@ -152,7 +153,7 @@ export function BrandingTab() {
     return val.startsWith('/api/admin/branding/');
   };
 
-  const hasEdits = Object.keys(edits).length > 0;
+  const hasEdits = hasAnyKey(edits); // for-in early-return, skips keys array alloc each render
 
   if (loading) {
     return <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">Loading...</div>;

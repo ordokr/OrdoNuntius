@@ -5,6 +5,9 @@ import { getStalwartCredentials } from '@/lib/stalwart/credentials';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Hoisted no-store header object.
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 /**
  * GET /api/push/preview
  *
@@ -66,10 +69,11 @@ export async function GET(request: NextRequest) {
       methodResponses: [string, Record<string, unknown>, string][];
     };
 
-    const inboxBody = inboxData.methodResponses.find(
-      ([method]) => method === 'Mailbox/query',
-    )?.[1] as { ids?: string[] } | undefined;
-
+    // Simple loop avoids the destructuring-array allocation per element from `.find`.
+    let inboxBody: { ids?: string[] } | undefined;
+    for (const r of inboxData.methodResponses) {
+      if (r[0] === 'Mailbox/query') { inboxBody = r[1] as { ids?: string[] }; break; }
+    }
     const inboxId = inboxBody?.ids?.[0];
 
     if (!inboxId) {
@@ -77,9 +81,7 @@ export async function GET(request: NextRequest) {
         email: null,
         unreadTotal: 0,
       }, {
-        headers: {
-          'Cache-Control': 'no-store',
-        },
+        headers: NO_STORE_HEADERS,
       });
     }
 
@@ -152,15 +154,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // SW already gates on its own logic - no-store keeps push events from
+    // being cached/replayed stale.
     return NextResponse.json({
       email,
       unreadTotal,
     }, {
-      headers: {
-        // SW already gates on its own logic - don't let push events get
-        // cached and served stale.
-        'Cache-Control': 'no-store',
-      },
+      headers: NO_STORE_HEADERS,
     });
   } catch (error) {
     // `fetch failed` from undici is too generic to debug - the real reason

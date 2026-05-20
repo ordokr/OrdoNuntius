@@ -4,6 +4,12 @@ import { isPublicHttpUrl } from '@/lib/security/url-guard';
 const MAX_RESPONSE_SIZE = 10 * 1024 * 1024; // 10MB
 const FETCH_TIMEOUT_MS = 15000;
 
+// Hoisted base request headers; identical on every probe (auth conditionally added).
+const BASE_REQ_HEADERS = {
+  'Accept': 'text/calendar, application/ics, text/plain, */*',
+  'User-Agent': 'JMAP-Webmail/1.0 Calendar-Fetcher',
+} as const;
+
 function extractBasicAuth(rawUrl: string): { cleanUrl: string; authHeader: string | null } | null {
   let parsed: URL;
   try {
@@ -64,10 +70,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Redirect to disallowed URL' }, { status: 400 });
       }
 
-      const headers: Record<string, string> = {
-        'Accept': 'text/calendar, application/ics, text/plain, */*',
-        'User-Agent': 'JMAP-Webmail/1.0 Calendar-Fetcher',
-      };
+      const headers: Record<string, string> = { ...BASE_REQ_HEADERS };
       if (authHeader && new URL(currentUrl).origin === originalOrigin) {
         headers['Authorization'] = authHeader;
       }

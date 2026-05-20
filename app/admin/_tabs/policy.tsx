@@ -6,7 +6,13 @@ import type { SettingsPolicy, FeatureGates } from '@/lib/admin/types';
 import { DEFAULT_FEATURE_GATES, DEFAULT_POLICY } from '@/lib/admin/types';
 import { apiFetch } from '@/lib/browser-navigation';
 
-const EXCLUDED_FEATURE_GATES: (keyof FeatureGates)[] = ['pluginsEnabled', 'pluginsUploadEnabled', 'themesEnabled', 'userThemesEnabled'];
+const EXCLUDED_FEATURE_GATES: Set<keyof FeatureGates> = new Set(['pluginsEnabled', 'pluginsUploadEnabled', 'themesEnabled', 'userThemesEnabled']);
+
+// Pre-filtered list of feature-gate keys to render. Was: Object.keys(DEFAULT_FEATURE_GATES)
+// + .filter rebuilt every render. Now built once at module load (excluded keys
+// also resolved via Set above instead of array.includes).
+const RENDERED_FEATURE_GATE_KEYS = (Object.keys(DEFAULT_FEATURE_GATES) as (keyof FeatureGates)[])
+  .filter((key) => !EXCLUDED_FEATURE_GATES.has(key));
 
 const FEATURE_GATE_LABELS: Partial<Record<keyof FeatureGates, { label: string; description: string }>> = {
   sidebarAppsEnabled: { label: 'Sidebar Apps', description: 'Allow custom web apps in navigation rail' },
@@ -180,9 +186,7 @@ export function PolicyTab() {
           <p className="text-xs text-muted-foreground mt-0.5">Toggle entire features on or off for all users. Plugin and theme gates are on their respective admin pages.</p>
         </div>
         <div className="divide-y divide-border">
-          {(Object.keys(DEFAULT_FEATURE_GATES) as (keyof FeatureGates)[])
-            .filter(key => !EXCLUDED_FEATURE_GATES.includes(key))
-            .map(key => {
+          {RENDERED_FEATURE_GATE_KEYS.map(key => {
             const meta = FEATURE_GATE_LABELS[key];
             if (!meta) return null;
             const { label, description } = meta;

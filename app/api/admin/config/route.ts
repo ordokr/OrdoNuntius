@@ -6,6 +6,10 @@ import { CONFIG_ENV_MAP } from '@/lib/admin/types';
 import { parseJmapServers } from '@/lib/admin/jmap-servers';
 import { logger } from '@/lib/logger';
 
+// Hoisted: O(1) key validation Set + no-store header object built once.
+const VALID_CONFIG_KEYS = new Set(Object.keys(CONFIG_ENV_MAP));
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 /**
  * GET /api/admin/config - Get full config with sources (admin-protected)
  */
@@ -18,7 +22,7 @@ export async function GET() {
     const config = configManager.getAllWithSources();
 
     return NextResponse.json(config, {
-      headers: { 'Cache-Control': 'no-store' },
+      headers: NO_STORE_HEADERS,
     });
   } catch (error) {
     logger.error('Admin config read error', { error: error instanceof Error ? error.message : 'Unknown error' });
@@ -41,9 +45,11 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Request body must be an object' }, { status: 400 });
     }
 
-    // Validate keys
-    const validKeys = Object.keys(CONFIG_ENV_MAP);
-    const invalidKeys = Object.keys(updates).filter(k => !validKeys.includes(k));
+    // Validate keys (O(n) Set lookup vs O(n*m) Array.includes).
+    const invalidKeys: string[] = [];
+    for (const k of Object.keys(updates)) {
+      if (!VALID_CONFIG_KEYS.has(k)) invalidKeys.push(k);
+    }
     if (invalidKeys.length > 0) {
       return NextResponse.json({ error: `Unknown config keys: ${invalidKeys.join(', ')}` }, { status: 400 });
     }

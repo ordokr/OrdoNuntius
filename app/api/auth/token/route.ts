@@ -6,6 +6,9 @@ import { exchangeCodeForTokens, buildOAuthParams, getMetadata, getTokenEndpoint 
 import { getCookieOptions } from '@/lib/oauth/cookie-config';
 import { MAX_ACCOUNT_SLOTS } from '@/lib/account-utils';
 
+// Hoisted: form-encoded request headers used on every refresh/revoke call.
+const FORM_HEADERS = { 'Content-Type': 'application/x-www-form-urlencoded' } as const;
+
 function getSlot(request: NextRequest): number {
   const raw = request.nextUrl.searchParams.get('slot');
   if (raw === null) return 0;
@@ -75,7 +78,7 @@ export async function PUT(request: NextRequest) {
 
     const tokenResponse = await fetch(tokenEndpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: FORM_HEADERS,
       body: params.toString(),
     });
 
@@ -128,7 +131,7 @@ export async function DELETE(request: NextRequest) {
               const params = buildOAuthParams({ token, token_type_hint: 'refresh_token' }, slotServerId);
               await fetch(metadata.revocation_endpoint, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                headers: FORM_HEADERS,
                 body: params.toString(),
               }).catch(() => {});
             }
@@ -162,7 +165,7 @@ export async function DELETE(request: NextRequest) {
         try {
           const revocationResponse = await fetch(metadata.revocation_endpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: FORM_HEADERS,
             body: params.toString(),
           });
           if (!revocationResponse.ok) {

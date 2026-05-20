@@ -9,6 +9,11 @@ import {
   DEFAULT_VERSION_ENDPOINT,
 } from '@/lib/version-check';
 
+// Resolve build-time env vars once at module load (constant per process).
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0';
+const GIT_COMMIT = process.env.NEXT_PUBLIC_GIT_COMMIT || 'unknown';
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 /**
  * GET /api/admin/version
  * Returns the cached update status, last check times, and effective config.
@@ -21,8 +26,8 @@ export async function GET() {
     const state = await loadState();
     return NextResponse.json(
       {
-        current: process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0',
-        build: process.env.NEXT_PUBLIC_GIT_COMMIT || 'unknown',
+        current: APP_VERSION,
+        build: GIT_COMMIT,
         endpoint: effectiveEndpoint(state),
         defaultEndpoint: DEFAULT_VERSION_ENDPOINT,
         disabledByEnv: disabledByEnv(),
@@ -31,7 +36,7 @@ export async function GET() {
         nextScheduledAt: state.nextScheduledAt,
         status: state.status,
       },
-      { headers: { 'Cache-Control': 'no-store' } },
+      { headers: NO_STORE_HEADERS },
     );
   } catch (err) {
     logger.error('version admin GET error', {

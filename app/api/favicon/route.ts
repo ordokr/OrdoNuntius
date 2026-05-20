@@ -22,6 +22,11 @@ const NEGATIVE_CACHE_MAX_SIZE = 2000;
 // Strict domain validation to prevent SSRF
 const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
 
+// Hoisted header objects shared across every response path.
+const SHORT_CACHE_HEADERS = { 'Cache-Control': 'public, max-age=86400' } as const; // 1 day
+const LONG_CACHE_HEADERS = { 'Cache-Control': 'public, max-age=1209600' } as const; // 2 weeks
+const ERR_CACHE_HEADERS = { 'Cache-Control': 'public, max-age=300' } as const; // 5 min
+
 function isValidDomain(domain: string): boolean {
   if (domain.length > 253) return false;
   if (!DOMAIN_RE.test(domain)) return false;
@@ -424,7 +429,7 @@ export async function GET(request: NextRequest) {
   if (!domain || !isValidDomain(domain)) {
     return new NextResponse(null, {
       status: 400,
-      headers: { 'Cache-Control': 'public, max-age=86400' },
+      headers: SHORT_CACHE_HEADERS,
     });
   }
 
@@ -436,7 +441,7 @@ export async function GET(request: NextRequest) {
   if (neg && Date.now() - neg.fetchedAt < NEGATIVE_CACHE_TTL_MS) {
     return new NextResponse(null, {
       status: 404,
-      headers: { 'Cache-Control': 'public, max-age=86400' }, // 1 day
+      headers: SHORT_CACHE_HEADERS,
     });
   }
 
@@ -446,7 +451,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(cached.data, {
       headers: {
         'Content-Type': cached.contentType,
-        'Cache-Control': 'public, max-age=1209600', // 2 weeks
+        ...LONG_CACHE_HEADERS,
       },
     });
   }
@@ -462,7 +467,7 @@ export async function GET(request: NextRequest) {
       negativeCache.set(normalizedDomain, { fetchedAt: Date.now() });
       return new NextResponse(null, {
         status: 404,
-        headers: { 'Cache-Control': 'public, max-age=86400' },
+        headers: SHORT_CACHE_HEADERS,
       });
     }
 
@@ -475,7 +480,7 @@ export async function GET(request: NextRequest) {
       negativeCache.set(normalizedDomain, { fetchedAt: Date.now() });
       return new NextResponse(null, {
         status: 404,
-        headers: { 'Cache-Control': 'public, max-age=86400' },
+        headers: SHORT_CACHE_HEADERS,
       });
     }
 
@@ -486,13 +491,13 @@ export async function GET(request: NextRequest) {
     return new NextResponse(data, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=1209600',
+        ...LONG_CACHE_HEADERS,
       },
     });
   } catch {
     return new NextResponse(null, {
       status: 502,
-      headers: { 'Cache-Control': 'public, max-age=300' }, // 5 min
+      headers: ERR_CACHE_HEADERS,
     });
   }
 }

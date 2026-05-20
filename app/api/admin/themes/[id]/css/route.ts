@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getThemeCSS, getThemeRegistry } from '@/lib/admin/plugin-registry';
 import { logger } from '@/lib/logger';
 
+// Hoisted regex + headers.
+const THEME_ID_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+const CSS_HEADERS = {
+  'Content-Type': 'text/css; charset=utf-8',
+  'Cache-Control': 'public, max-age=3600',
+  'X-Content-Type-Options': 'nosniff',
+} as const;
+
 /**
  * GET /api/admin/themes/[id]/css - Serve theme CSS to clients
  */
@@ -13,7 +21,7 @@ export async function GET(
     const { id } = await params;
 
     // Validate ID format
-    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(id)) {
+    if (!THEME_ID_RE.test(id)) {
       return NextResponse.json({ error: 'Invalid theme ID' }, { status: 400 });
     }
 
@@ -32,13 +40,7 @@ export async function GET(
       return NextResponse.json({ error: 'Theme CSS not found' }, { status: 404 });
     }
 
-    return new NextResponse(css, {
-      headers: {
-        'Content-Type': 'text/css; charset=utf-8',
-        'Cache-Control': 'public, max-age=3600',
-        'X-Content-Type-Options': 'nosniff',
-      },
-    });
+    return new NextResponse(css, { headers: CSS_HEADERS });
   } catch (error) {
     logger.error('Theme CSS serve error', { error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

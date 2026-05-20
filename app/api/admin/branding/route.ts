@@ -30,9 +30,20 @@ const VALID_SLOTS = new Set([
   'loginLogoDarkUrl',
 ]);
 
+// Hoisted regex + extension maps so per-request allocations drop.
+const UNSAFE_FILENAME_CHARS_RE = /[^a-zA-Z0-9._-]/g;
+const EXT_BY_MIME: Record<string, string> = {
+  'image/svg+xml': '.svg',
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/webp': '.webp',
+  'image/x-icon': '.ico',
+  'image/vnd.microsoft.icon': '.ico',
+};
+const POSSIBLE_EXTENSIONS = ['.svg', '.png', '.jpg', '.webp', '.ico'] as const;
+
 function sanitizeFilename(name: string): string {
-  // Strip directory traversal, keep only safe chars
-  return path.basename(name).replace(/[^a-zA-Z0-9._-]/g, '_');
+  return path.basename(name).replace(UNSAFE_FILENAME_CHARS_RE, '_');
 }
 
 /**
@@ -71,16 +82,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Determine extension from mime type
-    const extMap: Record<string, string> = {
-      'image/svg+xml': '.svg',
-      'image/png': '.png',
-      'image/jpeg': '.jpg',
-      'image/webp': '.webp',
-      'image/x-icon': '.ico',
-      'image/vnd.microsoft.icon': '.ico',
-    };
-    const ext = extMap[file.type] || '.png';
+    const ext = EXT_BY_MIME[file.type] || '.png';
     const safeName = sanitizeFilename(`${slot}${ext}`);
     const filePath = path.join(getBrandingDir(), safeName);
 
@@ -125,9 +127,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Find and remove matching files for this slot
-    const possibleExts = ['.svg', '.png', '.jpg', '.webp', '.ico'];
     let removed = false;
-    for (const ext of possibleExts) {
+    for (const ext of POSSIBLE_EXTENSIONS) {
       const filePath = path.join(getBrandingDir(), `${slot}${ext}`);
       if (existsSync(filePath)) {
         await unlink(filePath);
