@@ -37,8 +37,8 @@ const FilePreviewModal = dynamic(
   () => import("@/components/files/file-preview-modal").then(m => ({ default: m.FilePreviewModal })),
   { ssr: false, loading: () => null }
 );
-import { loadFilesSettings } from "@/components/files/files-settings-dialog";
-import type { FolderLayout } from "@/components/files/files-settings-dialog";
+import { loadFilesSettings } from "@/lib/files-settings";
+import type { FolderLayout } from "@/lib/files-settings";
 import { AlertTriangle } from "lucide-react";
 
 export default function FilesPage() {

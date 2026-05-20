@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Folder, FolderOpen, FileText, FileCode, ImageIcon, FileAudio, File, Home, ChevronRight, ChevronDown } from "lucide-react";
 import { SettingsSection, SettingItem, ToggleSwitch, RadioGroup } from "./settings-section";
-import { loadFilesSettings, saveFilesSettings, type FilesSettings, type FolderLayout } from "@/components/files/files-settings-dialog";
+import { loadFilesSettings, saveFilesSettings, type FilesSettings, type FolderLayout } from "@/lib/files-settings";
 import { cn } from "@/lib/utils";
 
 interface SampleFile {
