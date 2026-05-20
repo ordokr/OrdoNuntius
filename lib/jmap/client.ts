@@ -4654,7 +4654,7 @@ export class JMAPClient implements IJMAPClient {
         ["CalendarEvent/query", { accountId, filter, limit: 1000 }, "0"],
         ["CalendarEvent/get", {
           accountId,
-          properties: [...CALENDAR_TASK_PROPERTIES],
+          properties: CALENDAR_TASK_PROPERTIES,
           "#ids": { resultOf: "0", name: "CalendarEvent/query", path: "/ids" },
         }, "1"]
       ], this.calendarUsing());
@@ -4742,7 +4742,7 @@ export class JMAPClient implements IJMAPClient {
       ["CalendarEvent/get", {
         accountId,
         ids: null,
-        properties: [...CALENDAR_TASK_PROPERTIES],
+        properties: CALENDAR_TASK_PROPERTIES,
       }, "0"]
     ], this.calendarUsing());
 
@@ -4865,12 +4865,16 @@ export class JMAPClient implements IJMAPClient {
       throw new Error("Failed to create task - no id returned");
     }
 
-    // Fetch back with task-specific properties
-    debug.log('calendar', 'CalendarTask/create re-fetching with task properties', { createdId, properties: [...CALENDAR_TASK_PROPERTIES] });
+    // Fetch back with task-specific properties. The debug payload is gated
+    // behind isDebugEnabled so we don't pay for the object literal when calendar
+    // debugging is off.
+    if (isDebugEnabled('calendar')) {
+      debug.log('calendar', 'CalendarTask/create re-fetching with task properties', { createdId, properties: CALENDAR_TASK_PROPERTIES });
+    }
     const getResponse = await this.request([
       ["CalendarEvent/get", {
         accountId,
-        properties: [...CALENDAR_TASK_PROPERTIES],
+        properties: CALENDAR_TASK_PROPERTIES,
         ids: [createdId],
       }, "0"]
     ], this.calendarUsing());
