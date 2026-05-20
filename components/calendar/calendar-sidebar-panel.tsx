@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Globe, ListTodo, Pencil, RefreshCw, Share2, Trash2, Cake, Users, Plus, Eraser, Palette } from "lucide-react";
-import { cn, formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime, hasAnyKey } from "@/lib/utils";
 import type { Calendar } from "@/lib/jmap/types";
 import { CalendarColorPicker } from "@/components/settings/calendar-management-settings";
 import { useCalendarStore } from "@/stores/calendar-store";
@@ -162,7 +162,7 @@ export function CalendarSidebarPanel({
           {cal.id === BIRTHDAY_CALENDAR_ID && (
             <Cake className="w-3 h-3 text-muted-foreground flex-shrink-0" />
           )}
-          {!cal.isShared && Object.keys(cal.shareWith || {}).length > 0 && (
+          {!cal.isShared && hasAnyKey(cal.shareWith) && (
             <Users
               className="w-3 h-3 text-muted-foreground flex-shrink-0"
               aria-label={tMgmt('share')}

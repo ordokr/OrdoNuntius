@@ -23,6 +23,21 @@ export function firstValue<T>(rec: Record<string, T> | null | undefined): T | un
 }
 
 /**
+ * Returns true when the record has at least one own key. Replaces the
+ * ubiquitous `Object.keys(rec).length > 0` pattern which allocates a
+ * keys array just to check size — wasteful in per-row render paths
+ * (`hasParticipants`, `hasShareWith`, etc.).
+ *
+ * for-in early-return: walks at most one key. Mirror of `firstValue` but
+ * returns a boolean.
+ */
+export function hasAnyKey<T>(rec: Record<string, T> | null | undefined): boolean {
+  if (!rec) return false;
+  for (const _ in rec) return true;
+  return false;
+}
+
+/**
  * Split a comma-separated string into trimmed non-empty parts.
  *
  * Replaces the ubiquitous `s.split(',').map(x => x.trim()).filter(Boolean)`
