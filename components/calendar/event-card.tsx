@@ -58,6 +58,9 @@ function parseDuration(duration: string | undefined): number {
   return total;
 }
 
+// Shared frozen literal so the non-draggable branch doesn't allocate {} per render.
+const EMPTY_DRAG_PROPS = Object.freeze({}) as Record<string, never>;
+
 function createEventDragPreview(title: string, timeRange: string, color: string): HTMLElement {
   const el = document.createElement("div");
   el.style.cssText = `
@@ -122,9 +125,14 @@ function EventCardImpl({ event, calendar, variant, onClick, onMouseEnter, onMous
     onDragStart: handleDragStart,
     onDragEnd: handleDragEnd,
     "aria-roledescription": "draggable event",
-  } : {};
+  } : EMPTY_DRAG_PROPS;
 
-  const handleContextMenu = onContextMenu ? (e: React.MouseEvent) => onContextMenu(e, event) : undefined;
+  // Stable handler when onContextMenu provided; undefined preserves browser default.
+  const handleContextMenuInner = useCallback(
+    (e: React.MouseEvent) => onContextMenu?.(e, event),
+    [onContextMenu, event],
+  );
+  const handleContextMenu = onContextMenu ? handleContextMenuInner : undefined;
 
   if (variant === "chip") {
     return (

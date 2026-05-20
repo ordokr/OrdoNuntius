@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ContactListItem } from "./contact-list-item";
 import { ContactContextMenu } from "./contact-context-menu";
 import { useContextMenu } from "@/hooks/use-context-menu";
-import { cn } from "@/lib/utils";
+import { cn, hasAnyKey } from "@/lib/utils";
 import type { AnniversaryDate, ContactCard } from "@/lib/jmap/types";
 import { getContactDisplayName, getContactPhotoUri } from "@/stores/contact-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -157,18 +157,12 @@ export function ContactList({
 
     // Each contact-filter pass previously allocated 6 Object.values arrays
     // (emails, phones, orgs, titles, addresses, anniversaries) UPFRONT
-    // before any filter ran. For a 5000-contact list that's 30k throwaway
-    // arrays per keystroke. Walk each Record with for...in inline where
-    // actually needed, and break early on the first match for presence
-    // checks. Helpers: `hasAny` (any key in record) lifted out for clarity.
-    const hasAny = (r: Record<string, unknown> | null | undefined) => {
-      if (!r) return false;
-      for (const _ in r) return true;
-      return false;
-    };
+    // before any filter ran. Walk each Record with for...in inline; use
+    // shared `hasAnyKey` from @/lib/utils for presence checks (avoids
+    // re-creating a helper closure on each useMemo run).
     return contacts.filter((c) => {
-      if (!matchTri(hasAny(c.emails), filters.hasEmail)) return false;
-      if (!matchTri(hasAny(c.phones), filters.hasPhone)) return false;
+      if (!matchTri(hasAnyKey(c.emails), filters.hasEmail)) return false;
+      if (!matchTri(hasAnyKey(c.phones), filters.hasPhone)) return false;
       if (!matchTri(!!getContactPhotoUri(c), filters.hasPhoto)) return false;
 
       if (orgLower) {

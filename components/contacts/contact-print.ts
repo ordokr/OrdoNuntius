@@ -1,13 +1,11 @@
 import type { ContactCard, PartialDate } from "@/lib/jmap/types";
 import { getContactDisplayName, getContactPhotoUri } from "@/stores/contact-store";
 
+// Single-pass HTML escape — was 5 chained replace calls (5 full string scans + 4 intermediates).
+const HTML_ESCAPE_RE = /[&<>"']/g;
+const HTML_ESCAPE_MAP: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  return value.replace(HTML_ESCAPE_RE, (c) => HTML_ESCAPE_MAP[c]);
 }
 
 export function printContact(contact: ContactCard, displayName?: string): void {

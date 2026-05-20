@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "@/i18n/navigation";
@@ -100,8 +100,11 @@ export function ContactActivity({ contact }: ContactActivityProps) {
   const [emailsError, setEmailsError] = useState(false);
   const [eventsError, setEventsError] = useState(false);
 
-  const addresses = getContactEmails(contact);
-  const addressKey = addresses.join(",");
+  // Memoize per `contact.emails` reference — the contact prop usually
+  // shares the same emails object across parent re-renders, so we avoid
+  // rebuilding the lowercase set + join key each render.
+  const addresses = useMemo(() => getContactEmails(contact), [contact]);
+  const addressKey = useMemo(() => addresses.join(","), [addresses]);
 
   useEffect(() => {
     if (!client || addresses.length === 0) {
@@ -175,6 +178,13 @@ export function ContactActivity({ contact }: ContactActivityProps) {
     };
   }, [client, addressKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Build date-bucketed event groups once per `events` reference. Was
+  // walking the events array + allocating a Map + Array.from per render.
+  const eventGroups = useMemo(
+    () => (events ? Array.from(groupEventsByDate(events).entries()) : []),
+    [events],
+  );
+
   if (addresses.length === 0) return null;
 
   const handleOpenEmail = (email: Email) => {
@@ -215,8 +225,6 @@ export function ContactActivity({ contact }: ContactActivityProps) {
       ? { weekday: "long", month: "long", day: "numeric" }
       : { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   };
-
-  const eventGroups = events ? Array.from(groupEventsByDate(events).entries()) : [];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-x-8">

@@ -23,9 +23,11 @@ interface ContactListItemProps {
 export function ContactListItem({ contact, isSelected, isChecked, hasSelection, density, selectedContactIds, onClick, onCheckboxClick, onContextMenu }: ContactListItemProps) {
   const name = getContactDisplayName(contact);
   const email = getContactPrimaryEmail(contact);
-  const org = contact.organizations
-    ? Object.values(contact.organizations)[0]?.name
-    : undefined;
+  // First-key lookup avoids the Object.values array alloc per list-item render.
+  let org: string | undefined;
+  if (contact.organizations) {
+    for (const k in contact.organizations) { org = contact.organizations[k]?.name; break; }
+  }
 
   const handleDragStart = useCallback((e: DragEvent<HTMLDivElement>) => {
     // Drag all selected contacts if this one is selected, otherwise just this one
