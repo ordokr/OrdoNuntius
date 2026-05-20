@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback } from "react";
+import dynamic from "next/dynamic";
 import { formatDate, localPart, stripInvisibleLeading } from "@/lib/utils";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
@@ -14,7 +15,17 @@ import { useAccountStore } from "@/stores/account-store";
 import { getThreadColorTag, getEmailColorTags } from "@/lib/thread-utils";
 import { useEmailDrag } from "@/hooks/use-email-drag";
 import { useLongPress } from "@/hooks/use-long-press";
-import { ThreadEmailItem } from "./thread-email-item";
+// ThreadEmailItem (209 LOC + Avatar + 7 lucide icons + drag/long-press
+// hooks) only renders inside the expanded-thread pane, which is gated
+// on `isExpanded && !isMobile && !isFocusedMailLayout`. isExpanded starts
+// false for every thread on cold-load, so wrapping the import in
+// dynamic() ties the chunk fetch to the first thread expansion. The
+// fetch then runs in parallel with the email-list fetch the expand
+// triggers, masking its latency.
+const ThreadEmailItem = dynamic(
+  () => import("./thread-email-item").then(m => ({ default: m.ThreadEmailItem })),
+  { ssr: false, loading: () => null },
+);
 import { EmailHoverActions } from "./email-hover-actions";
 import { useTranslations } from "next-intl";
 
