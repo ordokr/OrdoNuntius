@@ -1,8 +1,13 @@
 import { create } from 'zustand';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import type { FilterRule, SieveCapabilities, VacationSieveConfig } from '@/lib/jmap/sieve-types';
-import { parseScript } from '@/lib/sieve/parser';
-import { generateScript } from '@/lib/sieve/generator';
+// parseScript (778 LOC) and generateScript (242 LOC) are heavy Sieve
+// language tools used only inside the async fetchFilters / saveFilters
+// actions below. filter-store itself is pulled into every authenticated
+// route's boot bundle via auth-store + account-state-manager, so eager
+// imports would drag ~1020 LOC of parser/generator into the cold-load
+// even when the JMAP server doesn't support Sieve at all.
+// Lazy-loaded at call time below.
 import { debug } from '@/lib/debug';
 
 interface FilterStore {
@@ -68,7 +73,11 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
 
       set({ activeScriptId: activeScript.id });
 
-      const content = await client.getSieveScriptContent(activeScript.blobId);
+      // Fan out the parser fetch in parallel with the script-content RTT.
+      const [content, { parseScript }] = await Promise.all([
+        client.getSieveScriptContent(activeScript.blobId),
+        import('@/lib/sieve/parser'),
+      ]);
       set({ rawScript: content });
 
       const result = parseScript(content);
@@ -110,6 +119,7 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
       if (isOpaque) {
         content = rawScript;
       } else {
+        const { generateScript } = await import('@/lib/sieve/generator');
         content = generateScript(rules, vacationSettings || undefined, { externalRequires });
       }
 
