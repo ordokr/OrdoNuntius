@@ -102,12 +102,13 @@ export function ThreadConversationView({
       // Always expand most recent
       idsToExpand.add(emails[0].id);
 
-      // Also expand all unread emails
-      emails.forEach(email => {
+      // Also expand all unread emails. for-of drops the per-email callback
+      // call vs forEach.
+      for (const email of emails) {
         if (!email.keywords?.$seen) {
           idsToExpand.add(email.id);
         }
-      });
+      }
 
       setExpandedIds(idsToExpand);
     }
