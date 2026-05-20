@@ -27,8 +27,16 @@ import { useIsMobile } from "@/hooks/use-media-query";
 import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
 import { usePolicyStore } from "@/stores/policy-store";
 import { FileBrowser } from "@/components/files/file-browser";
-import { ImagePreviewModal } from "@/components/files/image-preview-modal";
-import { FilePreviewModal } from "@/components/files/file-preview-modal";
+// Preview modals only mount when the user clicks a file/image —
+// defer past first paint of the files browser.
+const ImagePreviewModal = dynamic(
+  () => import("@/components/files/image-preview-modal").then(m => ({ default: m.ImagePreviewModal })),
+  { ssr: false, loading: () => null }
+);
+const FilePreviewModal = dynamic(
+  () => import("@/components/files/file-preview-modal").then(m => ({ default: m.FilePreviewModal })),
+  { ssr: false, loading: () => null }
+);
 import { loadFilesSettings } from "@/components/files/files-settings-dialog";
 import type { FolderLayout } from "@/components/files/files-settings-dialog";
 import { AlertTriangle } from "lucide-react";
