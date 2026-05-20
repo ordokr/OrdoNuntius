@@ -538,6 +538,7 @@ export const useAuthStore = create<AuthState>()(
       isDemoMode: false,
 
       login: async (serverUrl, username, password, totp, rememberMe) => {
+        await ensureLazyAuthDeps();
         const effectivePassword = totp ? `${password}$${totp}` : password;
         set({ isLoading: true, error: null, isRateLimited: false, rateLimitUntil: null });
 
@@ -745,6 +746,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       loginDemo: async () => {
+        await ensureLazyAuthDeps();
         set({ isLoading: true, error: null, isRateLimited: false, rateLimitUntil: null });
         try {
           // Clear all store data before re-initializing with fresh demo data
@@ -810,6 +812,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       loginWithOAuth: async (serverUrl, code, codeVerifier, redirectUri, serverId) => {
+        await ensureLazyAuthDeps();
         set({ isLoading: true, error: null, isRateLimited: false, rateLimitUntil: null });
 
         try {
@@ -939,6 +942,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       loginWithServerSso: async (code, state) => {
+        await ensureLazyAuthDeps();
         set({ isLoading: true, error: null, isRateLimited: false, rateLimitUntil: null });
 
         try {
@@ -1056,6 +1060,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       refreshAccessToken: async (forAccountId?: string) => {
+        await ensureLazyAuthDeps();
         // Resolve the target account: explicit param wins, else active.
         // Resolving at call time (vs. read at fire time) is what kills the
         // scheduleRefresh race — a timer scheduled for A but firing after
@@ -1290,6 +1295,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       switchAccount: async (accountId: string) => {
+        await ensureLazyAuthDeps();
         const state = get();
         if (state.activeAccountId === accountId) return;
 
@@ -1462,6 +1468,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkAuth: async () => {
+        await ensureLazyAuthDeps();
         const accountStore = useAccountStore.getState();
         const accounts = accountStore.accounts;
 
