@@ -16,7 +16,10 @@ import { sanitizeOutgoingCalendarEventData } from '@/lib/calendar-event-normaliz
 // so the static import shipped it on every cold inbox load.
 import { generateUUID } from '@/lib/utils';
 import { apiFetch } from '@/lib/browser-navigation';
-import { BIRTHDAY_CALENDAR_ID } from '@/lib/birthday-calendar';
+// Just the id constant — pulling it from the full birthday-calendar
+// module would drag date-fns helpers + contact-store into the inbox
+// boot chain via navigation-rail.
+import { BIRTHDAY_CALENDAR_ID } from '@/lib/birthday-calendar-id';
 
 // id→entity lookup caches against the array identity. The calendar store
 // calls `calendars.find(c => c.id === ...)` and `events.find(e => e.id === ...)`

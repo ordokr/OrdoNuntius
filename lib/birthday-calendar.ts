@@ -1,9 +1,11 @@
 import type { ContactCard, CalendarEvent, Calendar, PartialDate, Timestamp } from '@/lib/jmap/types';
 import { getContactDisplayName } from '@/stores/contact-store';
 import { eachYearOfInterval, parseISO } from 'date-fns';
-
-export const BIRTHDAY_CALENDAR_ID = '__birthday-calendar__';
-export const BIRTHDAY_CALENDAR_COLOR = '#eab308'; // Yellow
+// Re-export the id/color constants so callers that imported them from this
+// file keep working; the canonical source is the tiny no-deps module so
+// calendar-store can pull just the id without dragging the generator in.
+export { BIRTHDAY_CALENDAR_ID, BIRTHDAY_CALENDAR_COLOR } from '@/lib/birthday-calendar-id';
+import { BIRTHDAY_CALENDAR_ID, BIRTHDAY_CALENDAR_COLOR } from '@/lib/birthday-calendar-id';
 
 /**
  * Virtual calendar object for the contact birthday calendar.
