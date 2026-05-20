@@ -66,7 +66,7 @@ export function findContactByEmail(
 // 9 actions in this store did `contacts.find(c => c.id === id)`. WeakMap
 // keyed on the array reference; lazy build; auto-GC on next set().
 const _contactByIdIndex = new WeakMap<readonly ContactCard[], Map<string, ContactCard>>();
-function contactByIdLookup(contacts: readonly ContactCard[]): Map<string, ContactCard> {
+export function contactByIdLookup(contacts: readonly ContactCard[]): Map<string, ContactCard> {
   let m = _contactByIdIndex.get(contacts);
   if (!m) {
     m = new Map<string, ContactCard>();

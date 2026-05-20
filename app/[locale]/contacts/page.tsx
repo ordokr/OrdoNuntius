@@ -16,7 +16,7 @@ import { ContactImportDialog } from "@/components/contacts/contact-import-dialog
 import { RenameDialog } from "@/components/files/rename-dialog";
 import { exportContacts } from "@/components/contacts/contact-export";
 import { useShallow } from "zustand/react/shallow";
-import { useContactStore, getContactDisplayName, countActiveGroupMembers } from "@/stores/contact-store";
+import { useContactStore, getContactDisplayName, countActiveGroupMembers, contactByIdLookup } from "@/stores/contact-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
@@ -207,11 +207,11 @@ export default function ContactsPage() {
   // in the search bar; without memo each typed character re-scans the
   // entire contact list twice.
   const selectedContact = useMemo(
-    () => contacts.find((c) => c.id === selectedContactId) || null,
+    () => (selectedContactId ? contactByIdLookup(contacts).get(selectedContactId) ?? null : null),
     [contacts, selectedContactId],
   );
   const selectedGroup = useMemo(
-    () => (selectedGroupId ? contacts.find(c => c.id === selectedGroupId) || null : null),
+    () => (selectedGroupId ? contactByIdLookup(contacts).get(selectedGroupId) ?? null : null),
     [contacts, selectedGroupId],
   );
   const selectedGroupMembers = useMemo(() => selectedGroupId ? getGroupMembers(selectedGroupId) : [], [selectedGroupId, getGroupMembers]);
