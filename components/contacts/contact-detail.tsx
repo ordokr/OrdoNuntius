@@ -10,7 +10,8 @@ import type { ContactCard, AnniversaryDate, PartialDate } from "@/lib/jmap/types
 import { getContactDisplayName, getContactPrimaryEmail, getContactPhotoUri } from "@/stores/contact-store";
 import { ContactActivity } from "./contact-activity";
 import { useSmimeStore } from "@/stores/smime-store";
-import { parseCertificatePemOrDer, extractCertificateInfo } from "@/lib/smime/certificate-utils";
+// certificate-utils pulls pkijs + asn1js. Only contacts with attached
+// S/MIME cryptoKeys need it, and the parse runs in a useEffect — defer.
 import type { CertificateInfo } from "@/lib/smime/types";
 import { toast } from "@/stores/toast-store";
 import { exportContact } from "./contact-export";
@@ -154,6 +155,9 @@ export function ContactDetail({ contact, onEdit, onDelete, onAddToGroup, onDupli
             derBytes = key.uri;
           }
           if (!derBytes) continue;
+          // Lazy import: pulls pkijs/asn1js — only loaded once per contacts
+          // route session if any contact actually has a crypto key.
+          const { parseCertificatePemOrDer, extractCertificateInfo } = await import("@/lib/smime/certificate-utils");
           const cert = parseCertificatePemOrDer(derBytes);
           const der = typeof derBytes === 'string' ? cert.toSchema(true).toBER(false) : derBytes;
           const info = await extractCertificateInfo(cert, der);
