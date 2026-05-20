@@ -9,7 +9,7 @@ import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle, FileText, Bookma
 import { cn, formatFileSize, formatDateTime, generateUUID, splitTrimmed } from "@/lib/utils";
 import { debug } from "@/lib/debug";
 import { toast } from "@/stores/toast-store";
-import { sanitizeEmailHtml } from "@/lib/email-sanitization";
+import { sanitizeEmailHtml } from "@/lib/email-sanitize-html";
 import { emailHooks, contactHooks } from "@/lib/plugin-hooks";
 import type { OutgoingEmail, RecipientSuggestion } from "@/lib/plugin-types";
 import { useAuthStore } from "@/stores/auth-store";

@@ -3,7 +3,8 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
 import DOMPurify from "dompurify";
 import { Email, ContactCard, Mailbox } from "@/lib/jmap/types";
-import { EMAIL_IFRAME_SANITIZE_CONFIG, collapseBlockedImageContainers, plainTextToSafeHtml } from "@/lib/email-sanitization";
+import { EMAIL_IFRAME_SANITIZE_CONFIG } from "@/lib/email-sanitize-html";
+import { collapseBlockedImageContainers, plainTextToSafeHtml } from "@/lib/email-sanitization";
 import { hasMeaningfulHtmlBody } from "@/lib/signature-utils";
 import { getEmailColorTags } from "@/lib/thread-utils";
 import { Button } from "@/components/ui/button";

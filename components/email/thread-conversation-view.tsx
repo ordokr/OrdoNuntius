@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import DOMPurify from "dompurify";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
-import { EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers, plainTextToSafeHtml } from "@/lib/email-sanitization";
+import { EMAIL_SANITIZE_CONFIG } from "@/lib/email-sanitize-html";
+import { collapseBlockedImageContainers, plainTextToSafeHtml } from "@/lib/email-sanitization";
 import { hasMeaningfulHtmlBody } from "@/lib/signature-utils";
 import { transformInlineStyles, transformColorForDarkMode, transformBgColorForDarkMode } from "@/lib/color-transform";
 import { useThemeStore } from "@/stores/theme-store";

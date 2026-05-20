@@ -1,4 +1,4 @@
-import { parseHtmlSafely, sanitizeSignatureHtml } from '@/lib/email-sanitization';
+import { parseHtmlSafely } from '@/lib/email-sanitization';
 
 type SignatureSource = {
   textSignature?: string;
@@ -18,6 +18,18 @@ const BLOCK_TAGS = new Set([
   'p',
   'section',
   'tr',
+]);
+
+// Tags whose text content must NOT contribute to the plain-text signature.
+// Previously we routed the html through sanitizeSignatureHtml (DOMPurify) to
+// strip these before walking; that pulled DOMPurify (~21KB min) into the
+// main inbox bundle just so the optional html-signature → text fallback
+// could sanitize. parseHtmlSafely already prevents script execution
+// (DOMParser doesn't execute), so we only need to drop the text contents
+// of these elements during the walk to match the prior behaviour.
+const SKIP_TEXT_TAGS = new Set([
+  'script', 'style', 'noscript', 'iframe', 'object', 'embed',
+  'head', 'template', 'svg', 'math',
 ]);
 
 // Hoisted to module scope — was rebuilt via `.join(', ')` over a 22-element
@@ -80,6 +92,10 @@ function htmlToPlainText(html: string): string {
     const element = node as HTMLElement;
     const tagName = element.tagName.toLowerCase();
 
+    if (SKIP_TEXT_TAGS.has(tagName)) {
+      return;
+    }
+
     if (tagName === 'br') {
       appendNewline();
       return;
@@ -123,7 +139,10 @@ export function getPlainTextSignature(signature?: SignatureSource | null): strin
   }
 
   if (signature?.htmlSignature?.trim()) {
-    return htmlToPlainText(sanitizeSignatureHtml(signature.htmlSignature));
+    // htmlToPlainText walks via parseHtmlSafely (DOMParser, no script
+    // execution) and skips script/style/iframe/etc. subtrees, so we no
+    // longer need a DOMPurify pass to get safe plain text out.
+    return htmlToPlainText(signature.htmlSignature);
   }
 
   return '';

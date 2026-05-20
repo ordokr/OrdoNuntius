@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Identity, EmailAddress } from '@/lib/jmap/types';
-import { sanitizeSignatureHtml } from '@/lib/email-sanitization';
+import { sanitizeSignatureHtml } from '@/lib/email-sanitize-html';
 import { getEmailValidationErrorCode, validateEmailList } from '@/lib/validation';
 import { splitTrimmed, hasAnyKey } from '@/lib/utils';
 

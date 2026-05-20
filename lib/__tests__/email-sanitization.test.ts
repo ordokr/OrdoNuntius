@@ -1,13 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import DOMPurify from 'dompurify';
-import {
-  sanitizeEmailHtml,
-  sanitizeSignatureHtml,
-  parseHtmlSafely,
-  hasRichFormatting,
-  plainTextToSafeHtml,
-  EMAIL_SANITIZE_CONFIG,
-} from '../email-sanitization';
+import { parseHtmlSafely, hasRichFormatting, plainTextToSafeHtml } from '../email-sanitization';
+import { sanitizeEmailHtml, sanitizeSignatureHtml, EMAIL_SANITIZE_CONFIG } from '../email-sanitize-html';
 
 describe('email-sanitization', () => {
   describe('sanitizeEmailHtml', () => {
