@@ -120,7 +120,14 @@ import { Button } from "@/components/ui/button";
 import { useConfig } from "@/hooks/use-config";
 import { usePluginStore } from "@/stores/plugin-store";
 import { useThemeStore } from "@/stores/theme-store";
-import { consumePendingMailto, subscribeToPendingMailto } from "@/lib/protocol-handlers/session";
+// protocol-handlers/session (~357 LOC) is dynamic-imported inside the
+// mailto-bridge useEffect below. It's only needed once the inbox is
+// mounted-and-authenticated to consume any pending mailto and listen
+// for new ones via the broadcast channel. The pending sessionStorage
+// entry persists until consumed, so a small chunk-fetch delay can't
+// drop a pending mailto — only the live broadcast-channel listener has
+// a small registration window, narrow enough that overlapping mailtos
+// during chunk load are statistically improbable.
 import type { ParsedMailto } from "@/lib/protocol-handlers/mailto";
 import { plainTextToComposerBody } from "@/lib/email-composer-utils";
 import { appLifecycleHooks, uiHooks, routerHooks, toastHooks, emailHooks } from "@/lib/plugin-hooks";
@@ -893,13 +900,23 @@ export default function Home() {
   useEffect(() => {
     if (!isAuthenticated || !client) return;
 
-    const openPendingMailto = () => {
-      const pending = consumePendingMailto();
-      if (pending) handleMailtoProtocolRequest(pending);
-    };
+    let cleanup: (() => void) | undefined;
+    let mounted = true;
 
-    openPendingMailto();
-    return subscribeToPendingMailto(openPendingMailto);
+    void import("@/lib/protocol-handlers/session").then(({ consumePendingMailto, subscribeToPendingMailto }) => {
+      if (!mounted) return;
+      const openPendingMailto = () => {
+        const pending = consumePendingMailto();
+        if (pending) handleMailtoProtocolRequest(pending);
+      };
+      openPendingMailto();
+      cleanup = subscribeToPendingMailto(openPendingMailto);
+    });
+
+    return () => {
+      mounted = false;
+      cleanup?.();
+    };
   }, [isAuthenticated, client, handleMailtoProtocolRequest]);
 
   // Initial data load for paths that didn't go through login()'s prefetch
