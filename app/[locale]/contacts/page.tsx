@@ -8,7 +8,17 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { ContactList } from "@/components/contacts/contact-list";
-import { ContactDetail } from "@/components/contacts/contact-detail";
+// ContactDetail (757 LOC + 27 lucide icons + ContactActivity → calendar-store
+// pull) only renders meaningful content when a contact is actually
+// selected. Cold-load shows the "no contact selected" placeholder, so
+// defer the heavy detail view and render an inline placeholder while
+// `selectedContact` is null. The chunk fetch is then tied to the first
+// contact click.
+const ContactDetail = dynamic(
+  () => import("@/components/contacts/contact-detail").then(m => ({ default: m.ContactDetail })),
+  { ssr: false, loading: () => null }
+);
+import { BookUser } from "lucide-react";
 // ContactForm (~50KB) only mounts in create/edit views and bundles a large
 // vcard helper tree; defer past initial paint.
 const ContactForm = dynamic(
@@ -729,21 +739,24 @@ export default function ContactsPage() {
         );
 
       default:
+        if (!selectedContact) {
+          // Inline placeholder — matches ContactDetail's own null-contact
+          // branch but ships in the route entry chunk so the heavy
+          // ContactDetail bundle stays uncalled until a contact is picked.
+          return (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+              <BookUser className="w-16 h-16 mb-4 opacity-20" />
+              <p className="text-sm">{t("detail.no_contact_selected")}</p>
+            </div>
+          );
+        }
         return (
           <ContactDetail
             contact={selectedContact}
             onEdit={handleEdit}
             onDelete={handleDelete}
-            onAddToGroup={
-              selectedContact
-                ? () => handleAddContactToGroup(selectedContact.id)
-                : undefined
-            }
-            onDuplicate={
-              selectedContact
-                ? () => void handleDuplicateContact(selectedContact)
-                : undefined
-            }
+            onAddToGroup={() => handleAddContactToGroup(selectedContact.id)}
+            onDuplicate={() => void handleDuplicateContact(selectedContact)}
             isMobile={isMobile}
           />
         );
