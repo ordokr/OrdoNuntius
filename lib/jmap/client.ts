@@ -975,7 +975,7 @@ export class JMAPClient implements IJMAPClient {
         ["Email/get", {
           accountId: targetAccountId,
           "#ids": { resultOf: "0", name: "Email/query", path: "/ids" },
-          properties: [...EMAIL_LIST_PROPERTIES],
+          properties: EMAIL_LIST_PROPERTIES,
         }, "1"],
       ]);
 
@@ -1758,7 +1758,7 @@ export class JMAPClient implements IJMAPClient {
         ["Email/get", {
           accountId: targetAccountId,
           "#ids": { resultOf: "0", name: "Email/query", path: "/ids" },
-          properties: [...EMAIL_LIST_PROPERTIES],
+          properties: EMAIL_LIST_PROPERTIES,
         }, "1"],
       ]);
 
@@ -1804,7 +1804,7 @@ export class JMAPClient implements IJMAPClient {
         ["Email/get", {
           accountId: targetAccountId,
           "#ids": { resultOf: "0", name: "Email/query", path: "/ids" },
-          properties: [...EMAIL_LIST_PROPERTIES],
+          properties: EMAIL_LIST_PROPERTIES,
         }, "1"],
       ]);
 
@@ -4075,7 +4075,7 @@ export class JMAPClient implements IJMAPClient {
         const getResponse = await this.request([
           ["CalendarEvent/get", {
             accountId,
-            properties: [...CALENDAR_EVENT_PROPERTIES],
+            properties: CALENDAR_EVENT_PROPERTIES,
             ids: batchIds,
           }, "0"]
         ], this.calendarUsing());
@@ -4184,7 +4184,7 @@ export class JMAPClient implements IJMAPClient {
         ["CalendarEvent/query", queryArgs, "q"],
         ["CalendarEvent/get", {
           accountId,
-          properties: [...CALENDAR_EVENT_PROPERTIES],
+          properties: CALENDAR_EVENT_PROPERTIES,
           "#ids": { resultOf: "q", name: "CalendarEvent/query", path: "/ids" },
         }, "g0"]
       ], using);
@@ -4218,7 +4218,7 @@ export class JMAPClient implements IJMAPClient {
           const getResponse = await this.request([
             ["CalendarEvent/get", {
               accountId,
-              properties: [...CALENDAR_EVENT_PROPERTIES],
+              properties: CALENDAR_EVENT_PROPERTIES,
               ids: batchIds,
             }, "0"]
           ], using);
@@ -4281,7 +4281,7 @@ export class JMAPClient implements IJMAPClient {
       const response = await this.request([
         ["CalendarEvent/get", {
           accountId,
-          properties: [...CALENDAR_EVENT_PROPERTIES],
+          properties: CALENDAR_EVENT_PROPERTIES,
           ids: [id],
         }, "0"]
       ], this.calendarUsing());
@@ -4447,7 +4447,7 @@ export class JMAPClient implements IJMAPClient {
     const getResponse = await this.request([
       ["CalendarEvent/get", {
         accountId,
-        properties: [...CALENDAR_EVENT_PROPERTIES],
+        properties: CALENDAR_EVENT_PROPERTIES,
         ids: createdIds,
       }, "0"]
     ], this.calendarUsing());
