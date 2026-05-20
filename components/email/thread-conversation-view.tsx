@@ -47,24 +47,32 @@ interface ThreadConversationViewProps {
   onMarkAsRead?: (emailId: string, read: boolean) => void;
 }
 
-// Helper function to get file icon based on mime type or extension
+// Extension classification sets — hoisted to module level so each
+// getFileIcon call hits an O(1) Set.has() instead of re-allocating the
+// array literal. getFileIcon runs per attachment chip per email in the
+// thread view.
+const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp']);
+const VIDEO_EXTS = new Set(['mp4', 'avi', 'mov', 'wmv']);
+const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'flac']);
+const ARCHIVE_EXTS = new Set(['zip', 'rar', '7z', 'tar', 'gz']);
+
 const getFileIcon = (name?: string, type?: string) => {
-  const ext = name?.split('.').pop()?.toLowerCase();
+  const ext = name?.split('.').pop()?.toLowerCase() || '';
   const mimeType = type?.toLowerCase();
 
-  if (mimeType?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext || '')) {
+  if (mimeType?.startsWith('image/') || IMAGE_EXTS.has(ext)) {
     return FileImage;
   }
-  if (mimeType?.startsWith('video/') || ['mp4', 'avi', 'mov', 'wmv'].includes(ext || '')) {
+  if (mimeType?.startsWith('video/') || VIDEO_EXTS.has(ext)) {
     return FileVideo;
   }
-  if (mimeType?.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'flac'].includes(ext || '')) {
+  if (mimeType?.startsWith('audio/') || AUDIO_EXTS.has(ext)) {
     return FileAudio;
   }
   if (mimeType === 'application/pdf' || ext === 'pdf') {
     return FileText;
   }
-  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext || '')) {
+  if (ARCHIVE_EXTS.has(ext)) {
     return FileArchive;
   }
   return File;

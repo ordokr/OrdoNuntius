@@ -141,30 +141,44 @@ interface EmailViewerProps {
 }
 
 // Helper function to get file icon based on mime type or extension
+// Extension classification sets — hoisted to module level so each
+// getFileIcon call hits an O(1) Set.has() instead of re-allocating the
+// array literal and walking it. getFileIcon runs per attachment chip.
+const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp']);
+const VIDEO_EXTS = new Set(['mp4', 'avi', 'mov', 'wmv']);
+const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'flac']);
+const ARCHIVE_EXTS = new Set(['zip', 'rar', '7z', 'tar', 'gz']);
+const OFFICE_EXTS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']);
+
 const getFileIcon = (name?: string, type?: string) => {
-  const ext = name?.split('.').pop()?.toLowerCase();
+  const ext = name?.split('.').pop()?.toLowerCase() || '';
   const mimeType = type?.toLowerCase();
 
-  if (mimeType?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext || '')) {
+  if (mimeType?.startsWith('image/') || IMAGE_EXTS.has(ext)) {
     return FileImage;
   }
-  if (mimeType?.startsWith('video/') || ['mp4', 'avi', 'mov', 'wmv'].includes(ext || '')) {
+  if (mimeType?.startsWith('video/') || VIDEO_EXTS.has(ext)) {
     return FileVideo;
   }
-  if (mimeType?.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'flac'].includes(ext || '')) {
+  if (mimeType?.startsWith('audio/') || AUDIO_EXTS.has(ext)) {
     return FileAudio;
   }
   if (mimeType === 'application/pdf' || ext === 'pdf') {
     return FileText;
   }
-  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext || '')) {
+  if (ARCHIVE_EXTS.has(ext)) {
     return FileArchive;
   }
-  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext || '')) {
+  if (OFFICE_EXTS.has(ext)) {
     return FileText;
   }
   return File;
 };
+
+// Leaf media tags excluded from the dark-mode invert walk. Hoisted to
+// module level so the array isn't reallocated for every element in every
+// iframe-content rebuild (large HTML emails can have hundreds of nodes).
+const LEAF_MEDIA_TAGS = new Set(['IMG', 'VIDEO', 'SVG', 'CANVAS', 'OBJECT', 'EMBED']);
 
 const MIME_TYPE_LABELS: Record<string, string> = {
   'application/pdf': 'Document.pdf',
@@ -2971,7 +2985,7 @@ export function EmailViewer({
                   htmlEl.hasAttribute('background') || htmlEl.hasAttribute('bgcolor')) return;
               // Skip leaf media elements (already re-inverted by CSS)
               const tag = htmlEl.tagName;
-              if (['IMG', 'VIDEO', 'SVG', 'CANVAS', 'OBJECT', 'EMBED'].includes(tag)) return;
+              if (LEAF_MEDIA_TAGS.has(tag)) return;
               const computed = win.getComputedStyle(htmlEl);
               if (computed.backgroundImage && computed.backgroundImage !== 'none') {
                 // Only re-invert if this container doesn't have media children
