@@ -18,6 +18,7 @@ import { useTranslations } from "next-intl";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { SearchChips } from "@/components/search/search-chips";
 import { isFilterEmpty, DEFAULT_SEARCH_FILTERS } from "@/lib/jmap/search-utils";
+import { mailboxByIdLookup } from "@/stores/email-slices/_helpers";
 
 // Hoisted out of EmailList so a new component type isn't created on
 // every EmailList render — that would force React to unmount/remount
@@ -202,7 +203,7 @@ export function EmailList({
   // own mailboxes.find + emailKeywords.find on each render, multiplying
   // O(M+K) by ~50 virtual items on every scroll / store update.
   const currentMailbox = useMemo(
-    () => mailboxes.find(m => m.id === selectedMailbox),
+    () => selectedMailbox ? mailboxByIdLookup(mailboxes).get(selectedMailbox) : undefined,
     [mailboxes, selectedMailbox]
   );
   const currentMailboxRole = currentMailbox?.role;

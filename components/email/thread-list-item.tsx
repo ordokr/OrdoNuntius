@@ -9,6 +9,7 @@ import { Paperclip, Star, ChevronRight, ChevronDown, Loader2, MessageSquare, Che
 import { useSettingsStore, KEYWORD_PALETTE, type KeywordDefinition } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useEmailStore } from "@/stores/email-store";
+import { mailboxByIdLookup } from "@/stores/email-slices/_helpers";
 import { useAccountStore } from "@/stores/account-store";
 import { getThreadColorTag, getEmailColorTags } from "@/lib/thread-utils";
 import { useEmailDrag } from "@/hooks/use-email-drag";
@@ -78,7 +79,7 @@ const SingleEmailItemImpl = React.forwardRef<HTMLDivElement, SingleEmailItemProp
     const mailboxes = useEmailStore(s => s.mailboxes);
     // Prefer the hoisted prop (computed once in EmailList for the whole virtual
     // list); fall back to a local scan only if a caller didn't pass it through.
-    const currentMailboxRole = currentMailboxRoleProp ?? mailboxes.find(mb => mb.id === selectedMailbox)?.role;
+    const currentMailboxRole = currentMailboxRoleProp ?? (selectedMailbox ? mailboxByIdLookup(mailboxes).get(selectedMailbox)?.role : undefined);
     const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
     const sender = showRecipient ? (email.to?.[0] ?? email.from?.[0]) : email.from?.[0];
     const density = useSettingsStore((state) => state.density);
@@ -425,7 +426,7 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
     const threadAccountColor = latestEmail.accountId ? getAccountById(latestEmail.accountId)?.avatarColor : undefined;
     // Prefer the hoisted prop; fall back to a scan only if a caller didn't
     // thread it through (back-compat for standalone consumers).
-    const currentMailboxRole = currentMailboxRoleProp ?? mailboxes.find(mb => mb.id === selectedMailbox)?.role;
+    const currentMailboxRole = currentMailboxRoleProp ?? (selectedMailbox ? mailboxByIdLookup(mailboxes).get(selectedMailbox)?.role : undefined);
     const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
     // Collect up to 4 unique recipient display names. Was: flatMap (per
     // email per recipient allocations) → new Set → Array.from → slice(4).

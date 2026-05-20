@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { Paperclip, Star, CheckSquare, Square, Reply, Forward } from "lucide-react";
 import { useEmailStore } from "@/stores/email-store";
+import { mailboxByIdLookup } from "@/stores/email-slices/_helpers";
 import { useSettingsStore, KEYWORD_PALETTE, type KeywordDefinition } from "@/stores/settings-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEmailDrag } from "@/hooks/use-email-drag";
@@ -56,7 +57,7 @@ function EmailListItemImpl({ email, selected, currentMailboxRole: currentMailbox
   const isForwarded = email.keywords?.$forwarded;
   // Prefer the hoisted prop (computed once by EmailList for the whole list);
   // fall back to a local scan only when a standalone consumer didn't thread it.
-  const currentMailboxRole = currentMailboxRoleProp ?? mailboxes.find(mb => mb.id === selectedMailbox)?.role;
+  const currentMailboxRole = currentMailboxRoleProp ?? (selectedMailbox ? mailboxByIdLookup(mailboxes).get(selectedMailbox)?.role : undefined);
   const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
   const sender = showRecipient ? (email.to?.[0] ?? email.from?.[0]) : email.from?.[0];
   const isFocusedMailLayout = mailLayout === 'focus';
