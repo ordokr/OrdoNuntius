@@ -74,23 +74,32 @@ export function CalendarSidebarPanel({
   const { contextMenu, openContextMenu, closeContextMenu, menuRef } = useContextMenu<Calendar>();
   const [refreshingSubId, setRefreshingSubId] = useState<string | null>(null);
 
-  const personalCalendars = useMemo(() => calendars.filter(c => !c.isShared), [calendars]);
+  // Single-pass partition: was two separate `.filter()` walks over the
+  // same calendars array (personal + shared-grouped), plus the shared
+  // walk again to build the account groups. Now one walk pushes into
+  // both the personal array AND the per-account group Map.
+  const { personalCalendars, sharedAccountGroups } = useMemo(() => {
+    const personal: Calendar[] = [];
+    const groups = new Map<string, { accountName: string; calendars: Calendar[] }>();
+    for (const cal of calendars) {
+      if (!cal.isShared) {
+        personal.push(cal);
+        continue;
+      }
+      const key = cal.accountId || cal.accountName || cal.id;
+      let group = groups.get(key);
+      if (!group) {
+        group = { accountName: cal.accountName || key, calendars: [] };
+        groups.set(key, group);
+      }
+      group.calendars.push(cal);
+    }
+    return { personalCalendars: personal, sharedAccountGroups: Array.from(groups.values()) };
+  }, [calendars]);
   // O(1) membership check for the per-calendar `selectedCalendarIds
   // .includes(cal.id)` callsite. With many calendars rendered the array
   // .includes() walked the same list per row.
   const selectedCalendarIdsSet = useMemo(() => new Set(selectedCalendarIds), [selectedCalendarIds]);
-  const sharedAccountGroups = useMemo(() => {
-    const shared = calendars.filter(c => c.isShared);
-    const groups = new Map<string, { accountName: string; calendars: Calendar[] }>();
-    for (const cal of shared) {
-      const key = cal.accountId || cal.accountName || cal.id;
-      if (!groups.has(key)) {
-        groups.set(key, { accountName: cal.accountName || key, calendars: [] });
-      }
-      groups.get(key)!.calendars.push(cal);
-    }
-    return Array.from(groups.values());
-  }, [calendars]);
 
   // O(1) calendar→subscription lookup. Was `.find(s => s.calendarId === ...)`
   // per calendar render — for an account with many subscription calendars
