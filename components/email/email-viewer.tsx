@@ -94,7 +94,11 @@ const SmimePassphraseDialog = dynamic(
   () => import("@/components/settings/smime-passphrase-dialog").then(m => ({ default: m.SmimePassphraseDialog })),
   { ssr: false, loading: () => null }
 );
-import { findCalendarAttachment, isCalendarMimeType } from "@/lib/calendar-invitation";
+// Tiny detect-only module — avoids dragging the full ~628-line iMIP
+// pipeline (and its calendar-event-normalization dep) into the viewer
+// chunk; only the CalendarInvitationBanner (already dynamic) needs the
+// rest.
+import { findCalendarAttachment, isCalendarMimeType } from "@/lib/calendar-invitation-detect";
 import { RecipientPopover } from "./recipient-popover";
 import { isFilePreviewable } from "@/lib/file-preview";
 import { SmimeStatusBanner } from "./smime-status-banner";

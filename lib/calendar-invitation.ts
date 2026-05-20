@@ -2,6 +2,11 @@ import { parseISO } from 'date-fns';
 import type { Email, Attachment, CalendarEvent, CalendarParticipant, EmailBodyPart } from '@/lib/jmap/types';
 import { normalizeCalendarEventLike } from '@/lib/calendar-event-normalization';
 import { splitTrimmed } from '@/lib/utils';
+// Detect helpers live in their own tiny module so email-viewer can use
+// them without pulling the rest of this file (and its
+// calendar-event-normalization dep) into the eager inbox path.
+import { findCalendarAttachment, isCalendarMimeType, findCalendarBodyPart } from '@/lib/calendar-invitation-detect';
+export { findCalendarAttachment, isCalendarMimeType };
 
 export type InvitationMethod =
   | 'publish'
@@ -69,23 +74,6 @@ function parseContentType(value?: string | null): { mimeType: string; params: Re
     mimeType: mimeType.toLowerCase(),
     params,
   };
-}
-
-// Mime-only fast path: isCalendarMimeType is called per body part during
-// recursive findCalendarBodyPart walks (every email opened) and per
-// attachment in findCalendarAttachment. The full parseContentType walks
-// all `;`-separated params and allocates the params Record — wasted
-// work when the caller only needs the mime type.
-function extractMimeType(value?: string | null): string {
-  if (!value) return '';
-  const semi = value.indexOf(';');
-  const head = semi === -1 ? value : value.slice(0, semi);
-  return head.trim().toLowerCase();
-}
-
-export function isCalendarMimeType(value?: string | null): boolean {
-  const mimeType = extractMimeType(value);
-  return mimeType === 'text/calendar' || mimeType === 'application/ics' || mimeType === 'application/icalendar';
 }
 
 function normalizeInvitationMethod(value?: string | null): InvitationMethod {
@@ -238,32 +226,6 @@ function hasAuthenticationFailure(email?: Pick<Email, 'authenticationResults'>):
   );
 }
 
-function findCalendarBodyPart(parts?: EmailBodyPart[]): Attachment | null {
-  if (!parts) return null;
-
-  for (const part of parts) {
-    if (isCalendarMimeType(part.type) || part.name?.toLowerCase().endsWith('.ics') || part.name?.toLowerCase().endsWith('.ical')) {
-      return {
-        partId: part.partId,
-        blobId: part.blobId,
-        size: part.size,
-        name: part.name || 'invite.ics',
-        type: part.type,
-        charset: part.charset,
-        disposition: part.disposition,
-        cid: part.cid,
-      };
-    }
-
-    const nested = findCalendarBodyPart(part.subParts);
-    if (nested) {
-      return nested;
-    }
-  }
-
-  return null;
-}
-
 function looksLikeReply(event: Partial<CalendarEvent>): boolean {
   if (!event.participants) return false;
 
@@ -369,25 +331,6 @@ function getMethodFromEmail(email?: Pick<Email, 'headers' | 'attachments' | 'tex
   if (htmlMethod !== 'unknown') return htmlMethod;
 
   return extractMethodFromContentType(getHeaderValue(email?.headers, 'Content-Type'));
-}
-
-export function findCalendarAttachment(email: Email): Attachment | null {
-  if (email.attachments) {
-    for (const att of email.attachments) {
-      if (
-        isCalendarMimeType(att.type) ||
-        att.name?.toLowerCase().endsWith('.ics') ||
-        att.name?.toLowerCase().endsWith('.ical')
-      ) {
-        return att;
-      }
-    }
-  }
-
-  const inlineAttachment = findCalendarBodyPart(email.textBody) || findCalendarBodyPart(email.htmlBody);
-  if (inlineAttachment) return inlineAttachment;
-
-  return null;
 }
 
 export function getInvitationMethod(
