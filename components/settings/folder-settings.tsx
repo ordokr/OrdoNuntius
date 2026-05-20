@@ -530,19 +530,23 @@ export function FolderSettings() {
         )}
       </SettingsSection>
 
-      {/* Standard Folder Roles - advanced section */}
+      {/* Standard Folder Roles - advanced section. Hoisted nameCounts +
+          parentById Map out of STANDARD_ROLES.map so they aren't rebuilt
+          for every role (was: O(STANDARD_ROLES × M) per render). */}
       <SettingsSection title={t('standard_roles')} description={t('standard_roles_description')}>
-        {STANDARD_ROLES.map((role) => {
-          // Disambiguate duplicate folder names by appending parent path
+        {(() => {
           const nameCounts = new Map<string, number>();
-          ownMailboxes.forEach(mb => nameCounts.set(mb.name, (nameCounts.get(mb.name) || 0) + 1));
+          const parentById = new Map<string, typeof ownMailboxes[number]>();
+          for (const mb of ownMailboxes) {
+            nameCounts.set(mb.name, (nameCounts.get(mb.name) || 0) + 1);
+            parentById.set(mb.id, mb);
+          }
           const getParentPath = (mb: { parentId?: string; name: string }) => {
             if (!mb.parentId) return '';
-            const parent = ownMailboxes.find(p => p.id === mb.parentId);
+            const parent = parentById.get(mb.parentId);
             return parent ? `${parent.name}/` : '';
           };
-
-          return (
+          return STANDARD_ROLES.map((role) => (
             <SettingItem key={role} label={t(`role_${role}`)}>
               <Select
                 value={getRoleMailboxId(role)}
@@ -558,8 +562,8 @@ export function FolderSettings() {
                 ]}
               />
             </SettingItem>
-          );
-        })}
+          ));
+        })()}
       </SettingsSection>
     </div>
   );
