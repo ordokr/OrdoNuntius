@@ -45,6 +45,9 @@ const KNOWN_METHODS = new Set<InvitationMethod>([
   'declinecounter',
 ]);
 
+// Hoisted: was a fresh regex literal per parsed param.
+const PARAM_QUOTE_RE = /^"|"$/g;
+
 function parseContentType(value?: string | null): { mimeType: string; params: Record<string, string> } {
   if (!value) {
     return { mimeType: '', params: {} };
@@ -59,7 +62,7 @@ function parseContentType(value?: string | null): { mimeType: string; params: Re
     if (separatorIndex === -1) continue;
     const key = part.slice(0, separatorIndex).trim().toLowerCase();
     const rawValue = part.slice(separatorIndex + 1).trim();
-    params[key] = rawValue.replace(/^"|"$/g, '');
+    params[key] = rawValue.replace(PARAM_QUOTE_RE, '');
   }
 
   return {
@@ -68,8 +71,20 @@ function parseContentType(value?: string | null): { mimeType: string; params: Re
   };
 }
 
+// Mime-only fast path: isCalendarMimeType is called per body part during
+// recursive findCalendarBodyPart walks (every email opened) and per
+// attachment in findCalendarAttachment. The full parseContentType walks
+// all `;`-separated params and allocates the params Record — wasted
+// work when the caller only needs the mime type.
+function extractMimeType(value?: string | null): string {
+  if (!value) return '';
+  const semi = value.indexOf(';');
+  const head = semi === -1 ? value : value.slice(0, semi);
+  return head.trim().toLowerCase();
+}
+
 export function isCalendarMimeType(value?: string | null): boolean {
-  const { mimeType } = parseContentType(value);
+  const mimeType = extractMimeType(value);
   return mimeType === 'text/calendar' || mimeType === 'application/ics' || mimeType === 'application/icalendar';
 }
 
