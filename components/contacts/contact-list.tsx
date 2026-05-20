@@ -5,8 +5,17 @@ import { useTranslations, useLocale } from "next-intl";
 import { Search, BookUser, Trash2, Users, Download, X, UserPlus, CheckSquare, Square, Filter, Mail, Phone, Image as ImageIcon, RotateCcw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import dynamic from "next/dynamic";
 import { ContactListItem } from "./contact-list-item";
-import { ContactContextMenu } from "./contact-context-menu";
+// ContactContextMenu (207 LOC + lucide icons + ContextMenu primitive)
+// only mounts after a right-click — the render below is already gated
+// on `contextMenu.data`, and useContextMenu starts with `data: null`.
+// Dynamic so the chunk fetch is tied to the first right-click; latency
+// masked behind the click that opens the menu.
+const ContactContextMenu = dynamic(
+  () => import("./contact-context-menu").then(m => ({ default: m.ContactContextMenu })),
+  { ssr: false, loading: () => null },
+);
 import { useContextMenu } from "@/hooks/use-context-menu";
 import { cn, hasAnyKey } from "@/lib/utils";
 import type { AnniversaryDate, ContactCard } from "@/lib/jmap/types";

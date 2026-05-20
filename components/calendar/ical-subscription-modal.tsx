@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { X, Loader2, Globe } from "lucide-react";
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import { useCalendarStore, type ICalSubscription } from "@/stores/calendar-store";
-import { CalendarColorPicker } from "@/components/settings/calendar-management-settings";
+import { CalendarColorPicker } from "@/components/calendar/calendar-color-picker";
 import { toast } from "@/stores/toast-store";
 
 interface ICalSubscriptionModalProps {

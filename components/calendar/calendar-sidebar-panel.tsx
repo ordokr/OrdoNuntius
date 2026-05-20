@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { Globe, ListTodo, Pencil, RefreshCw, Share2, Trash2, Cake, Users, Plus, Eraser, Palette } from "lucide-react";
 import { cn, formatDateTime, hasAnyKey } from "@/lib/utils";
 import type { Calendar } from "@/lib/jmap/types";
-import { CalendarColorPicker } from "@/components/settings/calendar-management-settings";
+import { CalendarColorPicker } from "@/components/calendar/calendar-color-picker";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useTaskStore } from "@/stores/task-store";
