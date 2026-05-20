@@ -190,16 +190,25 @@ export function ContactForm({ contact, addressBooks, allKeywords, defaultAddress
     return pd;
   }
 
-  // Extract flat address fields from RFC 9553 components format
+  // Extract flat address fields from RFC 9553 components format. Single
+  // pass groups values by kind, then lookups join — was 6× filter+map+join
+  // (the `findComp('name') || findComp('number')` guard alone re-ran two
+  // chains before the actual street build).
   function addressToFlat(a: ContactAddress): AddressEntry {
     if (a.components && a.components.length > 0) {
-      const findComp = (kind: string) => a.components!.filter(c => c.kind === kind).map(c => c.value).join(' ');
+      const byKind: Record<string, string[]> = {};
+      for (const c of a.components) {
+        (byKind[c.kind] ||= []).push(c.value);
+      }
+      const getKind = (kind: string) => (byKind[kind] || []).join(' ');
+      const name = getKind('name');
+      const number = getKind('number');
       return {
-        street: findComp('name') || findComp('number') ? [findComp('number'), findComp('name')].filter(Boolean).join(' ') : '',
-        locality: findComp('locality'),
-        region: findComp('region'),
-        postcode: findComp('postcode'),
-        country: findComp('country'),
+        street: (name || number) ? [number, name].filter(Boolean).join(' ') : '',
+        locality: getKind('locality'),
+        region: getKind('region'),
+        postcode: getKind('postcode'),
+        country: getKind('country'),
         context: a.contexts?.work ? 'work' : a.contexts?.private ? 'private' : '',
       };
     }

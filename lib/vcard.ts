@@ -699,16 +699,22 @@ function generateSingleVCard(contact: ContactCard): string {
       let region = addr.region || "";
       let postcode = addr.postcode || "";
       let country = addr.country || "";
-      // RFC 9553 components-based address: extract flat fields for vCard ADR
+      // RFC 9553 components-based address: extract flat fields for vCard ADR.
+      // Was: 6× `.filter(...).map(...).join(' ')` allocating 12 intermediate
+      // arrays. Now a single pass groups values by kind, then lookups join.
       if (addr.components && addr.components.length > 0) {
-        const findComp = (kind: string) => addr.components!.filter(c => c.kind === kind).map(c => c.value).join(' ');
-        const number = findComp('number');
-        const name = findComp('name');
+        const byKind: Record<string, string[]> = {};
+        for (const c of addr.components) {
+          (byKind[c.kind] ||= []).push(c.value);
+        }
+        const getKind = (kind: string) => (byKind[kind] || []).join(' ');
+        const number = getKind('number');
+        const name = getKind('name');
         street = street || [number, name].filter(Boolean).join(' ');
-        locality = locality || findComp('locality');
-        region = region || findComp('region');
-        postcode = postcode || findComp('postcode');
-        country = country || findComp('country');
+        locality = locality || getKind('locality');
+        region = region || getKind('region');
+        postcode = postcode || getKind('postcode');
+        country = country || getKind('country');
       }
       const parts = [
         "",
