@@ -727,9 +727,15 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
     set({ isLoading: true, error: null });
     try {
       const mailboxes = await client.getMailboxes();
-      const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
+      // Single walk for sent + drafts — was two .find() scans.
+      let sentMailbox: typeof mailboxes[number] | undefined;
+      let draftsMailbox: typeof mailboxes[number] | undefined;
+      for (const mb of mailboxes) {
+        if (!sentMailbox && mb.role === 'sent') sentMailbox = mb;
+        else if (!draftsMailbox && mb.role === 'drafts') draftsMailbox = mb;
+        if (sentMailbox && draftsMailbox) break;
+      }
       if (!sentMailbox) throw new Error('No sent mailbox found');
-      const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
       await client.sendRawEmail(rawMimeBlob, identityId, sentMailbox.id, draftsMailbox?.id);
       set({ isLoading: false });
     } catch (error) {
@@ -1528,20 +1534,28 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
     const mode = useSettingsStore.getState().archiveMode;
     const archiveId = archiveMailbox.originalId || archiveMailbox.id;
 
-    const selected = emails.filter(e => selectedEmailIds.has(e.id));
-    if (selected.length === 0) return;
+    // Single walk builds selected-items + remaining — was 3 passes
+    // (selected = filter, selected.map, remaining = filter).
+    const archiveItems: Array<{ id: string; receivedAt: string }> = [];
+    const remaining: Email[] = [];
+    for (const e of emails) {
+      if (selectedEmailIds.has(e.id)) {
+        archiveItems.push({ id: e.id, receivedAt: e.receivedAt });
+      } else {
+        remaining.push(e);
+      }
+    }
+    if (archiveItems.length === 0) return;
 
     set({ isLoading: true, error: null });
     try {
       await client.batchArchiveEmails(
-        selected.map(e => ({ id: e.id, receivedAt: e.receivedAt })),
+        archiveItems,
         archiveId,
         mode,
         mailboxes,
         archiveMailbox.accountId,
       );
-
-      const remaining = emails.filter(e => !selectedEmailIds.has(e.id));
       set({ emails: remaining, selectedEmailIds: new Set(), isLoading: false });
 
       // Mailbox list + current-view refresh hit disjoint store fields and
@@ -1596,14 +1610,19 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
     try {
       await client.deleteMailbox(mailboxId);
       const { mailboxes, selectedMailbox } = get();
-      const newMailboxes = mailboxes.filter(mb => mb.id !== mailboxId);
+      // Single walk: build newMailboxes and (if needed) find inbox.
+      // Was filter + find = two passes over the mailbox list.
+      const needInbox = selectedMailbox === mailboxId;
+      const newMailboxes: Mailbox[] = [];
+      let inbox: Mailbox | undefined;
+      for (const mb of mailboxes) {
+        if (mb.id === mailboxId) continue;
+        newMailboxes.push(mb);
+        if (needInbox && !inbox && mb.role === 'inbox' && !mb.isShared) inbox = mb;
+      }
       const updates: Partial<EmailStore> = { mailboxes: newMailboxes };
-      // If the deleted mailbox was selected, switch to inbox
-      if (selectedMailbox === mailboxId) {
-        const inbox = newMailboxes.find(mb => mb.role === 'inbox' && !mb.isShared);
-        if (inbox) {
-          updates.selectedMailbox = inbox.id;
-        }
+      if (needInbox && inbox) {
+        updates.selectedMailbox = inbox.id;
       }
       set(updates as EmailStore);
     } catch (error) {

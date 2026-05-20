@@ -84,31 +84,40 @@ function formatDurationDisplay(minutes: number): string {
   return `${h}h${m}min`;
 }
 
+// Hoisted regexes — were re-compiled on every getAlertLabel call.
+const ALERT_MIN_RE = /-?PT?(\d+)M$/;
+const ALERT_HOUR_RE = /-?PT?(\d+)H$/;
+const ALERT_DAY_RE = /-?P(\d+)D/;
+const HTTP_URL_RE = /^https?:\/\//i;
+
 function getAlertLabel(event: CalendarEvent, t: ReturnType<typeof useTranslations>): string | null {
   if (!event.alerts) return null;
   const first = Object.values(event.alerts)[0];
   if (!first || !first.trigger || first.trigger["@type"] !== "OffsetTrigger") return null;
   const offset = first.trigger.offset;
   if (offset === "PT0S") return t("alerts.at_time");
-  const minMatch = offset.match(/-?PT?(\d+)M$/);
+  const minMatch = offset.match(ALERT_MIN_RE);
   if (minMatch) return t("alerts.minutes_before", { count: parseInt(minMatch[1]) });
-  const hourMatch = offset.match(/-?PT?(\d+)H$/);
+  const hourMatch = offset.match(ALERT_HOUR_RE);
   if (hourMatch) return t("alerts.hours_before", { count: parseInt(hourMatch[1]) });
-  const dayMatch = offset.match(/-?P(\d+)D/);
+  const dayMatch = offset.match(ALERT_DAY_RE);
   if (dayMatch) return t("alerts.days_before", { count: parseInt(dayMatch[1]) });
   return null;
 }
 
+// Frequency → translation-key. Was a Record literal built per call.
+const RECURRENCE_KEYS = {
+  daily: "recurrence.daily",
+  weekly: "recurrence.weekly",
+  monthly: "recurrence.monthly",
+  yearly: "recurrence.yearly",
+} as const;
+
 function getRecurrenceLabel(event: CalendarEvent, t: ReturnType<typeof useTranslations>): string | null {
   if (!event.recurrenceRules?.length) return null;
-  const freq = event.recurrenceRules[0].frequency;
-  const labels: Record<string, string> = {
-    daily: t("recurrence.daily"),
-    weekly: t("recurrence.weekly"),
-    monthly: t("recurrence.monthly"),
-    yearly: t("recurrence.yearly"),
-  };
-  return labels[freq] || null;
+  const freq = event.recurrenceRules[0].frequency as keyof typeof RECURRENCE_KEYS;
+  const key = RECURRENCE_KEYS[freq];
+  return key ? t(key) : null;
 }
 
 export function EventDetailPopover({
@@ -342,7 +351,7 @@ export function EventDetailPopover({
         {locationName && (
           <div className="flex items-start gap-2.5">
             <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-            {/^https?:\/\//i.test(locationName) ? (
+            {HTTP_URL_RE.test(locationName) ? (
               <a
                 href={locationName}
                 target="_blank"
@@ -600,6 +609,20 @@ export function EventDetailPopover({
   return createPortal(popover, document.body);
 }
 
+// Hoisted: were rebuilt per participant per render (up to 5 per popover).
+const PARTICIPANT_STATUS_COLORS: Record<string, string> = {
+  accepted: "text-success",
+  declined: "text-destructive",
+  tentative: "text-warning",
+  "needs-action": "text-muted-foreground",
+};
+const PARTICIPANT_STATUS_LABELS: Record<string, string> = {
+  accepted: "participants.accepted",
+  declined: "participants.declined",
+  tentative: "participants.tentative",
+  "needs-action": "participants.needs_action",
+};
+
 function ParticipantStatusBadge({
   status,
   t,
@@ -607,21 +630,9 @@ function ParticipantStatusBadge({
   status: CalendarParticipant["participationStatus"];
   t: ReturnType<typeof useTranslations>;
 }) {
-  const colors: Record<string, string> = {
-    accepted: "text-success",
-    declined: "text-destructive",
-    tentative: "text-warning",
-    "needs-action": "text-muted-foreground",
-  };
-  const labels: Record<string, string> = {
-    accepted: "participants.accepted",
-    declined: "participants.declined",
-    tentative: "participants.tentative",
-    "needs-action": "participants.needs_action",
-  };
   return (
-    <span className={`text-[10px] flex-shrink-0 ${colors[status] || ""}`}>
-      {t(labels[status] || labels["needs-action"])}
+    <span className={`text-[10px] flex-shrink-0 ${PARTICIPANT_STATUS_COLORS[status] || ""}`}>
+      {t(PARTICIPANT_STATUS_LABELS[status] || PARTICIPANT_STATUS_LABELS["needs-action"])}
     </span>
   );
 }

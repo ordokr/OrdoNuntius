@@ -14,6 +14,9 @@ import {
   resolveEndpointAllowed,
 } from '@/lib/telemetry';
 
+// Hoisted: shared no-store header object.
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 /**
  * GET /api/admin/telemetry
  * Returns current consent + endpoint + next/last send + a live preview
@@ -42,7 +45,7 @@ export async function GET() {
         payloadPreview: payload,
         accountCounts,
       },
-      { headers: { 'Cache-Control': 'no-store' } },
+      { headers: NO_STORE_HEADERS },
     );
   } catch (err) {
     logger.error('telemetry GET error', {

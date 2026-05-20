@@ -180,6 +180,19 @@ const getFileIcon = (name?: string, type?: string) => {
 // iframe-content rebuild (large HTML emails can have hundreds of nodes).
 const LEAF_MEDIA_TAGS = new Set(['IMG', 'VIDEO', 'SVG', 'CANVAS', 'OBJECT', 'EMBED']);
 
+// Hoisted: was redefined every render and called once per mailbox tree node
+// across three different dropdowns (move menu, tag menu, more menu).
+const getMoveMailboxIcon = (role?: string) => {
+  switch (role) {
+    case "inbox": return Inbox;
+    case "sent": return Send;
+    case "drafts": return File;
+    case "trash": return Trash2;
+    case "archive": return Archive;
+    default: return Folder;
+  }
+};
+
 const MIME_TYPE_LABELS: Record<string, string> = {
   'application/pdf': 'Document.pdf',
   'application/zip': 'Archive.zip',
@@ -583,6 +596,19 @@ function renderClickableRecipients(
   });
 }
 
+// Single-pass join of address components — replaces .filter().map().filter().join()
+// which allocated three intermediate arrays per address per render.
+function joinAddressComponents(components: ReadonlyArray<{ kind?: string; value?: string }>): string {
+  let out = "";
+  for (const c of components) {
+    if (c.kind === 'separator') continue;
+    const v = c.value;
+    if (!v) continue;
+    out = out ? out + ", " + v : v;
+  }
+  return out;
+}
+
 // Contact sidebar panel that slides in from the right on desktop
 function ContactSidebarPanel({
   email,
@@ -740,7 +766,7 @@ function ContactSidebarPanel({
                     {a.full || a.fullAddress
                       ? (a.full || a.fullAddress)
                       : a.components && a.components.length > 0
-                        ? a.components.filter(c => c.kind !== 'separator').map(c => c.value).filter(Boolean).join(", ")
+                        ? joinAddressComponents(a.components)
                         : [a.street, a.locality, a.region, a.postcode, a.country].filter(Boolean).join(", ")}
                   </div>
                 ))}
@@ -1000,17 +1026,19 @@ export function EmailViewer({
   }, [activeAccountId]);
 
   // Build mailbox tree for move-to dropdown
-  const moveTargetIds = useMemo(() => new Set(
-    mailboxes
-      .filter(
-        (m) =>
-          m.id !== selectedMailbox &&
-          m.role !== "drafts" &&
-          !m.id.startsWith("shared-") &&
-          m.myRights?.mayAddItems
-      )
-      .map((m) => m.id)
-  ), [mailboxes, selectedMailbox]);
+  // Single-pass Set build replaces .filter().map() into Set ctor (3 allocations).
+  const moveTargetIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const m of mailboxes) {
+      if (
+        m.id !== selectedMailbox &&
+        m.role !== "drafts" &&
+        !m.id.startsWith("shared-") &&
+        m.myRights?.mayAddItems
+      ) ids.add(m.id);
+    }
+    return ids;
+  }, [mailboxes, selectedMailbox]);
 
   const moveTree = useMemo(() => {
     const tree = buildMailboxTree(mailboxes);
@@ -1026,17 +1054,6 @@ export function EmailViewer({
     return filterTree(tree);
   }, [mailboxes, moveTargetIds]);
 
-  // Get mailbox icon based on role
-  const getMoveMailboxIcon = (role?: string) => {
-    switch (role) {
-      case "inbox": return Inbox;
-      case "sent": return Send;
-      case "drafts": return File;
-      case "trash": return Trash2;
-      case "archive": return Archive;
-      default: return Folder;
-    }
-  };
 
   // Close dropdown menus on click outside
   useEffect(() => {

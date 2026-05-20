@@ -3,7 +3,11 @@ import { configManager } from '@/lib/admin/config-manager';
 import { requireAdminAuth, getClientIP } from '@/lib/admin/session';
 import { auditLog } from '@/lib/admin/audit';
 import { logger } from '@/lib/logger';
+import { hasAnyKey } from '@/lib/utils';
 import type { SettingsPolicy } from '@/lib/admin/types';
+
+// Hoisted: shared no-store header object.
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
  * GET /api/admin/policy - Get settings policy (NOT admin-protected - users read this)
@@ -13,7 +17,7 @@ export async function GET() {
     await configManager.ensureLoaded();
     const policy = configManager.getPolicy();
     return NextResponse.json(policy, {
-      headers: { 'Cache-Control': 'no-store' },
+      headers: NO_STORE_HEADERS,
     });
   } catch (error) {
     logger.error('Policy read error', { error: error instanceof Error ? error.message : 'Unknown error' });

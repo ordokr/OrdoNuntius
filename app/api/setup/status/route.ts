@@ -7,6 +7,9 @@ import { SENSITIVE_CONFIG_KEYS } from '@/lib/admin/types';
 
 export const dynamic = 'force-dynamic';
 
+// Hoisted: shared no-store header object.
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 /**
  * GET /api/setup/status - public endpoint that returns the wizard state
  * and (if authenticated) the partial config saved by previous steps. The
@@ -47,6 +50,6 @@ export async function GET() {
       readOnly: isConfigReadOnly(),
       partialConfig,
     },
-    { headers: { 'Cache-Control': 'no-store' } },
+    { headers: NO_STORE_HEADERS },
   );
 }

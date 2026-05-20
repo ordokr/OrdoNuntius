@@ -5,11 +5,17 @@ import { getStalwartCredentials } from '@/lib/stalwart/credentials';
 import { configManager } from '@/lib/admin/config-manager';
 import { auditLog } from '@/lib/admin/audit';
 import { logger } from '@/lib/logger';
+import { hasAnyKey } from '@/lib/utils';
 import { locales as ALL_LOCALES } from '@/i18n/routing';
 
 const CLIENT_ID = 'ordo-nuntius';
 const CLIENT_DESCRIPTION = 'OrdoNuntius (auto-configured)';
 const JMAP_TIMEOUT_MS = 10_000;
+
+// Hoisted regexes: avoid recompiling per request / per locale filter iteration.
+const ORIGIN_URL_RE = /^https?:\/\/[^/]+$/;
+const LOCALE_RE = /^[a-z]{2,5}(-[A-Za-z0-9]+)*$/;
+const TRAILING_SLASH_RE = /\/+$/;
 
 interface JmapMethodCall {
   using: string[];
@@ -79,7 +85,7 @@ interface SetupRequestBody {
 }
 
 function isValidOriginUrl(value: string): boolean {
-  return /^https?:\/\/[^/]+$/.test(value);
+  return ORIGIN_URL_RE.test(value);
 }
 
 export async function POST(request: NextRequest) {
@@ -97,14 +103,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json() as SetupRequestBody;
-    const origin = (body.origin ?? '').trim().replace(/\/+$/, '');
+    const origin = (body.origin ?? '').trim().replace(TRAILING_SLASH_RE, '');
     if (!isValidOriginUrl(origin)) {
       return NextResponse.json(
         { error: 'Webmail origin must be a URL like "https://webmail.example.com" with no path.' },
         { status: 400 },
       );
     }
-    const issuerUrl = (body.issuerUrl ?? origin).trim().replace(/\/+$/, '');
+    const issuerUrl = (body.issuerUrl ?? origin).trim().replace(TRAILING_SLASH_RE, '');
     if (!isValidOriginUrl(issuerUrl)) {
       return NextResponse.json(
         { error: 'Stalwart issuer URL must be a URL like "https://mail.example.com" with no path.' },
@@ -112,7 +118,7 @@ export async function POST(request: NextRequest) {
       );
     }
     const localeList = Array.isArray(body.locales) && body.locales.length > 0
-      ? body.locales.filter(l => typeof l === 'string' && /^[a-z]{2,5}(-[A-Za-z0-9]+)*$/.test(l))
+      ? body.locales.filter(l => typeof l === 'string' && LOCALE_RE.test(l))
       : Array.from(ALL_LOCALES);
     if (localeList.length === 0) {
       return NextResponse.json({ error: 'No valid locales supplied.' }, { status: 400 });
@@ -195,13 +201,13 @@ export async function POST(request: NextRequest) {
       notCreated?: Record<string, unknown>;
       notUpdated?: Record<string, unknown>;
     };
-    if (setBody.notCreated && Object.keys(setBody.notCreated).length > 0) {
+    if (hasAnyKey(setBody.notCreated)) {
       return NextResponse.json(
         { error: 'Stalwart refused to create the OAuth client.', detail: setBody.notCreated },
         { status: 502 },
       );
     }
-    if (setBody.notUpdated && Object.keys(setBody.notUpdated).length > 0) {
+    if (hasAnyKey(setBody.notUpdated)) {
       return NextResponse.json(
         { error: 'Stalwart refused to update the OAuth client.', detail: setBody.notUpdated },
         { status: 502 },

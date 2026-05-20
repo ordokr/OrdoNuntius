@@ -14,6 +14,12 @@ const DIRECTORY_URL = process.env.EXTENSION_DIRECTORY_URL || '';
 
 const MAX_PREVIEW_SOURCE_LEN = 100_000;
 
+// Hoisted: shared header/signal constants.
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const ACCEPT_JSON_HEADERS = { Accept: 'application/json' } as const;
+const DETAIL_TIMEOUT_MS = 10_000;
+const BUNDLE_TIMEOUT_MS = 30_000;
+
 /**
  * GET /api/admin/marketplace/[slug]
  * Returns full preview info for an extension: directory metadata,
@@ -33,8 +39,8 @@ export async function GET(
     // 1. Extension metadata + screenshots + theme previews from the directory
     const detailUrl = new URL(`/api/v1/extension/${encodeURIComponent(slug)}`, DIRECTORY_URL);
     const detailRes = await fetch(detailUrl.toString(), {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(10000),
+      headers: ACCEPT_JSON_HEADERS,
+      signal: AbortSignal.timeout(DETAIL_TIMEOUT_MS),
     });
 
     if (!detailRes.ok) {
@@ -68,7 +74,7 @@ export async function GET(
           DIRECTORY_URL,
         );
         const bundleRes = await fetch(bundleUrl.toString(), {
-          signal: AbortSignal.timeout(30000),
+          signal: AbortSignal.timeout(BUNDLE_TIMEOUT_MS),
         });
 
         if (!bundleRes.ok) {
@@ -209,7 +215,7 @@ export async function GET(
         },
         installed,
       },
-      { headers: { 'Cache-Control': 'no-store' } },
+      { headers: NO_STORE_HEADERS },
     );
   } catch (error) {
     logger.error('Marketplace preview error', {
