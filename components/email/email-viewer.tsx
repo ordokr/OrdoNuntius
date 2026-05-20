@@ -2899,7 +2899,13 @@ export function EmailViewer({
   // True while the new email's body is still being fetched. Catches the
   // window between selectedEmail changing and isLoading flipping true, so the
   // quick reply / body don't flicker through a partial render.
-  const isBodyLoading = isLoading || !email?.bodyValues || Object.keys(email.bodyValues).length === 0;
+  // for...in early-return replaces `Object.keys(...).length === 0` which
+  // allocates a keys-array just to check size. Runs per viewer render.
+  let bodyValuesEmpty = true;
+  if (email?.bodyValues) {
+    for (const _ in email.bodyValues) { bodyValuesEmpty = false; break; }
+  }
+  const isBodyLoading = isLoading || !email?.bodyValues || bodyValuesEmpty;
 
   // Gates the quick reply on the iframe having loaded the current srcDoc, so
   // it doesn't flash in below a still-resizing iframe.

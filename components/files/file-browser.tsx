@@ -904,7 +904,7 @@ export function FileBrowser({
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [selectedResources, resources, currentPath, showSearch, showNewFolder, renameTarget, onDelete, onBatchDelete, onSelectAll, onClearSelection, onNavigate, onDownload, onCut, onCopy, onPaste, clipboard, handleNavigateUp]);
+  }, [selectedResources, resources, resourcesByName, currentPath, showSearch, showNewFolder, renameTarget, onDelete, onBatchDelete, onSelectAll, onClearSelection, onNavigate, onDownload, onCut, onCopy, onPaste, clipboard, handleNavigateUp]);
 
   const allSelected = resources.length > 0 && selectedResources.size === resources.length;
   const someSelected = selectedResources.size > 0 && !allSelected;
