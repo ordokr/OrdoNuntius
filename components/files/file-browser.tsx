@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import {
   Folder, File, Upload, FolderPlus, Download, Trash2,
@@ -19,7 +20,15 @@ import { RenameDialog } from "@/components/files/rename-dialog";
 import { FileUploadArea } from "@/components/files/file-upload-area";
 import { loadFilesSettings } from "@/lib/files-settings";
 import type { FolderLayout } from "@/lib/files-settings";
-import { FolderTreeSidebar } from "@/components/files/folder-tree-sidebar";
+// FolderTreeSidebar (~296 LOC + 5 lucide icons) only renders when the
+// folderLayout setting is "sidebar" — the default is "inline", so most
+// users never see it. The render site is already gated on `folderLayout
+// === "sidebar"`, so wrapping the import in dynamic() ties the chunk
+// fetch to the user opting into the sidebar layout.
+const FolderTreeSidebar = dynamic(
+  () => import("@/components/files/folder-tree-sidebar").then(m => ({ default: m.FolderTreeSidebar })),
+  { ssr: false, loading: () => null }
+);
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { getDroppedFilesAndFolders } from "@/lib/webdav/drop-utils";
 import type { FileResource } from "@/stores/file-store";
