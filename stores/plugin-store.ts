@@ -10,12 +10,37 @@ import type {
   Disposable,
 } from '@/lib/plugin-types';
 import { pluginStorage } from '@/lib/plugin-storage';
-import { extractPlugin } from '@/lib/plugin-validator';
-import { loadPlugin, deactivatePlugin, setPluginStoreAccessor, setupAutoDisable } from '@/lib/plugin-loader';
-import { setSlotRegistrationBridge } from '@/lib/plugin-api';
 import { removeAllPluginHooks } from '@/lib/plugin-hooks';
 import { usePolicyStore } from '@/stores/policy-store';
 import { apiFetch } from '@/lib/browser-navigation';
+
+// Lazy holder for the plugin runtime (plugin-loader + plugin-validator +
+// plugin-api). The full runtime, including JSZip and the theme compiler
+// transitively pulled in by plugin-validator, weighs ~60-80 KB minified
+// and was being shipped on every cold inbox load even for users without
+// plugins installed. Now it loads on first plugin action (install,
+// enable, or initializePlugins on a non-empty plugin list).
+type PluginRuntime = {
+  loader: typeof import('@/lib/plugin-loader');
+  validator: typeof import('@/lib/plugin-validator');
+  api: typeof import('@/lib/plugin-api');
+};
+let _runtime: PluginRuntime | null = null;
+let _runtimePromise: Promise<PluginRuntime> | null = null;
+async function getPluginRuntime(): Promise<PluginRuntime> {
+  if (_runtime) return _runtime;
+  if (!_runtimePromise) {
+    _runtimePromise = Promise.all([
+      import('@/lib/plugin-loader'),
+      import('@/lib/plugin-validator'),
+      import('@/lib/plugin-api'),
+    ]).then(([loader, validator, api]) => {
+      _runtime = { loader, validator, api };
+      return _runtime;
+    });
+  }
+  return _runtimePromise;
+}
 
 // ─── Slot State ──────────────────────────────────────────────
 
@@ -67,7 +92,10 @@ export const usePluginStore = create<PluginStoreState>()(
       initialized: false,
 
       installPlugin: async (file: File) => {
-        const result = await extractPlugin(file);
+        // Lazy-load the plugin runtime: extractPlugin pulls JSZip + the
+        // theme compiler chain; deactivatePlugin pulls plugin-loader/api.
+        const runtime = await getPluginRuntime();
+        const result = await runtime.validator.extractPlugin(file);
         if (!result.valid || !result.manifest) {
           return { success: false, error: result.errors.join('; '), warnings: result.warnings };
         }
@@ -79,7 +107,7 @@ export const usePluginStore = create<PluginStoreState>()(
         const existing = plugins.find(p => p.id === manifest.id);
         if (existing) {
           // Update: deactivate old, replace
-          deactivatePlugin(manifest.id);
+          runtime.loader.deactivatePlugin(manifest.id);
         }
 
         const plugin: InstalledPlugin = {
@@ -122,8 +150,10 @@ export const usePluginStore = create<PluginStoreState>()(
         const forceEnabledByPolicy = usePolicyStore.getState().isPluginForceEnabled(id);
         if (plugin.forceEnabled || forceEnabledByPolicy) return;
 
-        // Deactivate if running
-        deactivatePlugin(id);
+        // Deactivate if running. If the runtime never loaded, nothing was
+        // active anyway — skip rather than awaiting an import on a
+        // sync-style action.
+        if (_runtime) _runtime.loader.deactivatePlugin(id);
         removeAllPluginHooks(id);
 
         // Clean up storage
@@ -155,8 +185,9 @@ export const usePluginStore = create<PluginStoreState>()(
         if (requireApproval && !isApproved) return;
 
         // Ensure bridges are wired before loading (may not have run initializePlugins yet)
-        setPluginStoreAccessor({ setPluginStatus: get().setPluginStatus });
-        setSlotRegistrationBridge(get().registerSlot);
+        const runtime = await getPluginRuntime();
+        runtime.loader.setPluginStoreAccessor({ setPluginStatus: get().setPluginStatus });
+        runtime.api.setSlotRegistrationBridge(get().registerSlot);
 
         set({
           plugins: plugins.map(p =>
@@ -167,7 +198,7 @@ export const usePluginStore = create<PluginStoreState>()(
         // Load it immediately
         const updatedPlugin = get().plugins.find(p => p.id === id);
         if (updatedPlugin) {
-          await loadPlugin(updatedPlugin);
+          await runtime.loader.loadPlugin(updatedPlugin);
         }
       },
 
@@ -178,7 +209,8 @@ export const usePluginStore = create<PluginStoreState>()(
         const forceEnabledByPolicy = usePolicyStore.getState().isPluginForceEnabled(id);
         if (plugin.forceEnabled || forceEnabledByPolicy) return;
 
-        deactivatePlugin(id);
+        // If the runtime never loaded, nothing was active anyway.
+        if (_runtime) _runtime.loader.deactivatePlugin(id);
 
         set({
           plugins: plugins.map(p =>
@@ -242,24 +274,31 @@ export const usePluginStore = create<PluginStoreState>()(
             set({ plugins: deduped });
           }
 
-          // Wire up bridges
-          setPluginStoreAccessor({
+          // Sync server-managed plugins before deciding whether to load the
+          // runtime (server-managed plugins may add entries here).
+          await syncServerPlugins(get, set);
+
+          const enabledPlugins = get().plugins.filter(p => p.enabled && p.status !== 'error');
+          // No enabled plugins → skip the runtime load entirely. Users
+          // without plugins (the common case) never pay for the chunk.
+          if (enabledPlugins.length === 0) {
+            set({ initialized: true });
+            return;
+          }
+
+          // Wire up bridges via the lazy runtime
+          const runtime = await getPluginRuntime();
+          runtime.loader.setPluginStoreAccessor({
             setPluginStatus: get().setPluginStatus,
           });
-          setSlotRegistrationBridge(get().registerSlot);
-          setupAutoDisable();
-
-          // Sync server-managed plugins before loading
-          await syncServerPlugins(get, set);
+          runtime.api.setSlotRegistrationBridge(get().registerSlot);
+          runtime.loader.setupAutoDisable();
 
           // Load all enabled plugins. Each loadPlugin reads its bundle from
           // IndexedDB and runs the plugin's activate() — independent per
           // plugin, so parallelize. allSettled so one plugin's activate-time
-          // throw doesn't strand the others (loadPlugin catches internally
-          // and flips status to 'error', but a synchronous throw before that
-          // try/catch would still bubble — defensive).
-          const enabledPlugins = get().plugins.filter(p => p.enabled && p.status !== 'error');
-          await Promise.allSettled(enabledPlugins.map(p => loadPlugin(p)));
+          // throw doesn't strand the others.
+          await Promise.allSettled(enabledPlugins.map(p => runtime.loader.loadPlugin(p)));
 
           set({ initialized: true });
         })();
@@ -514,7 +553,8 @@ async function syncServerPlugins(
     }
     if (staleIds.length > 0) {
       for (const id of staleIds) {
-        deactivatePlugin(id);
+        // No runtime loaded → nothing to deactivate.
+        if (_runtime) _runtime.loader.deactivatePlugin(id);
         removeAllPluginHooks(id);
         pluginStorage.deleteCode(id);
       }
