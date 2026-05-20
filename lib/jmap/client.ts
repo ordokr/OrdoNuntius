@@ -96,6 +96,25 @@ const EMAIL_LIST_PROPERTIES = [
   "hasAttachment",
 ] as const;
 
+// Pre-built full-email properties list (list-properties + body/header
+// extras). Was rebuilt via spread on every getThreadEmails call.
+const EMAIL_FULL_PROPERTIES = [
+  ...EMAIL_LIST_PROPERTIES,
+  "textBody",
+  "htmlBody",
+  "bodyValues",
+  "attachments",
+  "blobId",
+  "sentAt",
+  "bcc",
+  "replyTo",
+  "messageId",
+  "inReplyTo",
+  "references",
+  "headers",
+  "bodyStructure",
+] as const;
+
 // Stalwart's default property list for Calendar/get omits shareWith, isVisible,
 // includeInAvailability, and the default-alerts properties. Without an explicit
 // `properties` list the share indicator and share dialog can't see existing
@@ -1082,13 +1101,7 @@ export class JMAPClient implements IJMAPClient {
         ["Email/get", {
           accountId: targetAccountId,
           ids: [emailId],
-          properties: [
-            "id", "threadId", "mailboxIds", "keywords", "size",
-            "receivedAt", "sentAt", "from", "to", "cc", "bcc", "replyTo",
-            "subject", "preview", "textBody", "htmlBody", "bodyValues",
-            "hasAttachment", "attachments", "messageId", "inReplyTo",
-            "references", "headers", "bodyStructure", "blobId",
-          ],
+          properties: EMAIL_FULL_PROPERTIES,
           fetchTextBodyValues: true,
           fetchHTMLBodyValues: true,
           fetchAllBodyValues: true,
@@ -1869,12 +1882,7 @@ export class JMAPClient implements IJMAPClient {
         ["Email/get", {
           accountId: targetAccountId,
           "#ids": { resultOf: "t", name: "Thread/get", path: "/list/*/emailIds" },
-          properties: [
-            ...EMAIL_LIST_PROPERTIES,
-            "textBody", "htmlBody", "bodyValues",
-            "attachments", "blobId", "sentAt", "bcc", "replyTo",
-            "messageId", "inReplyTo", "references", "headers", "bodyStructure",
-          ],
+          properties: EMAIL_FULL_PROPERTIES,
           fetchTextBodyValues: true,
           fetchHTMLBodyValues: true,
           fetchAllBodyValues: true,
