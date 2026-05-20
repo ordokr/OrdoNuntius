@@ -112,8 +112,12 @@ export class HookBus<T extends (...args: any[]) => any> {
     return this.handlers.length;
   }
 
-  /** Fire all handlers (observer pattern - no return values used) */
+  /** Fire all handlers (observer pattern - no return values used).
+   * Zero-handler fast path: skip the iterator + Promise allocation. Hooks
+   * fire per email render / event / nav, so the empty-bus case dominates
+   * when no plugins are installed (the common case). */
   async emit(...args: Parameters<T>): Promise<void> {
+    if (this.handlers.length === 0) return;
     for (const { pluginId, handler } of this.handlers) {
       if (pluginErrorTracker.isDisabled(pluginId)) continue;
       try {
@@ -126,6 +130,7 @@ export class HookBus<T extends (...args: any[]) => any> {
 
   /** Synchronous emit for performance-critical paths */
   emitSync(...args: Parameters<T>): void {
+    if (this.handlers.length === 0) return;
     for (const { pluginId, handler } of this.handlers) {
       if (pluginErrorTracker.isDisabled(pluginId)) continue;
       try {
@@ -138,6 +143,7 @@ export class HookBus<T extends (...args: any[]) => any> {
 
   /** Fire handlers as interceptors - any returning false cancels the operation */
   async intercept(...args: Parameters<T>): Promise<boolean> {
+    if (this.handlers.length === 0) return true;
     for (const { pluginId, handler } of this.handlers) {
       if (pluginErrorTracker.isDisabled(pluginId)) continue;
       try {
@@ -152,6 +158,7 @@ export class HookBus<T extends (...args: any[]) => any> {
 
   /** Fire handlers as transforms - each receives the output of the previous */
   async transform<V>(initial: V, ...rest: unknown[]): Promise<V> {
+    if (this.handlers.length === 0) return initial;
     let value = initial;
     for (const { pluginId, handler } of this.handlers) {
       if (pluginErrorTracker.isDisabled(pluginId)) continue;
