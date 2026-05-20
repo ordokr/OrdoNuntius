@@ -28,8 +28,19 @@ import { useTemplateStore } from "@/stores/template-store";
 import { SubAddressHelper } from "@/components/identity/sub-address-helper";
 import { generateSubAddress } from "@/lib/sub-addressing";
 import { substitutePlaceholders } from "@/lib/template-utils";
-import { TemplatePicker } from "@/components/templates/template-picker";
-import { TemplateForm } from "@/components/templates/template-form";
+import dynamic from "next/dynamic";
+// TemplatePicker + TemplateForm only mount on explicit user action
+// (browse templates / save as template). Defer past the composer's
+// first paint — both pull translation strings + DOMPurify-using
+// template-utils that the composer body doesn't need to render.
+const TemplatePicker = dynamic(
+  () => import("@/components/templates/template-picker").then(m => ({ default: m.TemplatePicker })),
+  { ssr: false, loading: () => null }
+);
+const TemplateForm = dynamic(
+  () => import("@/components/templates/template-form").then(m => ({ default: m.TemplateForm })),
+  { ssr: false, loading: () => null }
+);
 import type { EmailTemplate } from "@/lib/template-types";
 import { appendPlainTextSignature, getPlainTextSignature } from "@/lib/signature-utils";
 import { resolveReplyFrom } from "@/lib/reply-identity";
