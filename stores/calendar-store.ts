@@ -9,7 +9,10 @@ import { debug, isDebugEnabled } from '@/lib/debug';
 // into every authenticated route's first paint.
 import { normalizeAllDayDuration } from '@/lib/calendar-duration';
 import { parseDuration } from '@/components/calendar/event-card';
-import { sanitizeOutgoingCalendarEventData } from '@/lib/calendar-event-normalization';
+// sanitizeOutgoingCalendarEventData is lazy-imported at each call site
+// (createEvent / updateEvent / move-event paths) so calendar-event-
+// normalization (~6 KB src) doesn't ship on every authenticated route's
+// first paint via NavigationRail → calendar-store.
 // expandRecurringEvents (~26 KB src) is dynamic-imported at the
 // fetchEvents call site below — only the calendar route needs it,
 // but calendar-store is reachable from the inbox via navigation-rail
@@ -293,6 +296,7 @@ export const useCalendarStore = create<CalendarStore>()(
           // build for O(1) lookup; previously did `.find(c => c.id === calId)`
           // per calendarId. Also drops the Object.keys allocation.
           let targetAccountId = event.accountId;
+          const { sanitizeOutgoingCalendarEventData } = await import('@/lib/calendar-event-normalization');
           const cleanEvent = sanitizeOutgoingCalendarEventData({ ...event });
           if (event.calendarIds) {
             const remapped: Record<string, boolean> = {};
@@ -409,6 +413,7 @@ export const useCalendarStore = create<CalendarStore>()(
           }
           // Remap namespaced calendarIds back to original IDs. Same Map
           // + for...in pattern as createEvent above.
+          const { sanitizeOutgoingCalendarEventData } = await import('@/lib/calendar-event-normalization');
           const cleanUpdates = sanitizeOutgoingCalendarEventData({ ...updates });
           if (cleanUpdates.calendarIds) {
             const remapped: Record<string, boolean> = {};
@@ -592,6 +597,7 @@ export const useCalendarStore = create<CalendarStore>()(
 
         // Prepare all events for batch creation
         const prepared: Partial<CalendarEvent>[] = [];
+        const { sanitizeOutgoingCalendarEventData } = await import('@/lib/calendar-event-normalization');
         for (const event of eventsToProcess) {
           const src = sanitizeOutgoingCalendarEventData(event as Partial<CalendarEvent>);
           let cleanParticipants: Record<string, CalendarParticipant> | null = null;
