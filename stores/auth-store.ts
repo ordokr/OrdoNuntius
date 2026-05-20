@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { JMAPClient, RateLimitError } from '@/lib/jmap/client';
+import type { JMAPClient as JMAPClientCtor, RateLimitError as RateLimitErrorCtor } from '@/lib/jmap/client';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import { useIdentityStore } from './identity-store';
 import { useContactStore } from './contact-store';
@@ -14,9 +14,117 @@ import { debug } from '@/lib/debug';
 import { generateAccountId } from '@/lib/account-utils';
 import { replaceWindowLocation, getPathPrefix, getLocaleFromPath, apiFetch } from '@/lib/browser-navigation';
 import { notifyParent } from '@/lib/iframe-bridge';
-import { snapshotAccount, restoreAccount, clearAllStores, evictAccount, evictAll } from '@/lib/account-state-manager';
 import type { Identity } from '@/lib/jmap/types';
 import { sortIdentities } from '@/lib/identity-sort';
+
+// ─── Lazy deps ─────────────────────────────────────────────────────
+//
+// JMAPClient (~5841 LOC, ~167K minified) and lib/account-state-manager
+// (which transitively pulls calendar/contact/smime/filter/identity/
+// vacation/email stores) are dynamic-imported and cached at module
+// scope so they stay out of every authenticated route's cold-load.
+//
+// `ensureLazyAuthDeps()` is fire-and-forget-kicked-off at module load
+// so the chunks fetch in parallel with the rest of page rendering.
+// A follow-up commit will additionally `await ensureLazyAuthDeps()` at
+// the top of every async action (login*, checkAuth, switchAccount,
+// refreshAccessToken), closing the load-before-use loop. Sync entry
+// points (logout, logoutAll, performFullLogout) only run AFTER one of
+// those async paths authenticated the user, so by that time the
+// modules will be loaded.
+//
+// The sync proxy functions (snapshotAccount etc.) defensively log +
+// no-op if the module reference is somehow null — covering the
+// impossible-in-practice case of a logout before any login.
+
+type JmapClientModule = typeof import('@/lib/jmap/client');
+type AsmModule = typeof import('@/lib/account-state-manager');
+
+let _jmapClientMod: JmapClientModule | null = null;
+let _asmMod: AsmModule | null = null;
+let _depsPromise: Promise<void> | null = null;
+
+function ensureLazyAuthDeps(): Promise<void> {
+  if (_jmapClientMod && _asmMod) return Promise.resolve();
+  if (_depsPromise) return _depsPromise;
+  _depsPromise = Promise.all([
+    import('@/lib/jmap/client'),
+    import('@/lib/account-state-manager'),
+  ]).then(([jc, asm]) => {
+    _jmapClientMod = jc;
+    _asmMod = asm;
+  });
+  return _depsPromise;
+}
+
+// Kick off the dynamic imports immediately. The auth-store module is
+// pulled by every authenticated route, so this fire-and-forget loader
+// races against the rest of the page rendering and is almost always
+// resolved long before any user interaction.
+void ensureLazyAuthDeps().catch((err) => {
+  debug.error('Failed to prefetch lazy auth deps:', err);
+});
+
+// Sync proxies — wrap the loaded account-state-manager. All call sites
+// in this file must be reachable only AFTER an async action awaited
+// ensureLazyAuthDeps(); the null-branch is defensive and shouldn't
+// fire in practice.
+function snapshotAccount(accountId: string): void {
+  if (!_asmMod) {
+    debug.error('snapshotAccount called before account-state-manager loaded');
+    return;
+  }
+  _asmMod.snapshotAccount(accountId);
+}
+function restoreAccount(accountId: string): boolean {
+  if (!_asmMod) {
+    debug.error('restoreAccount called before account-state-manager loaded');
+    return false;
+  }
+  return _asmMod.restoreAccount(accountId);
+}
+function clearAllStores(): void {
+  if (!_asmMod) {
+    debug.error('clearAllStores called before account-state-manager loaded');
+    return;
+  }
+  _asmMod.clearAllStores();
+}
+function evictAccount(accountId: string): void {
+  if (!_asmMod) {
+    debug.error('evictAccount called before account-state-manager loaded');
+    return;
+  }
+  _asmMod.evictAccount(accountId);
+}
+function evictAll(): void {
+  if (!_asmMod) {
+    debug.error('evictAll called before account-state-manager loaded');
+    return;
+  }
+  _asmMod.evictAll();
+}
+
+// JMAPClient + RateLimitError accessors — assume ensureLazyAuthDeps()
+// has resolved by the time these are read. All construction call sites
+// are inside async action methods that already await deps.
+//
+// Note on types: the `import type { JMAPClient as JMAPClientCtor }`
+// alias above brings in the INSTANCE type (a TypeScript class name
+// in type position refers to the instance shape). We can't write
+// `typeof JMAPClientCtor` because the alias is type-only — there is
+// no value with that name to take `typeof` of. Use the
+// `JmapClientModule['JMAPClient']` indexed-access type instead, which
+// references the module's exported value (the constructor) directly.
+function getJMAPClientCtor(): JmapClientModule['JMAPClient'] {
+  if (!_jmapClientMod) {
+    throw new Error('JMAPClient module not loaded — async action must await ensureLazyAuthDeps() first');
+  }
+  return _jmapClientMod.JMAPClient;
+}
+function getRateLimitErrorCtor(): JmapClientModule['RateLimitError'] | null {
+  return _jmapClientMod?.RateLimitError ?? null;
+}
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -57,8 +165,8 @@ interface AuthState {
   clearError: () => void;
   syncIdentities: () => void;
   refreshIdentities: () => Promise<void>;
-  getClientForAccount: (accountId: string) => JMAPClient | undefined;
-  getAllConnectedClients: () => Map<string, JMAPClient>;
+  getClientForAccount: (accountId: string) => JMAPClientCtor | undefined;
+  getAllConnectedClients: () => Map<string, JMAPClientCtor>;
 }
 
 const ERROR_PATTERNS: Array<{ key: string; matches: string[] }> = [
@@ -78,8 +186,9 @@ function classifyLoginError(error: unknown): string {
   return 'generic';
 }
 
-function isRateLimitError(error: unknown): error is RateLimitError {
-  return error instanceof RateLimitError;
+function isRateLimitError(error: unknown): error is RateLimitErrorCtor {
+  const ctor = getRateLimitErrorCtor();
+  return ctor ? error instanceof ctor : false;
 }
 
 function getClientRateLimitState(client: IJMAPClient | null): Pick<AuthState, 'isRateLimited' | 'rateLimitUntil'> {
@@ -240,7 +349,7 @@ let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 let refreshPromise: Promise<string | null> | null = null;
 
 // Multi-account state: per-account JMAP clients and refresh timers
-const clients = new Map<string, JMAPClient>();
+const clients = new Map<string, JMAPClientCtor>();
 const refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const refreshPromises = new Map<string, Promise<string | null>>();
 
@@ -334,7 +443,7 @@ function performFullLogout(set: (state: Partial<AuthState>) => void): void {
 
 interface BearerLoginFinalization {
   /** The connected JMAPClient (already registered in `clients` map). */
-  client: JMAPClient;
+  client: JMAPClientCtor;
   /** Account ID — already added to accountStore by the caller. */
   accountId: string;
   username: string;
@@ -433,7 +542,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null, isRateLimited: false, rateLimitUntil: null });
 
         try {
-          const client = new JMAPClient(serverUrl, username, effectivePassword);
+          const client = new (getJMAPClientCtor())(serverUrl, username, effectivePassword);
           await client.connect();
 
           // Inbox emails are the cold-load critical path. Fire the prefetch
@@ -739,7 +848,7 @@ export const useAuthStore = create<AuthState>()(
           const { access_token, expires_in } = await tokenRes.json();
 
           const refreshFn = get().refreshAccessToken;
-          const client = JMAPClient.withBearer(serverUrl, access_token, '', () => refreshFn());
+          const client = getJMAPClientCtor().withBearer(serverUrl, access_token, '', () => refreshFn());
           await client.connect();
 
           // Inbox prefetch in parallel with everything below — see comment
@@ -867,7 +976,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const refreshFn = get().refreshAccessToken;
-          const client = JMAPClient.withBearer(ssoServerUrl, access_token, '', () => refreshFn());
+          const client = getJMAPClientCtor().withBearer(ssoServerUrl, access_token, '', () => refreshFn());
           await client.connect();
 
           // Inbox prefetch in parallel with everything below — see comment
@@ -1215,7 +1324,7 @@ export const useAuthStore = create<AuthState>()(
                 const refreshFn = get().refreshAccessToken;
                 // Bake accountId into the refresh closure from the start —
                 // unlike fresh logins, we already know it here.
-                targetClient = JMAPClient.withBearer(targetAccount.serverUrl, access_token, targetAccount.username, () => refreshFn(accountId));
+                targetClient = getJMAPClientCtor().withBearer(targetAccount.serverUrl, access_token, targetAccount.username, () => refreshFn(accountId));
                 bindClientStatusHandlers(targetClient, set, get, accountId);
                 await targetClient.connect();
                 clients.set(accountId, targetClient);
@@ -1231,7 +1340,7 @@ export const useAuthStore = create<AuthState>()(
               const res = await apiFetch(`/api/auth/session?slot=${targetAccount.cookieSlot}`, { method: 'PUT' });
               if (res.ok) {
                 const { serverUrl, username, password } = await res.json();
-                targetClient = new JMAPClient(serverUrl, username, password);
+                targetClient = new (getJMAPClientCtor())(serverUrl, username, password);
                 bindClientStatusHandlers(targetClient, set, get, accountId);
                 await targetClient.connect();
                 clients.set(accountId, targetClient);
@@ -1399,7 +1508,7 @@ export const useAuthStore = create<AuthState>()(
                   const refreshFn = get().refreshAccessToken;
                   // accountId is already known here (account.id) — bake it
                   // into the refresh callback at construction time.
-                  const client = JMAPClient.withBearer(account.serverUrl, access_token, account.username, () => refreshFn(account.id));
+                  const client = getJMAPClientCtor().withBearer(account.serverUrl, access_token, account.username, () => refreshFn(account.id));
                   bindClientStatusHandlers(client, set, get, account.id);
                   await client.connect();
                   clients.set(account.id, client);
@@ -1413,7 +1522,7 @@ export const useAuthStore = create<AuthState>()(
                 const res = await apiFetch(`/api/auth/session?slot=${account.cookieSlot}`, { method: 'PUT' });
                 if (res.ok) {
                   const { serverUrl, username, password } = await res.json();
-                  const client = new JMAPClient(serverUrl, username, password);
+                  const client = new (getJMAPClientCtor())(serverUrl, username, password);
                   bindClientStatusHandlers(client, set, get, account.id);
                   await client.connect();
                   clients.set(account.id, client);
@@ -1541,7 +1650,7 @@ export const useAuthStore = create<AuthState>()(
               const token = await get().refreshAccessToken();
               if (token && state.serverUrl) {
                 const refreshFn = get().refreshAccessToken;
-                const client = JMAPClient.withBearer(state.serverUrl, token, state.username || '', () => refreshFn());
+                const client = getJMAPClientCtor().withBearer(state.serverUrl, token, state.username || '', () => refreshFn());
                 await client.connect();
 
                 const accountId = generateAccountId(state.username || '', state.serverUrl);
@@ -1609,7 +1718,7 @@ export const useAuthStore = create<AuthState>()(
                   throw new Error('Incomplete session data');
                 }
                 const { serverUrl, username, password } = data;
-                const client = new JMAPClient(serverUrl, username, password);
+                const client = new (getJMAPClientCtor())(serverUrl, username, password);
                 await client.connect();
 
                 const accountId = generateAccountId(username, serverUrl);
