@@ -3318,19 +3318,30 @@ export class JMAPClient implements IJMAPClient {
     return calendarsAccount || this.accountId;
   }
 
+  // Memoized per JMAPClient instance — capability set is fixed for the
+  // session, so the `using` arrays don't change after construction. Each
+  // is called from 17 callsites for contact/calendar JMAP requests; the
+  // memo drops a fresh array allocation per call.
+  private _contactUsing?: string[];
+  private _calendarUsing?: string[];
+
   private contactUsing(): string[] {
+    if (this._contactUsing) return this._contactUsing;
     const using = ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:contacts"];
     if (this.hasCapability("urn:ietf:params:jmap:principals")) {
       using.push("urn:ietf:params:jmap:principals:owner");
     }
+    this._contactUsing = using;
     return using;
   }
 
   private calendarUsing(): string[] {
+    if (this._calendarUsing) return this._calendarUsing;
     const using = ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:calendars"];
     if (this.hasCapability("urn:ietf:params:jmap:principals")) {
       using.push("urn:ietf:params:jmap:principals:owner");
     }
+    this._calendarUsing = using;
     return using;
   }
 
