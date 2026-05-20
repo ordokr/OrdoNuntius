@@ -2,7 +2,15 @@
 
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { ThreadListItem } from "./thread-list-item";
-import { EmailContextMenu } from "./email-context-menu";
+import dynamic from "next/dynamic";
+// EmailContextMenu only mounts after a right-click — the render below is
+// already gated on `contextMenu.data`. Making it dynamic moves its 19
+// lucide icons, ContextMenu primitive, buildMailboxTree+KEYWORD_PALETTE
+// pulls, and translations out of the eager inbox bundle.
+const EmailContextMenu = dynamic(
+  () => import("./email-context-menu").then(m => ({ default: m.EmailContextMenu })),
+  { ssr: false, loading: () => null },
+);
 import { cn } from "@/lib/utils";
 import { Trash2, Mail, MailX, MailOpen, Loader2, SearchX, AlertTriangle } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";

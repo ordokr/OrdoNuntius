@@ -1,6 +1,7 @@
 "use client";
 
 import React, { memo, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
@@ -32,7 +33,16 @@ import {
 import { cn, buildMailboxTree, MailboxNode } from "@/lib/utils";
 import { Mailbox } from "@/lib/jmap/types";
 import { useContextMenu } from "@/hooks/use-context-menu";
-import { MailboxContextMenu, type MailboxContextTarget } from "./mailbox-context-menu";
+import type { MailboxContextTarget } from "./mailbox-context-menu";
+// MailboxContextMenu only renders after the user right-clicks a mailbox or
+// the folders header. useContextMenu starts with `data: null`, so gating
+// the dynamic component on `mailboxContextMenu.data` defers fetching the
+// chunk (~12 icons + context-menu translations + helper code) until the
+// first right-click — sidebar mounts on every authenticated route.
+const MailboxContextMenu = dynamic(
+  () => import("./mailbox-context-menu").then(m => ({ default: m.MailboxContextMenu })),
+  { ssr: false, loading: () => null },
+);
 import { useAccountStore } from '@/stores/account-store';
 import { UNIFIED_MAILBOX_IDS } from '@/lib/jmap/types';
 import type { UnifiedMailboxRole } from '@/lib/jmap/types';
@@ -1060,24 +1070,26 @@ export function Sidebar({
         {!isCollapsed && <PluginSlot name="sidebar-widget" className="border-t border-border" />}
       </div>
 
-      <MailboxContextMenu
-        target={mailboxContextMenu.data}
-        position={mailboxContextMenu.position}
-        isOpen={mailboxContextMenu.isOpen}
-        onClose={closeMailboxContextMenu}
-        menuRef={mailboxMenuRef}
-        mailboxes={mailboxes}
-        onMarkFolderRead={onMarkFolderRead}
-        onMarkFolderTreeRead={onMarkFolderTreeRead}
-        onMarkAllFoldersRead={onMarkAllFoldersRead}
-        onEmptyFolder={onEmptyFolder}
-        onCreateSubfolder={onCreateSubfolder}
-        onCreateFolder={onCreateFolder}
-        onRenameFolder={onRenameFolder}
-        onDeleteFolder={onDeleteFolder}
-        onImportEmail={onImportEmail}
-        onRefresh={onRefreshMailboxes}
-      />
+      {mailboxContextMenu.data && (
+        <MailboxContextMenu
+          target={mailboxContextMenu.data}
+          position={mailboxContextMenu.position}
+          isOpen={mailboxContextMenu.isOpen}
+          onClose={closeMailboxContextMenu}
+          menuRef={mailboxMenuRef}
+          mailboxes={mailboxes}
+          onMarkFolderRead={onMarkFolderRead}
+          onMarkFolderTreeRead={onMarkFolderTreeRead}
+          onMarkAllFoldersRead={onMarkAllFoldersRead}
+          onEmptyFolder={onEmptyFolder}
+          onCreateSubfolder={onCreateSubfolder}
+          onCreateFolder={onCreateFolder}
+          onRenameFolder={onRenameFolder}
+          onDeleteFolder={onDeleteFolder}
+          onImportEmail={onImportEmail}
+          onRefresh={onRefreshMailboxes}
+        />
+      )}
     </div>
   );
 }
