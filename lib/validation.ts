@@ -1,5 +1,12 @@
 import { splitTrimmed } from './utils';
 
+// Hoisted out of the per-call hot paths — isValidEmail and
+// getEmailValidationErrorCode fire per recipient per keystroke in the
+// composer; parseUnsubscribeUrls fires per email's List-Unsubscribe.
+const CONTROL_CHARS_RE = /[\r\n\0<>]/;
+const RFC5322_EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+const ANGLE_URL_RE = /<([^>]+)>/g;
+
 /**
  * RFC 5322 compliant email validation with security enhancements
  */
@@ -8,12 +15,9 @@ export function isValidEmail(email: string): boolean {
   if (!email || email.length > 254) return false;
 
   // Security: Block control characters and header injection
-  if (/[\r\n\0<>]/.test(email)) return false;
+  if (CONTROL_CHARS_RE.test(email)) return false;
 
-  // RFC 5322 compliant regex (simplified but secure)
-  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-
-  if (!emailRegex.test(email)) return false;
+  if (!RFC5322_EMAIL_RE.test(email)) return false;
 
   // Additional checks. indexOf+slice avoids the throwaway 2-element array
   // that `.split('@')` allocates per call — this function runs per
@@ -75,7 +79,7 @@ export type EmailValidationErrorCode =
 export function getEmailValidationErrorCode(email: string): EmailValidationErrorCode {
   if (!email?.trim()) return 'EMAIL_REQUIRED';
   if (email.length > 254) return 'EMAIL_TOO_LONG';
-  if (/[\r\n\0<>]/.test(email)) return 'EMAIL_INVALID_CHARS';
+  if (CONTROL_CHARS_RE.test(email)) return 'EMAIL_INVALID_CHARS';
   if (!isValidEmail(email)) return 'EMAIL_INVALID';
   return null;
 }
@@ -116,7 +120,8 @@ export function isValidUnsubscribeUrl(url: string): boolean {
 
   try {
     const parsed = new URL(url);
-    return ['http:', 'https:'].includes(parsed.protocol);
+    // Direct compare drops the 2-element array literal allocated per call.
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
   } catch {
     return false;
   }
@@ -135,19 +140,22 @@ export function parseUnsubscribeUrls(header: string): {
 } {
   if (!header?.trim()) return {};
 
-  const matches = header.match(/<([^>]+)>/g);
-  if (!matches) return {};
-
-  const urls = matches.map(m => m.slice(1, -1).trim());
-
-  const http = urls.find(u =>
-    (u.startsWith('http://') || u.startsWith('https://')) &&
-    isValidUnsubscribeUrl(u)
-  );
-  const mailto = urls.find(u =>
-    u.startsWith('mailto:') &&
-    isValidUnsubscribeUrl(u)
-  );
+  // Single pass via the hoisted /g regex: drops .map().find().find() over
+  // an intermediate `urls` array. parseUnsubscribeUrls runs per email's
+  // List-Unsubscribe header.
+  ANGLE_URL_RE.lastIndex = 0;
+  let http: string | undefined;
+  let mailto: string | undefined;
+  let m: RegExpExecArray | null;
+  while ((m = ANGLE_URL_RE.exec(header)) !== null) {
+    const u = m[1].trim();
+    if (!http && (u.startsWith('http://') || u.startsWith('https://')) && isValidUnsubscribeUrl(u)) {
+      http = u;
+    } else if (!mailto && u.startsWith('mailto:') && isValidUnsubscribeUrl(u)) {
+      mailto = u;
+    }
+    if (http && mailto) break;
+  }
 
   const preferred = http ? 'http' : (mailto ? 'mailto' : undefined);
 
