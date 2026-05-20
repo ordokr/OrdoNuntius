@@ -4,12 +4,14 @@ import { createContext, useContext, useState, useCallback, useEffect, type React
 import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { useAuthStore } from "@/stores/auth-store";
-// supportsCalendar derives from client.supportsCalendars() so the
-// 1093-line calendar-store stays off the app-shell boot path. The
-// provider wraps the entire authenticated tree, so dropping the
-// useCalendarStore hook here is consistent with the same pattern in
-// navigation-rail and keeps the eager bundle slim.
-import { useWebDAVStore } from "@/stores/webdav-store";
+// supportsCalendar/supportsWebDAV both derive from client capability
+// checks instead of subscribing to feature stores. The provider wraps
+// the entire authenticated tree, so pulling calendar-store (~1093 LOC)
+// or webdav-store (~515 LOC + WebDAVClient at ~304 LOC) into the
+// app-shell boot bundle just to read a single boolean each is a real
+// cold-load cost. The tour only uses these to decide whether to include
+// the corresponding nav step — `client?.supportsX()` already drives
+// whether the nav icon is visible at all, so it's the source-of-truth.
 import { getTourSteps, type TourStep } from "./tour-steps";
 // TourOverlay (~13 KB src) mounts only when the user starts the tour
 // (welcome banner button / settings reset / first-run for some demos).
@@ -53,13 +55,15 @@ export function TourProvider({ children }: { children: ReactNode }) {
   // in 3 separate stores.
   const isDemoMode = useAuthStore(s => s.isDemoMode);
   const supportsCalendar = useAuthStore(s => s.client?.supportsCalendars() ?? false);
-  const supportsWebDAV = useWebDAVStore(s => s.supportsWebDAV);
+  // client.supportsFiles() drives whether the files nav icon is shown
+  // (see navigation-rail) — mirror that here for the tour step filter.
+  const supportsWebDAV = useAuthStore(s => s.client?.supportsFiles() ?? true);
 
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [hasCompletedTour, setHasCompletedTour] = useState(false);
 
-  const steps = getTourSteps({ isDemoMode, supportsCalendar, supportsWebDAV: supportsWebDAV !== false });
+  const steps = getTourSteps({ isDemoMode, supportsCalendar, supportsWebDAV });
 
   useEffect(() => {
     try {
