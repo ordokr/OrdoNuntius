@@ -1,5 +1,5 @@
 import type { ContactCard, NameComponent, ContactOnlineService, AnniversaryDate, PartialDate } from "@/lib/jmap/types";
-import { generateUUID, splitTrimmed } from "@/lib/utils";
+import { generateUUID, hasAnyKey, splitTrimmed } from "@/lib/utils";
 
 // Convert RFC 9553 AnniversaryDate (PartialDate|Timestamp|string) to vCard date string
 function anniversaryDateToVcardString(date: AnniversaryDate): string {
@@ -145,7 +145,7 @@ function typeToPhoneFeatures(typeStr: string | undefined): Record<string, boolea
       features[t.toLowerCase()] = true;
     }
   }
-  return Object.keys(features).length > 0 ? features : undefined;
+  return hasAnyKey(features) ? features : undefined;
 }
 
 function typeToContext(typeStr: string | undefined): Record<string, boolean> | undefined {
@@ -452,9 +452,7 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
         case "RELATED": {
           if (!card.relatedTo) card.relatedTo = {};
           const relType = params.TYPE?.toLowerCase();
-          const relation: Record<string, boolean> = {};
-          if (relType) relation[relType] = true;
-          card.relatedTo[val] = { relation: Object.keys(relation).length > 0 ? relation : undefined };
+          card.relatedTo[val] = { relation: relType ? { [relType]: true } : undefined };
           break;
         }
 

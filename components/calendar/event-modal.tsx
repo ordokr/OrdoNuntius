@@ -17,7 +17,7 @@ import {
 } from "@/lib/calendar-participants";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { useSettingsStore } from "@/stores/settings-store";
-import { firstValue, generateUUID } from "@/lib/utils";
+import { firstValue, generateUUID, hasAnyKey } from "@/lib/utils";
 import { useFormatEventDate } from "@/hooks/use-format-event-date";
 import { calendarHooks } from "@/lib/plugin-hooks";
 import type { ConflictWarning } from "@/lib/plugin-types";
@@ -341,7 +341,7 @@ export function EventModal({
           relativeTo: null,
         },
       };
-    } else if (event && event.locations && Object.keys(event.locations).length > 0) {
+    } else if (event && hasAnyKey(event.locations)) {
       data.locations = null;
     }
 
@@ -355,7 +355,7 @@ export function EventModal({
           features: null,
         },
       };
-    } else if (event && event.virtualLocations && Object.keys(event.virtualLocations).length > 0) {
+    } else if (event && hasAnyKey(event.virtualLocations)) {
       data.virtualLocations = null;
     }
 
@@ -396,7 +396,7 @@ export function EventModal({
           relatedTo: null,
         },
       };
-    } else if (event && event.alerts && Object.keys(event.alerts).length > 0) {
+    } else if (event && hasAnyKey(event.alerts)) {
       data.alerts = null;
     }
 
@@ -507,7 +507,7 @@ export function EventModal({
     return () => modal.removeEventListener("keydown", handler);
   }, []);
 
-  const hasParticipants = attendees.length > 0 || (event?.participants && Object.keys(event.participants).length > 0);
+  const hasParticipants = attendees.length > 0 || hasAnyKey(event?.participants);
 
   if (isAttendeeMode && event) {
     const startD = getEventStartDate(event);

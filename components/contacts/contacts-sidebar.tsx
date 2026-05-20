@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu";
 import { useContextMenu } from "@/hooks/use-context-menu";
-import { cn } from "@/lib/utils";
+import { cn, hasAnyKey } from "@/lib/utils";
 import type { ContactCard, AddressBook } from "@/lib/jmap/types";
 import { getContactDisplayName } from "@/stores/contact-store";
 
@@ -701,6 +701,8 @@ function AddressBookItem({
     }
   }, [book, onDropContacts]);
 
+  const showShareIcon = !book.isShared && hasAnyKey(book.shareWith);
+
   return (
     <button
       onClick={onSelect}
@@ -719,12 +721,12 @@ function AddressBookItem({
     >
       <Book className="w-4 h-4 flex-shrink-0" />
       <span className="truncate">{book.name}</span>
-      {!book.isShared && Object.keys(book.shareWith || {}).length > 0 && (
+      {showShareIcon && (
         <Users className="w-3 h-3 text-muted-foreground flex-shrink-0 ml-auto" />
       )}
       <span className={cn(
         "text-xs text-muted-foreground tabular-nums",
-        !(!book.isShared && Object.keys(book.shareWith || {}).length > 0) && "ml-auto"
+        !showShareIcon && "ml-auto"
       )}>
         {contactCount}
       </span>

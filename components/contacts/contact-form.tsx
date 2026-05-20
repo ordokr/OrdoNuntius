@@ -6,7 +6,7 @@ import { X, Plus, ChevronDown, ChevronRight, User, Building, MapPin, Globe, Cake
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
-import { cn, splitTrimmed } from "@/lib/utils";
+import { cn, hasAnyKey, splitTrimmed } from "@/lib/utils";
 import type { ContactCard, ContactOnlineService, ContactAnniversary, ContactPersonalInfo, AddressBook, AnniversaryDate, PartialDate, ContactAddress, ContactMedia } from "@/lib/jmap/types";
 
 interface EmailEntry {
@@ -531,17 +531,17 @@ export function ContactForm({ contact, addressBooks, allKeywords, defaultAddress
     const data: Partial<ContactCard> = {
       name: { components: nameComponents, isOrdered: true },
       nicknames: nickname.trim() ? { n0: { name: nickname.trim() } } : undefined,
-      emails: Object.keys(emailsMap).length > 0 ? emailsMap : undefined,
-      phones: Object.keys(phonesMap).length > 0 ? phonesMap : undefined,
-      titles: Object.keys(titlesMap).length > 0 ? titlesMap : undefined,
+      emails: hasAnyKey(emailsMap) ? emailsMap : undefined,
+      phones: hasAnyKey(phonesMap) ? phonesMap : undefined,
+      titles: hasAnyKey(titlesMap) ? titlesMap : undefined,
       organizations: organization.trim()
         ? { o0: { name: organization.trim(), units: orgUnits } }
         : undefined,
-      addresses: Object.keys(addressesMap).length > 0 ? addressesMap : undefined,
-      onlineServices: Object.keys(onlineServicesMap).length > 0 ? onlineServicesMap : undefined,
-      anniversaries: Object.keys(anniversariesMap).length > 0 ? anniversariesMap : undefined,
-      personalInfo: Object.keys(personalInfoMap).length > 0 ? personalInfoMap : undefined,
-      keywords: Object.keys(keywordsMap).length > 0 ? keywordsMap : undefined,
+      addresses: hasAnyKey(addressesMap) ? addressesMap : undefined,
+      onlineServices: hasAnyKey(onlineServicesMap) ? onlineServicesMap : undefined,
+      anniversaries: hasAnyKey(anniversariesMap) ? anniversariesMap : undefined,
+      personalInfo: hasAnyKey(personalInfoMap) ? personalInfoMap : undefined,
+      keywords: hasAnyKey(keywordsMap) ? keywordsMap : undefined,
       notes: note.trim()
         ? { n0: { note: note.trim() } }
         : undefined,
@@ -554,7 +554,7 @@ export function ContactForm({ contact, addressBooks, allKeywords, defaultAddress
       calendarUri: calendarUri.trim() || undefined,
       schedulingUri: schedulingUri.trim() || undefined,
       freeBusyUri: freeBusyUri.trim() || undefined,
-      media: Object.keys(mediaMap).length > 0 ? mediaMap : undefined,
+      media: hasAnyKey(mediaMap) ? mediaMap : undefined,
       ...(selectedBookId ? { addressBookIds: { [selectedBookId]: true } } : {}),
     };
 

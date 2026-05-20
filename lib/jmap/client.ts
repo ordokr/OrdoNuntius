@@ -3,7 +3,7 @@ import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
 import { debug, isDebugEnabled } from "@/lib/debug";
-import { firstValue } from "@/lib/utils";
+import { firstValue, hasAnyKey } from "@/lib/utils";
 import { normalizeCalendarEventLike } from "@/lib/calendar-event-normalization";
 
 export class RateLimitError extends Error {
@@ -588,7 +588,7 @@ export class JMAPClient implements IJMAPClient {
     if (!response.ok || !response.redirected) return response;
 
     const peek = await response.clone().json().catch(() => null);
-    const hasAccounts = peek && Object.keys(peek.accounts || {}).length > 0;
+    const hasAccounts = hasAnyKey(peek?.accounts);
     const hasUsername = typeof peek?.username === 'string' && peek.username.length > 0;
     if (hasAccounts || hasUsername) return response;
 
@@ -1421,7 +1421,7 @@ export class JMAPClient implements IJMAPClient {
     }
 
     const methodCalls: JMAPMethodCall[] = [];
-    const hasCreates = Object.keys(createEntries).length > 0;
+    const hasCreates = hasAnyKey(createEntries);
     if (hasCreates) {
       methodCalls.push(['Mailbox/set', { accountId: targetAccountId, create: createEntries }, '0']);
     }
@@ -3762,7 +3762,7 @@ export class JMAPClient implements IJMAPClient {
   async createContact(contact: Partial<ContactCard>, targetAccountId?: string): Promise<ContactCard> {
     const accountId = targetAccountId || this.getContactsAccountId();
     let addressBookIds = contact.addressBookIds;
-    if (!addressBookIds || Object.keys(addressBookIds).length === 0) {
+    if (!hasAnyKey(addressBookIds)) {
       const books = await this.getAddressBooks();
       const defaultBook = books.find(b => b.isDefault) || books[0];
       if (defaultBook) {

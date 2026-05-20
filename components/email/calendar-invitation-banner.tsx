@@ -35,7 +35,7 @@ import {
   type InvitationMethod,
   type InvitationTrustAssessment,
 } from '@/lib/calendar-invitation';
-import { cn } from '@/lib/utils';
+import { cn, hasAnyKey } from '@/lib/utils';
 import { sanitizeColor } from '@/components/calendar/event-card';
 import { RecipientPopover } from './recipient-popover';
 
@@ -250,7 +250,7 @@ function buildProposalPatch(
     patch.virtualLocations = proposedEvent.virtualLocations ?? null;
   }
 
-  return Object.keys(patch).length > 0 ? patch : null;
+  return hasAnyKey(patch) ? patch : null;
 }
 
 function buildInvitationChangeItems(
@@ -525,7 +525,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
       return existingEvent;
     }
 
-    if (existingEvent.participants && Object.keys(existingEvent.participants).length > 0) {
+    if (hasAnyKey(existingEvent.participants)) {
       return existingEvent;
     }
 
@@ -594,7 +594,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
       const canFallbackToParsedParticipant = Boolean(
         existingEvent
         && myParticipant
-        && (!eventForRsvp?.participants || Object.keys(eventForRsvp.participants).length === 0)
+        && !hasAnyKey(eventForRsvp?.participants)
       );
       const calendarActions = useCalendarStore.getState();
       if (eventForRsvp && existingEventParticipant) {
