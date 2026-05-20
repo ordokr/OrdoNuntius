@@ -1,5 +1,9 @@
 import { useEffect, useRef } from 'react';
 
+// Hoisted: avoids re-allocating this long literal on every focusable query.
+const FOCUSABLE_SELECTOR =
+  'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"]):not(:disabled)';
+
 interface UseFocusTrapOptions {
   isActive: boolean;
   onEscape?: () => void;
@@ -24,9 +28,7 @@ export function useFocusTrap({
 
     // Get all focusable elements
     const getFocusableElements = () => {
-      return container.querySelectorAll<HTMLElement>(
-        'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"]):not(:disabled)'
-      );
+      return container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
     };
 
     // Focus first element

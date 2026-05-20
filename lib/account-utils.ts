@@ -88,12 +88,20 @@ export const MAX_ACCOUNTS_HTTP1 = 5;
  * `nextHopProtocol` without `Timing-Allow-Origin`, in which case we
  * under-detect and fall back to the conservative cap - that's safe.
  */
+// Sticky-positive cache: once we've seen h2/h3 we never have to walk the
+// (ever-growing) resource-timing buffer again. Called per render of the
+// account switcher / navigation rail, so the saved walk adds up.
+let _http2Detected = false;
 export function isHttp2Available(): boolean {
+  if (_http2Detected) return true;
   if (typeof performance === 'undefined') return false;
   const entries = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
   for (let i = entries.length - 1; i >= 0; i--) {
     const proto = entries[i].nextHopProtocol;
-    if (proto === 'h2' || proto === 'h3') return true;
+    if (proto === 'h2' || proto === 'h3') {
+      _http2Detected = true;
+      return true;
+    }
   }
   return false;
 }

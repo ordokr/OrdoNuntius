@@ -234,7 +234,10 @@ export class WebDAVClient {
     // Normalize the request URL for comparison (skip the "self" entry)
     const normalizedRequestUrl = requestUrl.replace(/\/+$/, '');
 
-    for (let i = 0; i < responses.length; i++) {
+    // Cache .length — `responses` is a live HTMLCollection; re-querying every
+    // iteration triggers a DOM walk per check.
+    const respCount = responses.length;
+    for (let i = 0; i < respCount; i++) {
       const resp = responses[i];
 
       const hrefEl = resp.getElementsByTagNameNS('DAV:', 'href')[0];

@@ -182,6 +182,11 @@ export function NavigationRail({
     () => (sidebarAppsEnabled ? sidebarApps : []),
     [sidebarAppsEnabled, sidebarApps],
   );
+  // Memoize the mobile-only subset; the horizontal nav re-filters per render otherwise.
+  const mobileSidebarApps = useMemo(
+    () => visibleSidebarApps.filter((app) => app.showOnMobile),
+    [visibleSidebarApps],
+  );
   const [isStalwartAdmin, setIsStalwartAdmin] = useState(false);
   const hasUpdate = useUpdateStore(selectHasUpdate);
   const updateSeverity = useUpdateStore((s) => s.status?.severity);
@@ -256,16 +261,14 @@ export function NavigationRail({
     return () => { cancelled = true; };
   }, []);
 
-  const navItems: NavItem[] = [
-    { id: "mail", icon: Mail, labelKey: "mail", href: "/", badge: inboxUnread },
-    { id: "calendar", icon: Calendar, labelKey: "calendar", href: "/calendar", hidden: !supportsCalendar },
-    { id: "contacts", icon: BookUser, labelKey: "contacts", href: "/contacts", hidden: !supportsContacts },
-    { id: "files", icon: HardDrive, labelKey: "files", href: "/files", hidden: !supportsFiles || !filesEnabled },
-  ];
+  // Single push-loop builds the visible list directly — was an array literal
+  // of all items followed by `.filter()`, allocating two arrays per render.
+  const visibleItems: NavItem[] = [{ id: "mail", icon: Mail, labelKey: "mail", href: "/", badge: inboxUnread }];
+  if (supportsCalendar) visibleItems.push({ id: "calendar", icon: Calendar, labelKey: "calendar", href: "/calendar" });
+  if (supportsContacts) visibleItems.push({ id: "contacts", icon: BookUser, labelKey: "contacts", href: "/contacts" });
+  if (supportsFiles && filesEnabled) visibleItems.push({ id: "files", icon: HardDrive, labelKey: "files", href: "/files" });
 
   const isSettingsActive = !activeAppId && pathname.startsWith("/settings");
-
-  const visibleItems = navItems.filter((item) => !item.hidden);
 
   const getIsActive = (href: string) => {
     if (activeAppId) return false;
@@ -316,7 +319,7 @@ export function NavigationRail({
         })}
 
         {/* Custom sidebar apps (per-app mobile visibility) */}
-        {visibleSidebarApps.filter((app) => app.showOnMobile).map((app) => {
+        {mobileSidebarApps.map((app) => {
           const AppIcon = lucideIcons[app.icon as keyof typeof lucideIcons] as LucideIcon | undefined;
           const isActive = activeAppId === app.id;
           return (

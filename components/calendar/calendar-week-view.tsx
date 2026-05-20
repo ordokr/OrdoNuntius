@@ -35,6 +35,8 @@ interface CalendarWeekViewProps {
 
 const HOUR_HEIGHT = 60;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
+// Sentinel empty array — `timedEvents.get(k) || []` was allocating one per render.
+const EMPTY_EVENTS: CalendarEvent[] = [];
 
 export function CalendarWeekView({
   selectedDate,
@@ -287,7 +289,9 @@ export function CalendarWeekView({
               <div className="absolute inset-x-0 pointer-events-none" style={{ top: allDayRowCount * 24 + 2 }}>
                 {weekDays.map((day, dayIndex) => {
                   const key = format(day, "yyyy-MM-dd");
-                  const dayTasks = tasksByDay.get(key) || [];
+                  // Skip empty days — avoids the `|| []` fallback allocation.
+                  const dayTasks = tasksByDay.get(key);
+                  if (!dayTasks) return null;
                   return dayTasks.map((task, taskIndex) => {
                     const isCompleted = task.progress === "completed";
                     let cal: typeof calendars[number] | undefined;
@@ -389,7 +393,7 @@ export function CalendarWeekView({
           <div className="flex-1 border-l border-border relative grid grid-cols-7">
             {weekDays.map((day) => {
               const key = format(day, "yyyy-MM-dd");
-              const dayEvents = timedEvents.get(key) || [];
+              const dayEvents = timedEvents.get(key) || EMPTY_EVENTS;
               const todayCol = isToday(day);
               const layouted = layoutOverlappingEvents(dayEvents, day);
 

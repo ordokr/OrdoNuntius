@@ -5,6 +5,7 @@ import { useCalendarStore } from "@/stores/calendar-store";
 import { toast } from "@/stores/toast-store";
 import { debug } from "@/lib/debug";
 import { formatIsoInTimeZone } from "@/lib/calendar-utils";
+import { hasAnyKey } from "@/lib/utils";
 import type { Calendar } from "@/lib/jmap/types";
 
 interface DragCreateState {
@@ -235,12 +236,8 @@ export function useTimeGridInteractions({
 
     try {
       const event = useCalendarStore.getState().events.find(ev => ev.id === resize.eventId);
-      // for...in break-at-first avoids Object.keys array allocation just
-       // to compute a boolean. Called per resize/drag drop.
-       let hasParticipants = false;
-       if (event?.participants) {
-         for (const _ in event.participants) { hasParticipants = true; break; }
-       }
+      // hasAnyKey: shared keys-empty check, avoids Object.keys allocation.
+      const hasParticipants = hasAnyKey(event?.participants);
       const updates: { start?: string; duration: string } = { duration: dur };
       if (startChanged && event?.start) {
         // Shift the event's floating `start` wall-clock by the delta (preserves event.timeZone).
@@ -372,12 +369,8 @@ export function useTimeGridInteractions({
         toast.error(errorMessages.move);
         return;
       }
-      // for...in break-at-first avoids Object.keys array allocation just
-       // to compute a boolean. Called per resize/drag drop.
-       let hasParticipants = false;
-       if (event?.participants) {
-         for (const _ in event.participants) { hasParticipants = true; break; }
-       }
+      // hasAnyKey: shared keys-empty check, avoids Object.keys allocation.
+      const hasParticipants = hasAnyKey(event?.participants);
       await useCalendarStore.getState().updateEvent(client, data.eventId, { start: newStartISO }, hasParticipants || undefined);
     } catch {
       toast.error(errorMessages.move);

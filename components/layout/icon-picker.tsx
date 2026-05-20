@@ -54,6 +54,9 @@ const POPULAR_ICONS = [
   'Aperture', 'CircleDot', 'Target', 'Crosshair',
 ];
 
+// Pre-filter at module scope; `name in lucideIcons` per render was hot.
+const POPULAR_ICONS_AVAILABLE = POPULAR_ICONS.filter(name => name in lucideIcons);
+
 interface IconPickerProps {
   value: string;
   onChange: (iconName: string) => void;
@@ -74,7 +77,7 @@ export function IconPicker({ value, onChange, className }: IconPickerProps) {
   }, []);
 
   const filteredIcons = useMemo(() => {
-    const source = showAll ? allIconNames : POPULAR_ICONS.filter(name => name in lucideIcons);
+    const source = showAll ? allIconNames : POPULAR_ICONS_AVAILABLE;
     if (!search.trim()) return source;
     const q = search.toLowerCase();
     return source.filter(name => name.toLowerCase().includes(q));

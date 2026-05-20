@@ -115,7 +115,12 @@ export function SubAddressHelper({
 
     // Add to recent tags and suggestions
     addRecentTag(selectedTag);
-    const domain = recipientEmails.map(extractDomain).find(Boolean);
+    // Inline find — was .map().find(Boolean) which allocated full array.
+    let domain: string | null = null;
+    for (const email of recipientEmails) {
+      const d = extractDomain(email);
+      if (d) { domain = d; break; }
+    }
     if (domain) {
       addTagSuggestion(domain, selectedTag);
     }

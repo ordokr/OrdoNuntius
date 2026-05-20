@@ -183,8 +183,11 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
 
   const handleSetPrimary = useCallback((identity: Identity) => {
     setPreferredPrimary(identity.id);
-    // Re-sort: move the preferred identity to the front
-    const reordered = [identity, ...identities.filter((id) => id.id !== identity.id)];
+    // Single-pass build replaces spread+filter (two allocations).
+    const reordered: Identity[] = [identity];
+    for (const id of identities) {
+      if (id.id !== identity.id) reordered.push(id);
+    }
     useIdentityStore.getState().setIdentities(reordered);
     syncIdentities();
     toast.success(tNotif('identity_set_primary'));

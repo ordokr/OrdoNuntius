@@ -9,6 +9,10 @@ import { cn } from "@/lib/utils";
 import type { CalendarViewMode } from "@/stores/calendar-store";
 import type { Calendar } from "@/lib/jmap/types";
 
+// Stable module-scope view lists — avoids new array literal per render.
+const VIEWS_WITH_TASKS: CalendarViewMode[] = ["month", "week", "day", "agenda", "tasks"];
+const VIEWS_BASIC: CalendarViewMode[] = ["month", "week", "day", "agenda"];
+
 interface CalendarToolbarProps {
   selectedDate: Date;
   viewMode: CalendarViewMode;
@@ -48,9 +52,7 @@ export function CalendarToolbar({
 }: CalendarToolbarProps) {
   const t = useTranslations("calendar");
   const formatter = useFormatter();
-  const views: CalendarViewMode[] = enableCalendarTasks
-    ? ["month", "week", "day", "agenda", "tasks"]
-    : ["month", "week", "day", "agenda"];
+  const views = enableCalendarTasks ? VIEWS_WITH_TASKS : VIEWS_BASIC;
   const [showCalendarDropdown, setShowCalendarDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -102,6 +104,28 @@ export function CalendarToolbar({
   // O(1) membership check per calendar row (two dropdown variants render
   // the same `selectedCalendarIds.includes(cal.id)` check per cal).
   const selectedCalendarIdsSet = useMemo(() => new Set(selectedCalendarIds), [selectedCalendarIds]);
+
+  // Single-pass partition; replaces two `.filter()` walks per render.
+  const { ownCalendars, sharedGroups } = useMemo(() => {
+    const own: Calendar[] = [];
+    const groups = new Map<string, { accountName: string; cals: Calendar[] }>();
+    if (calendars) {
+      for (const c of calendars) {
+        if (!c.isShared) {
+          own.push(c);
+        } else {
+          const key = c.accountId || c.accountName || c.id;
+          let g = groups.get(key);
+          if (!g) {
+            g = { accountName: c.accountName || key, cals: [] };
+            groups.set(key, g);
+          }
+          g.cals.push(c);
+        }
+      }
+    }
+    return { ownCalendars: own, sharedGroups: Array.from(groups.values()) };
+  }, [calendars]);
 
 
   useEffect(() => {
@@ -184,7 +208,7 @@ export function CalendarToolbar({
                       {t("my_calendars")}
                     </h3>
                     <div className="space-y-0.5">
-                      {calendars.filter(c => !c.isShared).map((cal) => {
+                      {ownCalendars.map((cal) => {
                         const isVisible = selectedCalendarIdsSet.has(cal.id);
                         const color = cal.color || "#3b82f6";
                         return (
@@ -210,49 +234,40 @@ export function CalendarToolbar({
                         );
                       })}
                     </div>
-                    {(() => {
-                      const shared = calendars.filter(c => c.isShared);
-                      const groups = new Map<string, { accountName: string; cals: typeof shared }>();
-                      for (const c of shared) {
-                        const key = c.accountId || c.accountName || c.id;
-                        if (!groups.has(key)) groups.set(key, { accountName: c.accountName || key, cals: [] });
-                        groups.get(key)!.cals.push(c);
-                      }
-                      return Array.from(groups.values()).map((group) => (
-                        <div key={group.accountName} className="mt-2">
-                          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 px-1">
-                            {group.accountName}
-                          </h3>
-                          <div className="space-y-0.5">
-                            {group.cals.map((cal) => {
-                              const isVisible = selectedCalendarIdsSet.has(cal.id);
-                              const color = cal.color || "#3b82f6";
-                              return (
-                                <button
-                                  key={cal.id}
-                                  onClick={() => onToggleVisibility(cal.id)}
+                    {sharedGroups.map((group) => (
+                      <div key={group.accountName} className="mt-2">
+                        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 px-1">
+                          {group.accountName}
+                        </h3>
+                        <div className="space-y-0.5">
+                          {group.cals.map((cal) => {
+                            const isVisible = selectedCalendarIdsSet.has(cal.id);
+                            const color = cal.color || "#3b82f6";
+                            return (
+                              <button
+                                key={cal.id}
+                                onClick={() => onToggleVisibility(cal.id)}
+                                className={cn(
+                                  "flex items-center gap-2 w-full px-2 py-2 rounded-md text-sm transition-colors duration-150 touch-manipulation",
+                                  "hover:bg-muted"
+                                )}
+                              >
+                                <span
                                   className={cn(
-                                    "flex items-center gap-2 w-full px-2 py-2 rounded-md text-sm transition-colors duration-150 touch-manipulation",
-                                    "hover:bg-muted"
+                                    "w-3.5 h-3.5 rounded-sm border-2 flex-shrink-0 transition-colors",
+                                    isVisible ? "border-transparent" : "border-muted-foreground/40 bg-transparent"
                                   )}
-                                >
-                                  <span
-                                    className={cn(
-                                      "w-3.5 h-3.5 rounded-sm border-2 flex-shrink-0 transition-colors",
-                                      isVisible ? "border-transparent" : "border-muted-foreground/40 bg-transparent"
-                                    )}
-                                    style={isVisible ? { backgroundColor: color, borderColor: color } : undefined}
-                                  />
-                                  <span className={cn("truncate", !isVisible && "text-muted-foreground")}>
-                                    {cal.name}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
+                                  style={isVisible ? { backgroundColor: color, borderColor: color } : undefined}
+                                />
+                                <span className={cn("truncate", !isVisible && "text-muted-foreground")}>
+                                  {cal.name}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
-                      ));
-                    })()}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

@@ -13,6 +13,9 @@ interface FilePreviewModalProps {
   getFileContent: () => Promise<{ blob: Blob; contentType: string }>;
 }
 
+// Module-scope regex — was rebuilt every line iteration.
+const NUMBERED_LIST_RE = /^\d+\. /;
+
 function SimpleMarkdown({ content }: { content: string }) {
   const lines = content.split("\n");
   const elements: React.ReactNode[] = [];
@@ -31,8 +34,10 @@ function SimpleMarkdown({ content }: { content: string }) {
       elements.push(<hr key={i} className="my-4 border-border" />);
     } else if (line.startsWith("- ") || line.startsWith("* ")) {
       elements.push(<li key={i} className="ml-4 list-disc">{processInline(line.slice(2))}</li>);
-    } else if (/^\d+\. /.test(line)) {
-      elements.push(<li key={i} className="ml-4 list-decimal">{processInline(line.replace(/^\d+\. /, ""))}</li>);
+    } else if (NUMBERED_LIST_RE.test(line)) {
+      // Single regex exec replaces test + replace (two regex runs).
+      const m = NUMBERED_LIST_RE.exec(line)!;
+      elements.push(<li key={i} className="ml-4 list-decimal">{processInline(line.slice(m[0].length))}</li>);
     } else if (line.startsWith("> ")) {
       elements.push(<blockquote key={i} className="border-l-4 border-border pl-4 italic text-muted-foreground my-2">{processInline(line.slice(2))}</blockquote>);
     } else if (line.startsWith("```")) {
@@ -72,19 +77,28 @@ function processInline(text: string): React.ReactNode {
     // Italic
     const italicMatch = remaining.match(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/);
 
-    const matches = [
-      boldMatch && { type: "bold", match: boldMatch },
-      codeMatch && { type: "code", match: codeMatch },
-      italicMatch && { type: "italic", match: italicMatch },
-    ].filter(Boolean).sort((a, b) => (a!.match.index ?? 0) - (b!.match.index ?? 0));
+    // Inline min-by-index — was a 3-elem array + filter + sort per iteration.
+    let first: { type: "bold" | "code" | "italic"; match: RegExpMatchArray } | null = null;
+    let firstIdx = Infinity;
+    if (boldMatch) {
+      const i = boldMatch.index ?? 0;
+      if (i < firstIdx) { first = { type: "bold", match: boldMatch }; firstIdx = i; }
+    }
+    if (codeMatch) {
+      const i = codeMatch.index ?? 0;
+      if (i < firstIdx) { first = { type: "code", match: codeMatch }; firstIdx = i; }
+    }
+    if (italicMatch) {
+      const i = italicMatch.index ?? 0;
+      if (i < firstIdx) { first = { type: "italic", match: italicMatch }; firstIdx = i; }
+    }
 
-    if (matches.length === 0) {
+    if (!first) {
       parts.push(remaining);
       break;
     }
 
-    const first = matches[0]!;
-    const idx = first.match.index ?? 0;
+    const idx = firstIdx === Infinity ? 0 : firstIdx;
 
     if (idx > 0) {
       parts.push(remaining.slice(0, idx));

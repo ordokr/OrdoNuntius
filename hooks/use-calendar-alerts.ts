@@ -53,7 +53,10 @@ export function useCalendarAlerts() {
       // saved allocation isn't huge but the pattern is free.
       const acknowledgedKeys = new Set<string>();
       for (const k in acknowledgedAlerts) acknowledgedKeys.add(k);
-      const allEvents = [...events, ...proactiveEventsRef.current];
+      // Skip the spread allocation when proactive cache is empty (common case
+      // — only populated after the first 5-min throttle window elapses).
+      const proactive = proactiveEventsRef.current;
+      const allEvents = proactive.length === 0 ? events : [...events, ...proactive];
       const pending = getPendingAlerts(allEvents, calendars, acknowledgedKeys, now);
 
       for (const alert of pending) {

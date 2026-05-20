@@ -36,6 +36,9 @@ const PATH_SEPARATOR = " › ";
 const MAX_PATH_LENGTH = 40;
 const MAX_SEGMENT_LENGTH = 16;
 
+// Module-scope Set replaces per-render literal `.includes(...)` lookup.
+const SYSTEM_MAILBOX_ROLES = new Set(["inbox", "sent", "drafts", "trash", "junk", "archive"]);
+
 function truncateSegment(name: string): string {
   return name.length > MAX_SEGMENT_LENGTH
     ? `${name.slice(0, MAX_SEGMENT_LENGTH - 1)}…`
@@ -144,9 +147,7 @@ export function MailboxContextMenu({
 
   const mailbox = target.mailbox;
   const isTrashOrJunk = mailbox.role === "trash" || mailbox.role === "junk";
-  const isSystem =
-    !!mailbox.role &&
-    ["inbox", "sent", "drafts", "trash", "junk", "archive"].includes(mailbox.role);
+  const isSystem = !!mailbox.role && SYSTEM_MAILBOX_ROLES.has(mailbox.role);
   const canRename = mailbox.myRights?.mayRename !== false && !isSystem;
   const canDelete = mailbox.myRights?.mayDelete !== false && !isSystem;
   const canCreateChild = mailbox.myRights?.mayCreateChild !== false;

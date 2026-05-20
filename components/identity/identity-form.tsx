@@ -7,7 +7,15 @@ import { Input } from '@/components/ui/input';
 import type { Identity, EmailAddress } from '@/lib/jmap/types';
 import { sanitizeSignatureHtml } from '@/lib/email-sanitization';
 import { getEmailValidationErrorCode, validateEmailList } from '@/lib/validation';
-import { splitTrimmed } from '@/lib/utils';
+import { splitTrimmed, hasAnyKey } from '@/lib/utils';
+
+// Module-level constant: was rebuilt on every validate() call.
+const EMAIL_ERROR_CODE_TO_KEY = {
+  EMAIL_REQUIRED: 'email_required',
+  EMAIL_TOO_LONG: 'email_too_long',
+  EMAIL_INVALID_CHARS: 'email_invalid_chars',
+  EMAIL_INVALID: 'email_invalid',
+} as const;
 
 interface IdentityFormData {
   name: string;
@@ -68,13 +76,7 @@ export function IdentityForm({ identity, onSave, onCancel }: IdentityFormProps) 
     // call site — the validation lib stays pure and locale-free.
     const emailErrorCode = getEmailValidationErrorCode(formData.email);
     if (emailErrorCode) {
-      const codeToKey: Record<NonNullable<typeof emailErrorCode>, string> = {
-        EMAIL_REQUIRED: 'email_required',
-        EMAIL_TOO_LONG: 'email_too_long',
-        EMAIL_INVALID_CHARS: 'email_invalid_chars',
-        EMAIL_INVALID: 'email_invalid',
-      };
-      newErrors.email = tValidationGlobal(codeToKey[emailErrorCode]);
+      newErrors.email = tValidationGlobal(EMAIL_ERROR_CODE_TO_KEY[emailErrorCode]);
     }
 
     // Validate reply-to email list
@@ -94,7 +96,8 @@ export function IdentityForm({ identity, onSave, onCancel }: IdentityFormProps) 
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    // hasAnyKey avoids the Object.keys() array allocation.
+    return !hasAnyKey(newErrors);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
