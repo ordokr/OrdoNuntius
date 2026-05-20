@@ -3,7 +3,11 @@ import { persist } from 'zustand/middleware';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import type { Calendar, CalendarEvent, CalendarParticipant, CalendarRights } from '@/lib/jmap/types';
 import { debug, isDebugEnabled } from '@/lib/debug';
-import { normalizeAllDayDuration } from '@/lib/calendar-utils';
+// Small standalone duration helper — calendar-utils itself (15+ KB and
+// transitively pulls event-card → calendar-utils cycle) is not needed
+// here. Keeping calendar-store light because navigation-rail pulls it
+// into every authenticated route's first paint.
+import { normalizeAllDayDuration } from '@/lib/calendar-duration';
 import { parseDuration } from '@/components/calendar/event-card';
 import { sanitizeOutgoingCalendarEventData } from '@/lib/calendar-event-normalization';
 // expandRecurringEvents (~26 KB src) is dynamic-imported at the

@@ -1,5 +1,5 @@
 import { addDays, differenceInCalendarDays, parseISO, startOfDay, subMilliseconds } from "date-fns";
-import { parseDuration } from "@/components/calendar/event-card";
+import { parseDuration } from "@/lib/calendar-duration";
 import type { CalendarEvent } from "@/lib/jmap/types";
 
 export interface CalendarWeekSegment {
@@ -155,12 +155,9 @@ export function isTimedEventFullDayOnDate(event: CalendarEvent, day: Date): bool
   return bounds?.startMinutes === 0 && bounds?.endMinutes === 1440;
 }
 
-export function normalizeAllDayDuration(duration: string | undefined): string | undefined {
-  if (!duration) return undefined;
-  const totalMinutes = parseDuration(duration);
-  const totalDays = Math.max(1, Math.ceil(totalMinutes / (24 * 60)));
-  return `P${totalDays}D`;
-}
+// normalizeAllDayDuration moved to lib/calendar-duration.ts — re-exported
+// here for any existing consumers that pulled it from this module.
+export { normalizeAllDayDuration } from "@/lib/calendar-duration";
 
 export function buildAllDayDuration(start: Date, inclusiveEnd: Date): string {
   const dayCount = Math.max(1, differenceInCalendarDays(startOfDay(inclusiveEnd), startOfDay(start)) + 1);

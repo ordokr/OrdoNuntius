@@ -41,22 +41,12 @@ function getEventColor(event: CalendarEvent, calendar?: Calendar): string {
   return sanitizeColor(event.color, sanitizeColor(calendar?.color));
 }
 
-// Single-regex ISO 8601 duration parser. Was 4 separate `duration.match(...)`
-// calls per parse — each allocates a RegExpMatchArray. One match returns
-// all components at once.
-const DURATION_RE = /^P?(?:(\d+)W)?(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/;
-function parseDuration(duration: string | undefined): number {
-  if (!duration) return 0;
-  const m = DURATION_RE.exec(duration);
-  if (!m) return 0;
-  let total = 0;
-  if (m[1]) total += parseInt(m[1]) * 7 * 24 * 60;
-  if (m[2]) total += parseInt(m[2]) * 24 * 60;
-  if (m[3]) total += parseInt(m[3]) * 60;
-  if (m[4]) total += parseInt(m[4]);
-  // S (seconds) intentionally ignored — caller works in minutes.
-  return total;
-}
+// parseDuration moved to lib/calendar-duration.ts (re-exported below for
+// existing consumers). Pulling it in from a tiny standalone module lets
+// calendar-store import the duration math without dragging the entire
+// event-card React component (and its calendar-utils transitive deps)
+// into the inbox bundle through navigation-rail.
+import { parseDuration } from "@/lib/calendar-duration";
 
 // Shared frozen literal so the non-draggable branch doesn't allocate {} per render.
 const EMPTY_DRAG_PROPS = Object.freeze({}) as Record<string, never>;
@@ -237,4 +227,5 @@ function EventCardImpl({ event, calendar, variant, onClick, onMouseEnter, onMous
 // build typecheck loses parameter types through MemoExoticComponent).
 export const EventCard: React.MemoExoticComponent<(props: EventCardProps) => React.JSX.Element> = memo(EventCardImpl);
 
-export { parseDuration, getEventColor, sanitizeColor };
+export { parseDuration };
+export { getEventColor, sanitizeColor };
