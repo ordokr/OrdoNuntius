@@ -148,7 +148,7 @@ function TableSizePicker({ onPick }: { onPick: (rows: number, cols: number) => v
         style={{ gridTemplateColumns: `repeat(${TABLE_PICKER_COLS}, 1fr)` }}
         onMouseLeave={() => setHover(null)}
       >
-        {Array.from({ length: TABLE_PICKER_ROWS * TABLE_PICKER_COLS }).map((_, i) => {
+        {Array.from({ length: TABLE_PICKER_ROWS * TABLE_PICKER_COLS }, (_, i) => {
           const r = Math.floor(i / TABLE_PICKER_COLS);
           const c = i % TABLE_PICKER_COLS;
           const active = hover && r <= hover.r && c <= hover.c;

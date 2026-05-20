@@ -411,13 +411,18 @@ export const useFileStore = create<FileState>((set, get) => ({
     set({ uploadAbortController: abortController });
     const totalFiles = files.length;
 
-    // Collect unique directory paths from the uploaded folder structure
+    // Collect unique directory paths from the uploaded folder structure.
+    // Was: O(depth²) via `parts.slice(0, i).join('/')` per nesting level —
+    // a 5-level upload re-walked 15 array slots per file. Now O(depth) by
+    // accumulating the prefix forward.
     const dirs = new Set<string>();
     for (const file of files) {
       const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
       const parts = relativePath.split('/');
-      for (let i = 1; i < parts.length; i++) {
-        dirs.add(parts.slice(0, i).join('/'));
+      let cumulative = '';
+      for (let i = 0; i < parts.length - 1; i++) {
+        cumulative = cumulative ? `${cumulative}/${parts[i]}` : parts[i];
+        dirs.add(cumulative);
       }
     }
 
@@ -428,9 +433,12 @@ export const useFileStore = create<FileState>((set, get) => ({
     // in-flight requests but the user's cancel intent only matters for the
     // *upload* loop below; a handful of empty server-side dirs from a
     // cancelled upload is acceptable. Was: N sequential RTT.
+    //
+    // Array.from(dirs, fn) walks the Set once into a result array — was
+    // [...dirs].map(fn) which allocates an intermediate array first.
     if (!abortController.signal.aborted) {
       await Promise.allSettled(
-        [...dirs].map(dir => {
+        Array.from(dirs, dir => {
           const fullDirName = prefix + dir.replace(/\//g, PATH_SEP);
           return client.createFileDirectory(fullDirName, null);
         }),

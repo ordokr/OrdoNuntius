@@ -172,7 +172,7 @@ export function ContactGroupForm({
 
         {selectedIds.size > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {Array.from(selectedIds).map((id) => {
+            {Array.from(selectedIds, (id) => {
               const contact = individualsById.get(id);
               if (!contact) return null;
               return (
