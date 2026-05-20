@@ -36,6 +36,10 @@ export function createBirthdayCalendar(name?: string, color?: string): Calendar 
   };
 }
 
+// Hoisted out of the per-anniversary hot path — parseBirthdayDate runs
+// per anniversary per contact in generateBirthdayEvents.
+const PARTIAL_BIRTHDAY_RE = /^--(\d{2})-(\d{2})$/;
+
 /**
  * Extract month and day from an AnniversaryDate.
  * Returns null if the date cannot be parsed into month/day.
@@ -45,7 +49,7 @@ function parseBirthdayDate(date: string | PartialDate | Timestamp): { month: num
     // Could be ISO date string like "1990-05-15" or partial "--05-15"
     if (date.startsWith('--')) {
       // Partial date: --MM-DD
-      const match = date.match(/^--(\d{2})-(\d{2})$/);
+      const match = PARTIAL_BIRTHDAY_RE.exec(date);
       if (match) {
         return { month: parseInt(match[1], 10), day: parseInt(match[2], 10) };
       }
@@ -114,9 +118,11 @@ export function generateBirthdayEvents(
   }
 
   const years = eachYearOfInterval({ start, end });
-  // Also include the end date's year if not already covered
+  // Also include the end date's year if not already covered. Compare
+  // against the last year in `years` directly — eachYearOfInterval
+  // returns in ascending order, so .some() is the same as a tail check.
   const endYear = end.getFullYear();
-  if (!years.some(y => y.getFullYear() === endYear)) {
+  if (years.length === 0 || years[years.length - 1].getFullYear() !== endYear) {
     years.push(new Date(endYear, 0, 1));
   }
 
