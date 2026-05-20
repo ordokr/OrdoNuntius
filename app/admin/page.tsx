@@ -1,18 +1,27 @@
 'use client';
 
 import { useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { useAdminTabStore, isAdminTab } from '@/stores/admin-tab-store';
-import { DashboardTab } from './_tabs/dashboard';
-import { SettingsTab } from './_tabs/settings';
-import { BrandingTab } from './_tabs/branding';
-import { AuthTab } from './_tabs/auth';
-import { PolicyTab } from './_tabs/policy';
-import { PluginsTab } from './_tabs/plugins';
-import { ThemesTab } from './_tabs/themes';
-import { MarketplaceTab } from './_tabs/marketplace';
-import { VersionTab } from './_tabs/version';
-import { TelemetryTab } from './_tabs/telemetry';
-import { LogsTab } from './_tabs/logs';
+
+// One tab shown at a time. Lazy each so only the active tab's chunk
+// loads on first paint. Heaviest tabs (themes 22.7K, plugins 19.0K,
+// auth 18.7K, marketplace 13.6K) used to all bundle into the route's
+// initial JS together.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const dyn = (loader: () => Promise<{ default: React.ComponentType<any> }>) =>
+  dynamic(loader, { ssr: false, loading: () => null });
+const DashboardTab = dyn(() => import('./_tabs/dashboard').then(m => ({ default: m.DashboardTab })));
+const SettingsTab = dyn(() => import('./_tabs/settings').then(m => ({ default: m.SettingsTab })));
+const BrandingTab = dyn(() => import('./_tabs/branding').then(m => ({ default: m.BrandingTab })));
+const AuthTab = dyn(() => import('./_tabs/auth').then(m => ({ default: m.AuthTab })));
+const PolicyTab = dyn(() => import('./_tabs/policy').then(m => ({ default: m.PolicyTab })));
+const PluginsTab = dyn(() => import('./_tabs/plugins').then(m => ({ default: m.PluginsTab })));
+const ThemesTab = dyn(() => import('./_tabs/themes').then(m => ({ default: m.ThemesTab })));
+const MarketplaceTab = dyn(() => import('./_tabs/marketplace').then(m => ({ default: m.MarketplaceTab })));
+const VersionTab = dyn(() => import('./_tabs/version').then(m => ({ default: m.VersionTab })));
+const TelemetryTab = dyn(() => import('./_tabs/telemetry').then(m => ({ default: m.TelemetryTab })));
+const LogsTab = dyn(() => import('./_tabs/logs').then(m => ({ default: m.LogsTab })));
 
 export default function AdminPage() {
   const activeTab = useAdminTabStore((s) => s.activeTab);
