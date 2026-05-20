@@ -2,9 +2,13 @@ import { parseISO } from 'date-fns';
 import type { CalendarEvent } from '@/lib/jmap/types';
 
 const DURATION_RE = /^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/;
+// Hoisted out of the per-event hot path — these were re-created on every
+// isMidnightValue call (hundreds per month-view load).
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_PORTION_RE = /T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?$/;
 
 function isDateOnlyValue(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+  return DATE_ONLY_RE.test(value);
 }
 
 function isMidnightValue(value: string): boolean {
@@ -12,7 +16,7 @@ function isMidnightValue(value: string): boolean {
     return true;
   }
 
-  const match = value.match(/T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?$/);
+  const match = TIME_PORTION_RE.exec(value);
   if (!match) {
     return false;
   }
@@ -80,10 +84,15 @@ export function isAllDayEventLike(event: Pick<Partial<CalendarEvent>, 'start' | 
  */
 function normalizeStalwartPropertyNames<T extends Partial<CalendarEvent>>(event: T): T {
   const raw = event as Record<string, unknown>;
-  let patched = false;
+  // Fast path: most events (Stalwart-normalized or no recurrence at all)
+  // hit neither branch. Skip the `updates` literal allocation in that case.
+  const hasSingularRule = 'recurrenceRule' in raw && !('recurrenceRules' in raw);
+  const hasSingularExcluded = 'excludedRecurrenceRule' in raw && !('excludedRecurrenceRules' in raw);
+  if (!hasSingularRule && !hasSingularExcluded) return event;
+
   const updates: Partial<CalendarEvent> = {};
 
-  if ('recurrenceRule' in raw && !('recurrenceRules' in raw)) {
+  if (hasSingularRule) {
     // JSCalendar 2.0 (jscalendarbis-15) defines recurrenceRule as a single object,
     // but Stalwart may also return it as an array (for JMAP-created events).
     // Normalize both forms to our internal array type.
@@ -93,19 +102,15 @@ function normalizeStalwartPropertyNames<T extends Partial<CalendarEvent>>(event:
     } else {
       updates.recurrenceRules = val as CalendarEvent['recurrenceRules'];
     }
-    patched = true;
   }
-  if ('excludedRecurrenceRule' in raw && !('excludedRecurrenceRules' in raw)) {
+  if (hasSingularExcluded) {
     const val = raw.excludedRecurrenceRule;
     if (val != null && !Array.isArray(val) && typeof val === 'object') {
       updates.excludedRecurrenceRules = [val] as CalendarEvent['excludedRecurrenceRules'];
     } else {
       updates.excludedRecurrenceRules = val as CalendarEvent['excludedRecurrenceRules'];
     }
-    patched = true;
   }
-
-  if (!patched) return event;
 
   const result = { ...event, ...updates } as T;
   // Set to undefined instead of `delete` — JSON.stringify omits undefined
