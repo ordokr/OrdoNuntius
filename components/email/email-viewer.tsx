@@ -79,7 +79,13 @@ import { mailboxByIdLookup } from "@/stores/email-slices/_helpers";
 import { useThemeStore } from "@/stores/theme-store";
 import { EmailIdentityBadge } from "./email-identity-badge";
 import { UnsubscribeBanner } from "./unsubscribe-banner";
-import { CalendarInvitationBanner } from "./calendar-invitation-banner";
+// CalendarInvitationBanner (~42 KB src + calendar-store pull) only mounts
+// when the open email is an iMIP / iCal invitation — rare relative to
+// total emails opened. Defer past the viewer's first paint.
+const CalendarInvitationBanner = dynamic(
+  () => import("./calendar-invitation-banner").then(m => ({ default: m.CalendarInvitationBanner })),
+  { ssr: false, loading: () => null }
+);
 import { useTour } from "@/components/tour/tour-provider";
 import dynamic from "next/dynamic";
 // SmimePassphraseDialog only mounts when the user opens an encrypted
