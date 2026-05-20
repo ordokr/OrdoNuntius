@@ -28,7 +28,15 @@ import { getActiveAccountSlotHeaders } from "@/lib/auth/active-account-slot";
 import { getMaxAccounts } from "@/lib/account-utils";
 import { cn, formatFileSize } from "@/lib/utils";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
-import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
+// KeyboardShortcutsModal (197 LOC + KEYBOARD_SHORTCUTS data + focus-trap
+// hook) only mounts after the user clicks the keyboard-shortcuts button.
+// navigation-rail is on every authenticated route, so the static import
+// shipped the modal on every cold-load. Gate the render below on
+// `showShortcutsModal` so the dynamic chunk only fetches on first open.
+const KeyboardShortcutsModal = dynamic(
+  () => import("@/components/keyboard-shortcuts-modal").then(m => ({ default: m.KeyboardShortcutsModal })),
+  { ssr: false, loading: () => null },
+);
 import { apiFetch } from "@/lib/browser-navigation";
 import { Avatar } from "@/components/ui/avatar";
 
@@ -604,10 +612,12 @@ export function NavigationRail({
             >
               <Keyboard className="w-[18px] h-[18px]" />
             </button>
-            <KeyboardShortcutsModal
-              isOpen={showShortcutsModal}
-              onClose={() => setShowShortcutsModal(false)}
-            />
+            {showShortcutsModal && (
+              <KeyboardShortcutsModal
+                isOpen={showShortcutsModal}
+                onClose={() => setShowShortcutsModal(false)}
+              />
+            )}
           </>
         )}
 
