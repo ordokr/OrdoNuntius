@@ -425,15 +425,22 @@ export function FileBrowser({
     localStorage.setItem("files-view-mode", mode);
   }, []);
 
-  // Filter and sort resources
+  // Filter and sort resources. Was two separate `.filter()` walks
+  // (folderLayout filter + searchQuery filter), each allocating its own
+  // intermediate array. Combine the two predicates into a single pass.
   const displayResources = useMemo(() => {
-    let filtered = resources;
-    if (folderLayout === "sidebar") {
-      filtered = filtered.filter(r => !r.isDirectory);
-    }
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(r => r.name.toLowerCase().includes(q));
+    const hideDirs = folderLayout === "sidebar";
+    const q = searchQuery ? searchQuery.toLowerCase() : null;
+    let filtered: typeof resources;
+    if (hideDirs || q) {
+      filtered = [];
+      for (const r of resources) {
+        if (hideDirs && r.isDirectory) continue;
+        if (q && !r.name.toLowerCase().includes(q)) continue;
+        filtered.push(r);
+      }
+    } else {
+      filtered = resources;
     }
 
     // Schwartzian for the "modified" sort path: previously each comparison
