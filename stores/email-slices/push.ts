@@ -28,7 +28,12 @@ import type { Email, Mailbox, StateChange } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { SearchFilters, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { useSettingsStore } from "@/stores/settings-store";
-import { useCalendarStore } from "@/stores/calendar-store";
+// calendar-store is dynamic-imported in the Calendar/CalendarEvent fan-out
+// branch below. The slice is loaded eagerly via email-store on the inbox
+// cold-path, so a static import would drag the 1093-line calendar-store
+// (and its date-fns/recurrence helpers) into the inbox boot bundle even
+// when the user is just reading mail. The fan-out branch is already inside
+// an async IIFE, so a local `await import` adds no extra await depth.
 import { mailboxByIdLookup } from "@/stores/email-slices/_helpers";
 
 // Fast equality for `keywords: Record<string, boolean>`. Avoids the
@@ -121,6 +126,7 @@ export const createPushSlice: StateCreator<
       // (those stores can import from this one indirectly).
       if (accountChanges.Calendar || accountChanges.CalendarEvent) {
         tasks.push((async () => {
+          const { useCalendarStore } = await import('@/stores/calendar-store');
           const calendarStore = useCalendarStore.getState();
           if (!calendarStore.supportsCalendar) return;
           calendarStore.fetchCalendars(client);

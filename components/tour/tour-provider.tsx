@@ -4,7 +4,11 @@ import { createContext, useContext, useState, useCallback, useEffect, type React
 import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { useAuthStore } from "@/stores/auth-store";
-import { useCalendarStore } from "@/stores/calendar-store";
+// supportsCalendar derives from client.supportsCalendars() so the
+// 1093-line calendar-store stays off the app-shell boot path. The
+// provider wraps the entire authenticated tree, so dropping the
+// useCalendarStore hook here is consistent with the same pattern in
+// navigation-rail and keeps the eager bundle slim.
 import { useWebDAVStore } from "@/stores/webdav-store";
 import { getTourSteps, type TourStep } from "./tour-steps";
 // TourOverlay (~13 KB src) mounts only when the user starts the tour
@@ -48,7 +52,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   // whole-store sub re-ran this (and re-derived `steps`) on every set()
   // in 3 separate stores.
   const isDemoMode = useAuthStore(s => s.isDemoMode);
-  const supportsCalendar = useCalendarStore(s => s.supportsCalendar);
+  const supportsCalendar = useAuthStore(s => s.client?.supportsCalendars() ?? false);
   const supportsWebDAV = useWebDAVStore(s => s.supportsWebDAV);
 
   const [isActive, setIsActive] = useState(false);
