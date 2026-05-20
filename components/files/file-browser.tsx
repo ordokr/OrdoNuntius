@@ -30,7 +30,12 @@ const FolderTreeSidebar = dynamic(
   { ssr: false, loading: () => null }
 );
 import { ResizeHandle } from "@/components/layout/resize-handle";
-import { getDroppedFilesAndFolders } from "@/lib/webdav/drop-utils";
+// drop-utils contains the recursive DataTransferItemList walker (~126 LOC)
+// and only runs when a user drops files into the browser. handleDrop is
+// already async, so a local `await import` defers the chunk off the
+// files-route entry without UX impact — the chunk lands while the drop
+// event handler is already setting isUploading and is followed by the
+// upload itself.
 import type { FileResource } from "@/stores/file-store";
 
 type SortKey = "name" | "size" | "modified";
@@ -716,6 +721,7 @@ export function FileBrowser({
 
     setIsUploading(true);
     try {
+      const { getDroppedFilesAndFolders } = await import("@/lib/webdav/drop-utils");
       const { files, hasDirectories } = await getDroppedFilesAndFolders(e.dataTransfer);
       if (files.length > 0) {
         if (hasDirectories) {
