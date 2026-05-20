@@ -69,7 +69,12 @@ const RecurrenceScopeDialog = dynamic(
   { ssr: false, loading: () => null }
 );
 import { NavigationRail } from "@/components/layout/navigation-rail";
-import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
+// SidebarAppsModal pulls IconPicker which bundles the full Lucide icon
+// registry. Defer past first paint.
+const SidebarAppsModal = dynamic(
+  () => import("@/components/layout/sidebar-apps-modal").then(m => ({ default: m.SidebarAppsModal })),
+  { ssr: false, loading: () => null }
+);
 import { InlineAppView } from "@/components/layout/inline-app-view";
 import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { ResizeHandle } from "@/components/layout/resize-handle";

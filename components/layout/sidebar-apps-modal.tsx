@@ -7,7 +7,14 @@ import { icons as lucideIcons, type LucideIcon } from 'lucide-react';
 import { cn, generateUUID, hasAnyKey } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { IconPicker } from './icon-picker';
+import dynamic from 'next/dynamic';
+// IconPicker imports `lucide-react`'s full `icons` registry (~550 KB src,
+// all 1544 icons). It only mounts inside the Add/Edit App form. Defer the
+// chunk past the modal's first paint.
+const IconPicker = dynamic(
+  () => import('./icon-picker').then(m => ({ default: m.IconPicker })),
+  { ssr: false, loading: () => null }
+);
 import { useSettingsStore, type SidebarApp } from '@/stores/settings-store';
 import { useFocusTrap } from '@/hooks/use-focus-trap';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
