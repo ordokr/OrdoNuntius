@@ -1,12 +1,21 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useWebDAVStore } from "@/stores/webdav-store";
 import { getTourSteps, type TourStep } from "./tour-steps";
-import { TourOverlay } from "./tour-overlay";
+// TourOverlay (~13 KB src) mounts only when the user starts the tour
+// (welcome banner button / settings reset / first-run for some demos).
+// TourProvider wraps the entire authenticated app shell, so the static
+// import shipped TourOverlay on every cold route load even though most
+// users never run the tour.
+const TourOverlay = dynamic(
+  () => import("./tour-overlay").then(m => ({ default: m.TourOverlay })),
+  { ssr: false, loading: () => null }
+);
 
 const TOUR_COMPLETED_KEY = "tour_completed";
 const TOUR_CURRENT_STEP_KEY = "tour_current_step";
