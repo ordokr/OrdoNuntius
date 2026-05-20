@@ -12,7 +12,12 @@ import { useAuthStore } from "@/stores/auth-store";
 // cold-load cost. The tour only uses these to decide whether to include
 // the corresponding nav step — `client?.supportsX()` already drives
 // whether the nav icon is visible at all, so it's the source-of-truth.
-import { getTourSteps, type TourStep } from "./tour-steps";
+// tour-steps holds ~221 LOC of step data + the getTourSteps filter.
+// TourProvider wraps the entire authenticated tree, but `steps` is only
+// needed when the user clicks "Start Tour" — startTour below dynamic-imports
+// the data on first invocation and stashes it in component state, so the
+// data stays out of every authenticated route's cold-load bundle.
+import type { TourStep } from "./tour-steps";
 // TourOverlay (~13 KB src) mounts only when the user starts the tour
 // (welcome banner button / settings reset / first-run for some demos).
 // TourProvider wraps the entire authenticated app shell, so the static
@@ -31,7 +36,10 @@ interface TourContextValue {
   currentStep: number;
   totalSteps: number;
   steps: TourStep[];
-  startTour: () => void;
+  // Async because tour-steps is lazy-imported on first call. Callers
+  // can fire-and-forget; React-batched state updates flip isActive once
+  // the chunk lands.
+  startTour: () => Promise<void>;
   stopTour: () => void;
   nextStep: () => void;
   prevStep: () => void;
@@ -62,8 +70,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [hasCompletedTour, setHasCompletedTour] = useState(false);
-
-  const steps = getTourSteps({ isDemoMode, supportsCalendar, supportsWebDAV });
+  // Lazy: populated when startTour first runs and the tour-steps chunk
+  // resolves. Empty before then — the overlay only renders when isActive
+  // is true, which only flips after steps land.
+  const [steps, setSteps] = useState<TourStep[]>([]);
 
   useEffect(() => {
     try {
@@ -71,7 +81,17 @@ export function TourProvider({ children }: { children: ReactNode }) {
     } catch { /* */ }
   }, []);
 
-  const startTour = useCallback(() => {
+  const startTour = useCallback(async () => {
+    // Resolve the steps chunk on first invocation. Subsequent calls reuse
+    // the already-loaded state; the small chunk-fetch delay is masked by
+    // the explicit user click that initiates the tour.
+    let currentSteps = steps;
+    if (currentSteps.length === 0) {
+      const { getTourSteps } = await import("./tour-steps");
+      currentSteps = getTourSteps({ isDemoMode, supportsCalendar, supportsWebDAV });
+      setSteps(currentSteps);
+    }
+
     let resumeStep = 0;
     try {
       const stored = localStorage.getItem(TOUR_CURRENT_STEP_KEY);
@@ -82,18 +102,18 @@ export function TourProvider({ children }: { children: ReactNode }) {
     } catch { /* */ }
 
     // If the resume step is beyond the current steps, start from 0
-    if (resumeStep >= steps.length) resumeStep = 0;
+    if (resumeStep >= currentSteps.length) resumeStep = 0;
 
     // Most steps live on the mailbox - navigate there (or to the step's specific page)
     // so we don't start the tour on a page where the targets don't exist.
-    const targetPage = steps[resumeStep]?.page ?? "/";
+    const targetPage = currentSteps[resumeStep]?.page ?? "/";
     if (pathname !== targetPage) {
       router.push(targetPage);
     }
 
     setCurrentStep(resumeStep);
     setIsActive(true);
-  }, [steps, pathname, router]);
+  }, [steps, isDemoMode, supportsCalendar, supportsWebDAV, pathname, router]);
 
   const stopTour = useCallback(() => {
     setIsActive(false);
