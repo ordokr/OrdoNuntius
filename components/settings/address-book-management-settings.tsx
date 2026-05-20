@@ -106,11 +106,16 @@ export function AddressBookManagementSettings() {
     }
   };
 
-  // Group: personal first, then by shared account
-  const personal = addressBooks.filter((b) => !b.isShared);
+  // Group: personal first, then by shared account. Single pass — was a
+  // separate filter() allocation followed by a second walk for sharedGroups.
+  const personal: AddressBook[] = [];
   const sharedGroups = new Map<string, { accountName: string; books: AddressBook[] }>();
   for (const book of addressBooks) {
-    if (!book.isShared || !book.accountId) continue;
+    if (!book.isShared) {
+      personal.push(book);
+      continue;
+    }
+    if (!book.accountId) continue;
     const key = book.accountId;
     const existing = sharedGroups.get(key);
     if (existing) existing.books.push(book);
@@ -223,7 +228,8 @@ export function AddressBookManagementSettings() {
       <div className="space-y-2">
         {personal.map(renderBook)}
 
-        {Array.from(sharedGroups.entries()).map(([accountId, group]) => (
+        {/* Array.from with mapFn drops the intermediate entries-array allocation. */}
+        {Array.from(sharedGroups, ([accountId, group]) => (
           <div key={accountId} className="mt-4 space-y-2">
             <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
               <Share2 className="w-3 h-3" />

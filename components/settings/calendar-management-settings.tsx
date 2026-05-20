@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { useShallow } from 'zustand/react/shallow';
 import { useCalendarStore } from '@/stores/calendar-store';
@@ -230,7 +230,8 @@ export function CalendarManagementSettings() {
         ...getActiveAccountSlotHeaders(),
       },
       body: JSON.stringify({
-        accounts: Array.from(accounts.entries()).map(([key, candidates]) => ({ key, candidates })),
+        // Was Array.from(map.entries()).map — single Array.from with mapFn drops the entries-array allocation.
+        accounts: Array.from(accounts, ([key, candidates]) => ({ key, candidates })),
       }),
       signal: controller.signal,
     })
@@ -377,9 +378,17 @@ export function CalendarManagementSettings() {
     }
   };
 
+  // Map lookup instead of calendars.find per render iteration — called for every
+  // calendar row, so was O(N²) before.
+  const calendarById = useMemo(() => {
+    const m = new Map<string, typeof calendars[number]>();
+    for (const c of calendars) m.set(c.id, c);
+    return m;
+  }, [calendars]);
+
   const buildCalDavUrl = (calendarId: string) => {
     if (!serverUrl || !username) return null;
-    const calendar = calendars.find((entry) => entry.id === calendarId);
+    const calendar = calendarById.get(calendarId);
     if (!calendar) return null;
     const accountKey = calendar.isShared ? (calendar.accountId || calendar.accountName || calendar.id) : username;
     return discoveredCalDavUrls[accountKey] || wellKnownCalDavUrl;
@@ -736,7 +745,7 @@ export function CalendarManagementSettings() {
       )}
 
       {sharingId && client && (() => {
-        const cal = calendars.find((c) => c.id === sharingId);
+        const cal = calendarById.get(sharingId);
         if (!cal) return null;
         return (
           <ShareCollectionDialog

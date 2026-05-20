@@ -50,7 +50,7 @@ import { sanitizeOutgoingCalendarEventData } from "@/lib/calendar-event-normaliz
 import { getEventStartDate } from "@/lib/calendar-utils";
 import { useTaskStore } from "@/stores/task-store";
 import { useContactStore } from "@/stores/contact-store";
-import { cn } from "@/lib/utils";
+import { cn, hasAnyKey } from "@/lib/utils";
 import type { Calendar, CalendarEvent, CalendarParticipant, CalendarRights } from "@/lib/jmap/types";
 import { ShareCollectionDialog } from "@/components/settings/share-collection-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -151,10 +151,17 @@ export default function CalendarPage() {
   const contacts = useContactStore((s) => s.contacts);
   const normalizedViewMode = isCalendarViewMode(viewMode) ? viewMode : "month";
 
-  const currentUserEmails = useMemo(() =>
-    identities.map(id => id.email).filter(Boolean),
-    [identities]
-  );
+  // Single-pass push instead of .map().filter(Boolean) — drops the
+  // intermediate map-array. currentUserEmails is in many useCallback deps,
+  // so a stable identity also matters; the array still re-allocates per
+  // identities change but with one allocation instead of two.
+  const currentUserEmails = useMemo(() => {
+    const out: string[] = [];
+    for (const id of identities) {
+      if (id.email) out.push(id.email);
+    }
+    return out;
+  }, [identities]);
 
   const [showEventModal, setShowEventModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -895,7 +902,8 @@ export default function CalendarPage() {
 
   const handleDeleteFromDetail = useCallback(() => {
     if (!detailEvent) return;
-    const hasParticipants = detailEvent.participants && Object.keys(detailEvent.participants).length > 0;
+    // hasAnyKey early-returns on first key — skips the Object.keys array.
+    const hasParticipants = hasAnyKey(detailEvent.participants);
     closeDetail();
     handleDeleteEvent(detailEvent.id, hasParticipants || undefined);
   }, [detailEvent, closeDetail, handleDeleteEvent]);
@@ -1011,7 +1019,8 @@ export default function CalendarPage() {
   }, [t]);
 
   const handleDeleteContextMenu = useCallback((event: CalendarEvent) => {
-    const hasParticipants = event.participants && Object.keys(event.participants).length > 0;
+    // hasAnyKey early-returns on first key — skips the Object.keys array.
+    const hasParticipants = hasAnyKey(event.participants);
     handleDeleteEvent(event.id, hasParticipants || undefined);
   }, [handleDeleteEvent]);
 

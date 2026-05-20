@@ -223,13 +223,17 @@ export const useWebDAVStore = create<WebDAVState>((set, get) => ({
     set({ uploadAbortController: abortController });
     const totalFiles = files.length;
 
-    // Collect all unique directory paths to create
+    // Collect all unique directory paths. Was O(depth²) via slice+join per
+    // level; accumulating the prefix forward is O(depth). A 5-level upload
+    // re-walked 15 array slots per file under the old code.
     const dirs = new Set<string>();
     for (const file of files) {
       const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
       const parts = relativePath.split('/');
-      for (let i = 1; i < parts.length; i++) {
-        dirs.add(parts.slice(0, i).join('/'));
+      let cumulative = '';
+      for (let i = 0; i < parts.length - 1; i++) {
+        cumulative = cumulative ? `${cumulative}/${parts[i]}` : parts[i];
+        dirs.add(cumulative);
       }
     }
 

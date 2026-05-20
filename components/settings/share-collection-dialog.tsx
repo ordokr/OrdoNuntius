@@ -38,24 +38,29 @@ const ADDRESS_BOOK_PRESETS: Record<Exclude<RolePreset, "custom" | "freeBusy">, A
   manager: { mayRead: true, mayWrite: true, mayShare: true, mayDelete: true },
 };
 
+// Pre-compute [name, preset, keys] tuples once — was Object.entries+Object.keys per detect call.
+const CALENDAR_PRESET_ENTRIES = (Object.entries(CALENDAR_PRESETS) as [Exclude<RolePreset, "custom">, CalendarRights][])
+  .map(([name, preset]) => [name, preset, Object.keys(preset) as (keyof CalendarRights)[]] as const);
+const ADDRESS_BOOK_PRESET_ENTRIES = (Object.entries(ADDRESS_BOOK_PRESETS) as [Exclude<RolePreset, "custom" | "freeBusy">, AddressBookRights][])
+  .map(([name, preset]) => [name, preset, Object.keys(preset) as (keyof AddressBookRights)[]] as const);
+
 function detectCalendarPreset(r: CalendarRights): RolePreset {
-  for (const [name, preset] of Object.entries(CALENDAR_PRESETS) as [Exclude<RolePreset, "custom">, CalendarRights][]) {
-    if ((Object.keys(preset) as (keyof CalendarRights)[]).every((k) => preset[k] === r[k])) {
-      return name;
-    }
+  for (const [name, preset, keys] of CALENDAR_PRESET_ENTRIES) {
+    if (keys.every((k) => preset[k] === r[k])) return name;
   }
   return "custom";
 }
 
 function detectAddressBookPreset(r: AddressBookRights): RolePreset {
-  for (const [name, preset] of Object.entries(ADDRESS_BOOK_PRESETS) as [Exclude<RolePreset, "custom" | "freeBusy">, AddressBookRights][]) {
-    const keys = Object.keys(preset) as (keyof AddressBookRights)[];
-    if (keys.every((k) => preset[k] === (r[k] ?? false))) {
-      return name;
-    }
+  for (const [name, preset, keys] of ADDRESS_BOOK_PRESET_ENTRIES) {
+    if (keys.every((k) => preset[k] === (r[k] ?? false))) return name;
   }
   return "custom";
 }
+
+// Hoisted: was a new array literal per render.
+const CALENDAR_PRESET_OPTIONS = ["freeBusy", "read", "readWrite", "manager"] as const;
+const ADDRESS_BOOK_PRESET_OPTIONS = ["read", "readWrite", "manager"] as const;
 
 interface ShareCollectionDialogProps {
   client: IJMAPClient;
@@ -184,9 +189,7 @@ export function ShareCollectionDialog({
     return Object.entries(shareWith || {}) as [string, AnyRights][];
   }, [shareWith]);
 
-  const presetOptions = kind === "calendar"
-    ? ["freeBusy", "read", "readWrite", "manager"] as const
-    : ["read", "readWrite", "manager"] as const;
+  const presetOptions = kind === "calendar" ? CALENDAR_PRESET_OPTIONS : ADDRESS_BOOK_PRESET_OPTIONS;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">

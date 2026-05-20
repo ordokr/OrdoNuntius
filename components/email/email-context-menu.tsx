@@ -132,6 +132,8 @@ export function EmailContextMenu({
   const isStarred = email.keywords?.$flagged;
   const isDraft = email.keywords?.['$draft'] === true;
   const currentColors = getCurrentColors(email.keywords);
+  // Set lookup for the per-color isActive check below (was O(N) per option).
+  const currentColorSet = useMemo(() => new Set(currentColors), [currentColors]);
   const showBatchActions = isMultiSelect && selectedCount > 1;
   const isInJunkFolder = currentMailboxRole === 'junk';
 
@@ -307,7 +309,7 @@ export function EmailContextMenu({
       {!showBatchActions && (
         <ContextMenuSubMenu icon={Tag} label={t("color_tag")}>
           {colorOptions.map((option) => {
-            const isActive = currentColors.includes(option.value);
+            const isActive = currentColorSet.has(option.value);
             return (
               <button
                 key={option.value}

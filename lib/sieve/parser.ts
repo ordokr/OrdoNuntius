@@ -93,8 +93,10 @@ function detectVacationOnlyScript(content: string): ParseResult | null {
   if (mimeBodyMatch) {
     textBody = mimeBodyMatch[1].trim();
   } else {
-    const allQuoted = [...stripped.matchAll(/"((?:[^"\\]|\\.)*)"/g)];
-    const last = allQuoted[allQuoted.length - 1];
+    // Iterate to keep only the last match — drops the [...matchAll] array
+    // allocation (vacation script bodies can be long).
+    let last: RegExpMatchArray | null = null;
+    for (const m of stripped.matchAll(/"((?:[^"\\]|\\.)*)"/g)) last = m;
     if (last) textBody = unescapeSieveString(last[1]);
   }
 
@@ -238,7 +240,12 @@ function scanTopLevel(content: string): TopBlock[] {
 
 function extractRequireTokens(stmt: string): string[] {
   const mList = /require\s+\[([\s\S]*?)\]\s*;/.exec(stmt);
-  if (mList) return [...mList[1].matchAll(/"([^"]+)"/g)].map(x => x[1]);
+  // Single push loop: drop the `[...matchAll].map(...)` two-allocation chain.
+  if (mList) {
+    const out: string[] = [];
+    for (const m of mList[1].matchAll(/"([^"]+)"/g)) out.push(m[1]);
+    return out;
+  }
   const mSingle = /require\s+"([^"]+)"\s*;/.exec(stmt);
   return mSingle ? [mSingle[1]] : [];
 }
@@ -250,8 +257,13 @@ function extractRequireTokens(stmt: string): string[] {
  * block, e.g. a trailing "# Nextcloud Mail - end" marker).
  */
 function lastCommentChunk(leading: string): string {
-  const parts = leading.split(/\r?\n\s*\r?\n/).map(s => s.trim()).filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : '';
+  // Track only the last non-empty trimmed chunk; drops .map + .filter arrays.
+  let last = '';
+  for (const part of leading.split(/\r?\n\s*\r?\n/)) {
+    const t = part.trim();
+    if (t) last = t;
+  }
+  return last;
 }
 
 function detectOriginLabel(leading: string): string {
@@ -275,9 +287,13 @@ function extractName(leading: string, fallback: string): string {
   const rr = leading.match(/#\s*Rule:\s*(.+?)\s*$/mi);
   if (rr) return rr[1].trim();
 
-  // Last non-empty trimmed comment line
-  const lines = leading.split('\n').map(l => l.replace(/^\s*#\s*/, '').trim()).filter(Boolean);
-  const last = lines[lines.length - 1];
+  // Last non-empty trimmed comment line. Walk the split result once
+  // tracking only the last non-empty line — drops the .map + .filter arrays.
+  let last = '';
+  for (const raw of leading.split('\n')) {
+    const t = raw.replace(/^\s*#\s*/, '').trim();
+    if (t) last = t;
+  }
   if (last && last.length <= 80 && !/^\/\*|\*\/$/.test(last)) return last;
 
   return fallback;
@@ -300,7 +316,13 @@ function splitTopLevelComma(s: string): string[] {
     i++;
   }
   parts.push(s.slice(start));
-  return parts.map(p => p.trim()).filter(Boolean);
+  // Single trim+filter pass — drops the .map intermediate array.
+  const out: string[] = [];
+  for (const p of parts) {
+    const t = p.trim();
+    if (t) out.push(t);
+  }
+  return out;
 }
 
 function splitStatements(body: string): string[] {
@@ -320,7 +342,13 @@ function splitStatements(body: string): string[] {
   }
   const tail = body.slice(start).trim();
   if (tail) stmts.push(tail);
-  return stmts.map(s => s.trim()).filter(Boolean);
+  // Single trim+filter pass — drops the .map intermediate array.
+  const out: string[] = [];
+  for (const s of stmts) {
+    const t = s.trim();
+    if (t) out.push(t);
+  }
+  return out;
 }
 
 function normalizeHeaderName(name: string): { field: FilterConditionField; headerName?: string } {

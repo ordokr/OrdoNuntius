@@ -822,9 +822,12 @@ export const useFileStore = create<FileState>((set, get) => ({
       const allNodes = await client.listFileNodes(null);
 
       if (parentId === null) {
-        // Root level: nodes with simple names (no "/")
-        const rootNodes = allNodes.filter(n => !n.name.includes('/'));
-        return rootNodes.map(n => nodeToResource(n));
+        // Single-pass filter+map. Was two arrays.
+        const rootResources: FileResource[] = [];
+        for (const n of allNodes) {
+          if (!n.name.includes('/')) rootResources.push(nodeToResource(n));
+        }
+        return rootResources;
       }
 
       // Find the folder node to get its server name

@@ -36,9 +36,16 @@ interface ContactDetailProps {
   className?: string;
 }
 
+// Module-scope: monthNames was being re-allocated per formatDate call (a
+// 12-string array literal per anniversary/created/updated render).
+const MONTH_NAMES_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 function formatPhoneFeatures(features?: Record<string, boolean>): string {
   if (!features) return "";
-  return Object.keys(features).filter(k => features[k]).join(", ");
+  // Single-pass push: was Object.keys().filter().join() = 2 throwaway arrays.
+  const out: string[] = [];
+  for (const k in features) if (features[k]) out.push(k);
+  return out.join(", ");
 }
 
 function getDateParts(dateInput: AnniversaryDate): { year?: number; month?: number; day?: number } {
@@ -91,9 +98,8 @@ function formatDate(dateInput: AnniversaryDate): string {
       return String(dateInput.utc);
     }
     const pd = dateInput as PartialDate;
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const parts: string[] = [];
-    if (pd.month && monthNames[pd.month - 1]) parts.push(monthNames[pd.month - 1]);
+    if (pd.month && MONTH_NAMES_SHORT[pd.month - 1]) parts.push(MONTH_NAMES_SHORT[pd.month - 1]);
     if (pd.day) parts.push(String(pd.day));
     if (pd.year) parts.push(String(pd.year));
     return parts.join(' ') || String(dateInput);
@@ -103,8 +109,7 @@ function formatDate(dateInput: AnniversaryDate): string {
     const parts = dateStr.substring(2).split("-");
     const month = parseInt(parts[0], 10);
     const day = parts[1] ? parseInt(parts[1], 10) : undefined;
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return day ? `${monthNames[month - 1]} ${day}` : monthNames[month - 1];
+    return day ? `${MONTH_NAMES_SHORT[month - 1]} ${day}` : MONTH_NAMES_SHORT[month - 1];
   }
   try {
     const d = new Date(dateStr);
@@ -208,7 +213,11 @@ export function ContactDetail({ contact, onEdit, onDelete, onAddToGroup, onDupli
   const jobTitles = titles.filter(t => t.kind !== "role");
   const onlineServices = contact.onlineServices ? Object.values(contact.onlineServices) : [];
   const anniversaries = contact.anniversaries ? Object.values(contact.anniversaries) : [];
-  const keywords = contact.keywords ? Object.keys(contact.keywords).filter(k => contact.keywords![k]) : [];
+  // Single-pass push: Object.keys().filter() built a throwaway array per render.
+  const keywords: string[] = [];
+  if (contact.keywords) {
+    for (const k in contact.keywords) if (contact.keywords[k]) keywords.push(k);
+  }
 
   const handleImportContactCert = async (keyIndex: number) => {
     const key = cryptoKeys[keyIndex];
@@ -617,7 +626,11 @@ export function ContactDetail({ contact, onEdit, onDelete, onAddToGroup, onDupli
 
 function formatContexts(contexts?: Record<string, boolean>): string {
   if (!contexts) return "";
-  return Object.keys(contexts).filter(k => contexts[k]).join(", ");
+  // Single-pass push: was Object.keys().filter().join() = 2 throwaway arrays
+  // per call, and this fires N times per contact (per email/phone/address/etc).
+  const out: string[] = [];
+  for (const k in contexts) if (contexts[k]) out.push(k);
+  return out.join(", ");
 }
 
 export function Section({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {

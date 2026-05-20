@@ -122,9 +122,6 @@ export function TemplatePicker({ isOpen, onClose, onSelect }: TemplatePickerProp
     );
   };
 
-  const categorizedEntries = Object.entries(byCategory).filter(
-    ([cat]) => cat !== ''
-  );
   // Build favoriteIds + shownIds in one walk each (avoids the
   // intermediate `.map(...).id` array allocations). recentFiltered
   // is a separate `.filter()` walk but its result is also accumulated
@@ -138,9 +135,22 @@ export function TemplatePicker({ isOpen, onClose, onSelect }: TemplatePickerProp
     recentFiltered.push(r);
     shownIds.add(r.id);
   }
-  const uncategorizedFiltered = (byCategory[''] || []).filter(
-    (i) => !shownIds.has(i.id)
-  );
+  // Single Object.entries walk: skip the empty-category bucket, build
+  // uncategorized in the same pass, and pre-filter each categorized list
+  // (no `.filter()` inside the JSX render loop below).
+  const categorizedFiltered: Array<[string, EmailTemplate[]]> = [];
+  let uncategorizedFiltered: EmailTemplate[] = [];
+  for (const [cat, items] of Object.entries(byCategory)) {
+    if (cat === '') {
+      uncategorizedFiltered = items.filter((i) => !shownIds.has(i.id));
+      continue;
+    }
+    const filteredItems: EmailTemplate[] = [];
+    for (const i of items) {
+      if (!shownIds.has(i.id)) filteredItems.push(i);
+    }
+    if (filteredItems.length > 0) categorizedFiltered.push([cat, filteredItems]);
+  }
 
   return (
     <>
@@ -201,12 +211,7 @@ export function TemplatePicker({ isOpen, onClose, onSelect }: TemplatePickerProp
               <>
                 {renderSection(t('section_favorites'), favorites)}
                 {renderSection(t('section_recent'), recentFiltered)}
-                {categorizedEntries.map(([cat, items]) =>
-                  renderSection(
-                    cat,
-                    items.filter((i) => !shownIds.has(i.id))
-                  )
-                )}
+                {categorizedFiltered.map(([cat, items]) => renderSection(cat, items))}
                 {renderSection(t('section_uncategorized'), uncategorizedFiltered)}
               </>
             )}

@@ -141,6 +141,13 @@ const CALENDAR_PROPERTIES = [
 // parseEmailHeaders call (per email viewer mount).
 const SPAM_HEADER_NAMES = ['X-Spam-Status', 'X-Spam-Result', 'X-Rspamd-Score'] as const;
 
+// `using` arrays for JMAP requests whose capabilities are static (don't
+// depend on instance state). Hoisted to module scope so each request
+// doesn't allocate a fresh string array.
+const VACATION_USING: string[] = ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail", "urn:ietf:params:jmap:vacationresponse"];
+const SIEVE_USING: string[] = ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:sieve"];
+const PRINCIPALS_USING: string[] = ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:principals"];
+
 // Stalwart's default property list for AddressBook/get omits shareWith, so
 // existing shares would be invisible after a fresh login.
 const ADDRESS_BOOK_PROPERTIES = [
@@ -2049,7 +2056,7 @@ export class JMAPClient implements IJMAPClient {
   }
 
   private vacationUsing(): string[] {
-    return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail", "urn:ietf:params:jmap:vacationresponse"];
+    return VACATION_USING;
   }
 
   async getVacationResponse(): Promise<VacationResponse> {
@@ -3106,7 +3113,7 @@ export class JMAPClient implements IJMAPClient {
   }
 
   private sieveUsing(): string[] {
-    return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:sieve"];
+    return SIEVE_USING;
   }
 
   getSieveCapabilities(): SieveCapabilities | null {
@@ -3512,7 +3519,7 @@ export class JMAPClient implements IJMAPClient {
   // ── Sharing (RFC 9670) ──────────────────────────────────────────────────────
 
   private principalsUsing(): string[] {
-    return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:principals"];
+    return PRINCIPALS_USING;
   }
 
   /**
@@ -4949,11 +4956,17 @@ export class JMAPClient implements IJMAPClient {
     return filesAccount || this.accountId;
   }
 
+  // Memoized like contactUsing/calendarUsing — capabilities are fixed after
+  // session, so the `using` array doesn't change. Called from every file
+  // op (list, upload, delete, etc.) — was allocating a fresh array per call.
+  private _fileUsing?: string[];
   private fileUsing(): string[] {
+    if (this._fileUsing) return this._fileUsing;
     const using = ["urn:ietf:params:jmap:core"];
     if (this.hasCapability("urn:ietf:params:jmap:filenode")) {
       using.push("urn:ietf:params:jmap:filenode");
     }
+    this._fileUsing = using;
     return using;
   }
 

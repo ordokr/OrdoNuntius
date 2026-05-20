@@ -65,7 +65,9 @@ export const usePolicyStore = create<PolicyState>()((set, get) => ({
   },
 
   getForcedThemeId: (availableThemeIds) => {
-    const forceEnabledThemes = get().policy.forceEnabledThemes || [];
+    // Avoid the `|| []` allocation when the policy field is undefined.
+    const forceEnabledThemes = get().policy.forceEnabledThemes;
+    if (!forceEnabledThemes || forceEnabledThemes.length === 0) return null;
     if (!availableThemeIds || availableThemeIds.length === 0) {
       return forceEnabledThemes[0] || null;
     }
@@ -74,23 +76,28 @@ export const usePolicyStore = create<PolicyState>()((set, get) => ({
     return forceEnabledThemes.find((themeId) => available.has(themeId)) || null;
   },
 
+  // Each predicate previously did `(arr || []).includes(...)` — the
+  // fallback `[]` allocates a fresh empty array on every call even when
+  // the policy field IS set, just to satisfy TS for the `|| []` branch.
+  // Optional-chained `?.includes(...) ?? false` drops the allocation
+  // (and still returns false when the field is missing).
   isThemeDisabled: (themeId, isBuiltIn) => {
     const tp = get().policy.themePolicy || DEFAULT_THEME_POLICY;
     if (isBuiltIn) {
-      return (tp.disabledBuiltinThemes || []).includes(themeId);
+      return tp.disabledBuiltinThemes?.includes(themeId) ?? false;
     }
-    return (tp.disabledThemes || []).includes(themeId);
+    return tp.disabledThemes?.includes(themeId) ?? false;
   },
 
   isPluginForceEnabled: (pluginId) => {
-    return (get().policy.forceEnabledPlugins || []).includes(pluginId);
+    return get().policy.forceEnabledPlugins?.includes(pluginId) ?? false;
   },
 
   isPluginApproved: (pluginId) => {
-    return (get().policy.approvedPlugins || []).includes(pluginId);
+    return get().policy.approvedPlugins?.includes(pluginId) ?? false;
   },
 
   isThemeForceEnabled: (themeId) => {
-    return (get().policy.forceEnabledThemes || []).includes(themeId);
+    return get().policy.forceEnabledThemes?.includes(themeId) ?? false;
   },
 }));

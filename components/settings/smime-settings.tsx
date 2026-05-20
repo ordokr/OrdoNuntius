@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import {
   Upload,
@@ -233,13 +233,20 @@ export function SmimeSettings() {
     }
   };
 
+  // Was Object.entries().filter().map() (3 intermediate arrays) + identities.find() per match.
+  // Single-pass loop; identity lookup via Map built once per render instead of per-keyRecord.
+  const identityById = useMemo(() => {
+    const m = new Map<string, typeof identities[number]>();
+    for (const i of identities) m.set(i.id, i);
+    return m;
+  }, [identities]);
   const getBoundIdentityNames = (keyId: string): string[] => {
-    return Object.entries(identityKeyBindings)
-      .filter(([, kId]) => kId === keyId)
-      .map(([identityId]) => {
-        const identity = identities.find((i) => i.id === identityId);
-        return identity?.email ?? identityId;
-      });
+    const out: string[] = [];
+    for (const identityId in identityKeyBindings) {
+      if (identityKeyBindings[identityId] !== keyId) continue;
+      out.push(identityById.get(identityId)?.email ?? identityId);
+    }
+    return out;
   };
 
   return (

@@ -362,17 +362,30 @@ export function getPrimaryCalendarId(event: Pick<CalendarEvent, 'calendarIds'>):
   return undefined;
 }
 
+// Cache Intl.DateTimeFormat per timeZone — constructing one walks the ICU
+// timezone tables, which is non-trivial. formatIsoInTimeZone is called per
+// event during calendar serialization with the same timezone string.
+const _isoTzFormatters = new Map<string, Intl.DateTimeFormat>();
+function getIsoTzFormatter(timeZone: string): Intl.DateTimeFormat {
+  let f = _isoTzFormatters.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+    _isoTzFormatters.set(timeZone, f);
+  }
+  return f;
+}
+
 export function formatIsoInTimeZone(date: Date, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
+  const parts = getIsoTzFormatter(timeZone).formatToParts(date);
   const map: Record<string, string> = {};
   for (const part of parts) {
     if (part.type !== "literal") map[part.type] = part.value;

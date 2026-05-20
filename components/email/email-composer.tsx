@@ -351,9 +351,14 @@ export function EmailComposer({
   });
 
   const client = useAuthStore((s) => s.client);
-  const currentIdentity = selectedIdentityId
-    ? identities.find((identity) => identity.id === selectedIdentityId) || primaryIdentity
-    : primaryIdentity;
+  // useMemo: composer re-renders on every keystroke; .find() walked
+  // identities each time. Same for the signature-fallback alias branch below.
+  const currentIdentity = useMemo(
+    () => (selectedIdentityId
+      ? identities.find((identity) => identity.id === selectedIdentityId) || primaryIdentity
+      : primaryIdentity),
+    [selectedIdentityId, identities, primaryIdentity],
+  );
   // Alias identities often lack a configured signature - fall back to the primary
   // identity's signature so replies (which auto-select a matching alias) still
   // populate the user's signature.
@@ -1056,9 +1061,15 @@ export function EmailComposer({
     };
   }, []);
 
-  const toAddresses = splitTrimmed(to);
-  const bodyPlainText = plainTextMode ? body.trim() : htmlToPlainText(body).trim();
-  const hasContent = bodyPlainText || attachments.some(att => att.blobId && !att.uploading);
+  // Composer re-renders on every keystroke in any field. Memo the per-render
+  // derivations so unrelated keystrokes (subject, cc, etc.) skip the To split
+  // and (more importantly) the DOMParser run inside htmlToPlainText.
+  const toAddresses = useMemo(() => splitTrimmed(to), [to]);
+  const bodyPlainText = useMemo(
+    () => (plainTextMode ? body.trim() : htmlToPlainText(body).trim()),
+    [plainTextMode, body],
+  );
+  const hasContent = !!bodyPlainText || attachments.some(att => att.blobId && !att.uploading);
   const canSend = toAddresses.length > 0 && !!subject && hasContent;
 
   const getSendTooltip = (): string | undefined => {

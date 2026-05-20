@@ -365,10 +365,11 @@ function expandYearly(
     : [eventStart.getMonth()];
 
   if (rule.byWeekNo?.length) {
-    // Expand by ISO week numbers
+    // Expand by ISO week numbers. In-place setHours + direct push drops
+    // the intermediate .map array and the spread-push allocation.
     for (const wn of rule.byWeekNo) {
       const weekDates = datesInISOWeek(year, wn, rule.firstDayOfWeek || 'mo');
-      dates.push(...weekDates.map(d => { d.setHours(h, m, s, 0); return d; }));
+      for (const d of weekDates) { d.setHours(h, m, s, 0); dates.push(d); }
     }
   } else if (rule.byYearDay?.length) {
     // Expand by day-of-year
@@ -385,10 +386,11 @@ function expandYearly(
       }
     }
   } else if (rule.byDay?.length) {
-    // byDay with nthOfPeriod in yearly context = nth weekday of year or month
+    // byDay with nthOfPeriod in yearly context = nth weekday of year or month.
+    // Direct push loop drops the spread-push allocation per month.
     for (const mo of months) {
       const expanded = expandByDayInMonth(year, mo, rule.byDay, h, m, s);
-      dates.push(...expanded);
+      for (const d of expanded) dates.push(d);
     }
   } else if (rule.byMonthDay?.length) {
     for (const mo of months) {
@@ -424,8 +426,9 @@ function expandMonthly(
   const dates: Date[] = [];
 
   if (rule.byDay?.length) {
-    const expanded = expandByDayInMonth(year, month, rule.byDay, h, m, s);
-    dates.push(...expanded);
+    // Return expansion directly — `dates` was empty in this branch so the
+    // intermediate array + spread-push is wasted work.
+    return expandByDayInMonth(year, month, rule.byDay, h, m, s);
   } else if (rule.byMonthDay?.length) {
     for (const md of rule.byMonthDay) {
       const d = resolveMonthDay(year, month, md);

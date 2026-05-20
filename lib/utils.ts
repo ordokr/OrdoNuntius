@@ -31,7 +31,7 @@ export function firstValue<T>(rec: Record<string, T> | null | undefined): T | un
  * for-in early-return: walks at most one key. Mirror of `firstValue` but
  * returns a boolean.
  */
-export function hasAnyKey<T>(rec: Record<string, T> | null | undefined): boolean {
+export function hasAnyKey<T>(rec: Record<string, T> | null | undefined): rec is Record<string, T> {
   if (!rec) return false;
   for (const _ in rec) return true;
   return false;

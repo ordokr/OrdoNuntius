@@ -449,17 +449,18 @@ export const useSmimeStore = create<SmimeStore>()(
 
       getRecipientCerts: (emails) => {
         const { publicCerts } = get();
+        // O(emails + certs) via one lowercased-email index. Was
+        // O(emails × certs) with two `.toLowerCase()` calls per pair —
+        // composing to 50 recipients with 100 stored certs that's 10k
+        // string allocations every time the composer re-evaluates encrypt.
+        const byEmail = new Map<string, SmimePublicCert>();
+        for (const c of publicCerts) byEmail.set(c.email.toLowerCase(), c);
         const found: SmimePublicCert[] = [];
         const missing: string[] = [];
         for (const email of emails) {
-          const cert = publicCerts.find(
-            (c) => c.email.toLowerCase() === email.toLowerCase(),
-          );
-          if (cert) {
-            found.push(cert);
-          } else {
-            missing.push(email);
-          }
+          const cert = byEmail.get(email.toLowerCase());
+          if (cert) found.push(cert);
+          else missing.push(email);
         }
         return { found, missing };
       },

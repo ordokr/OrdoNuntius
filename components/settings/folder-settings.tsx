@@ -135,10 +135,24 @@ export function FolderSettings() {
   const ownMailboxes = useMemo(() => mailboxes.filter(mb => !mb.isShared), [mailboxes]);
   const folderTree = useMemo(() => buildMailboxTree(ownMailboxes), [ownMailboxes]);
 
-  const getRoleMailboxId = (role: string): string => {
-    const mb = ownMailboxes.find(m => m.role === role);
-    return mb?.id ?? '';
-  };
+  // Single-pass derivations from ownMailboxes:
+  // - mailboxByRole: was ownMailboxes.find per STANDARD_ROLES entry (6× linear scan per render).
+  // - nameCounts/parentById: were rebuilt in an IIFE inside the STANDARD_ROLES block
+  //   on every render (typing, expanding a folder, etc.) even though their input
+  //   only changes when mailboxes does.
+  const { mailboxByRole, nameCounts, parentById } = useMemo(() => {
+    const byRole = new Map<string, typeof ownMailboxes[number]>();
+    const counts = new Map<string, number>();
+    const byId = new Map<string, typeof ownMailboxes[number]>();
+    for (const mb of ownMailboxes) {
+      if (mb.role) byRole.set(mb.role, mb);
+      counts.set(mb.name, (counts.get(mb.name) || 0) + 1);
+      byId.set(mb.id, mb);
+    }
+    return { mailboxByRole: byRole, nameCounts: counts, parentById: byId };
+  }, [ownMailboxes]);
+
+  const getRoleMailboxId = (role: string): string => mailboxByRole.get(role)?.id ?? '';
 
   const getIconForMailbox = (mb: { id: string; role?: string }): LucideIcon => {
     // Custom icon takes priority for non-role folders
@@ -242,7 +256,7 @@ export function FolderSettings() {
     setIsLoading(true);
     try {
       if (mailboxId === '') {
-        const current = ownMailboxes.find(m => m.role === role);
+        const current = mailboxByRole.get(role);
         if (current) {
           await setMailboxRole(client, current.id, null);
         }
@@ -530,17 +544,11 @@ export function FolderSettings() {
         )}
       </SettingsSection>
 
-      {/* Standard Folder Roles - advanced section. Hoisted nameCounts +
-          parentById Map out of STANDARD_ROLES.map so they aren't rebuilt
-          for every role (was: O(STANDARD_ROLES × M) per render). */}
+      {/* Standard Folder Roles - advanced section. nameCounts + parentById
+          are now memoized at the component level so they're not rebuilt on
+          every unrelated re-render. */}
       <SettingsSection title={t('standard_roles')} description={t('standard_roles_description')}>
         {(() => {
-          const nameCounts = new Map<string, number>();
-          const parentById = new Map<string, typeof ownMailboxes[number]>();
-          for (const mb of ownMailboxes) {
-            nameCounts.set(mb.name, (nameCounts.get(mb.name) || 0) + 1);
-            parentById.set(mb.id, mb);
-          }
           const getParentPath = (mb: { parentId?: string; name: string }) => {
             if (!mb.parentId) return '';
             const parent = parentById.get(mb.parentId);

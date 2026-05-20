@@ -6,7 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { usePluginStore } from '@/stores/plugin-store';
 import { usePolicyStore } from '@/stores/policy-store';
 import { SettingsSection, ToggleSwitch } from './settings-section';
-import { cn } from '@/lib/utils';
+import { cn, hasAnyKey } from '@/lib/utils';
 import { AlertTriangle, Puzzle, Lock, Server } from 'lucide-react';
 import { toast } from '@/stores/toast-store';
 import type { InstalledPlugin, PluginStatus, SettingFieldSchema } from '@/lib/plugin-types';
@@ -224,7 +224,7 @@ function PluginCard({ plugin, isExpanded, isForceEnabled, isManaged, needsApprov
           )}
 
           {/* Settings (auto-generated from schema) */}
-          {plugin.settingsSchema && Object.keys(plugin.settingsSchema).length > 0 && (
+          {plugin.settingsSchema && hasAnyKey(plugin.settingsSchema) && (
             <div className="space-y-2">
               <span className="text-xs font-medium text-foreground">Settings:</span>
               {Object.entries(plugin.settingsSchema).map(([key, schema]) => (

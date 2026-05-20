@@ -13,6 +13,10 @@ import { SettingsSection, SettingItem, Select, ToggleSwitch } from './settings-s
 import { AlertTriangle, FolderSync, Loader2 } from 'lucide-react';
 import { usePolicyStore } from '@/stores/policy-store';
 
+// Hoisted: were inline `as const` literals per render — allocated each pass through the render.
+const HOVER_ACTIONS_MODES = ['inline', 'floating'] as const;
+const HOVER_ACTIONS_CORNERS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const;
+
 export function ReadingSettings() {
   const t = useTranslations('settings.email_behavior');
   const [isReorganizing, setIsReorganizing] = useState(false);
@@ -317,7 +321,7 @@ export function ReadingSettings() {
         <div className="pt-2 space-y-2">
           <label className="text-xs font-medium text-foreground">{t('hover_actions.mode_label')}</label>
           <div className="flex gap-2">
-            {(['inline', 'floating'] as const).map((mode) => (
+            {HOVER_ACTIONS_MODES.map((mode) => (
               <button
                 key={mode}
                 type="button"
@@ -339,7 +343,7 @@ export function ReadingSettings() {
           <div className="pt-1 space-y-2">
             <label className="text-xs font-medium text-foreground">{t('hover_actions.corner_label')}</label>
             <div className="grid grid-cols-2 gap-2 w-48">
-              {(['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const).map((corner) => (
+              {HOVER_ACTIONS_CORNERS.map((corner) => (
                 <button
                   key={corner}
                   type="button"

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { ContactCard } from "@/lib/jmap/types";
-import { getContactDisplayName, getContactPrimaryEmail } from "@/stores/contact-store";
+import { getContactDisplayName, getContactPrimaryEmail, contactByIdLookup } from "@/stores/contact-store";
 
 interface ContactGroupFormProps {
   group?: ContactCard | null;
@@ -48,14 +48,11 @@ export function ContactGroupForm({
     });
   }, [individuals, memberSearch]);
 
-  // Direct id→contact map: the selected-chips loop below was doing
-  // `individuals.find(c => c.id === id)` per selected id, i.e. O(S × N).
-  // One Map build per render flips this to O(N + S).
-  const individualsById = useMemo(() => {
-    const m = new Map<string, ContactCard>();
-    for (const c of individuals) m.set(c.id, c);
-    return m;
-  }, [individuals]);
+  // Use the store's shared WeakMap-cached id→contact lookup instead of
+  // rebuilding a local Map each render. When `individuals` is the same
+  // array reference as last render (common — it comes from the store
+  // memoized list), this is O(1) cache hit; otherwise lazy O(N) once.
+  const individualsById = contactByIdLookup(individuals);
 
   const toggleMember = (id: string) => {
     const next = new Set(selectedIds);
