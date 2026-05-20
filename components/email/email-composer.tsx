@@ -18,11 +18,13 @@ import { useAccountStore } from "@/stores/account-store";
 import { useSmimeStore } from "@/stores/smime-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useSettingsStore } from "@/stores/settings-store";
-import { buildMimeMessage, wrapCmsAsSmimeMessage } from "@/lib/smime/mime-builder";
+// S/MIME send pipeline modules — pkijs/asn1js-backed crypto plus a MIME
+// builder. Only loaded when the user actually sends a signed/encrypted
+// message (rare). Otherwise the composer chunk would carry ~50 KB+ of
+// crypto code that almost no message uses.
 import type { MimeAttachment } from "@/lib/smime/mime-builder";
-import { smimeSign } from "@/lib/smime/smime-sign";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
-import { smimeEncrypt } from "@/lib/smime/smime-encrypt";
+// smimeEncrypt dynamic-imported below (see S/MIME pipeline note above).
 import { useContactStore } from "@/stores/contact-store";
 import { useTemplateStore } from "@/stores/template-store";
 import { SubAddressHelper } from "@/components/identity/sub-address-helper";
@@ -1262,8 +1264,18 @@ export function EmailComposer({
       const sendAllowed = await emailHooks.onBeforeEmailSend.intercept(sendablePreview);
       if (!sendAllowed) return;
 
-      // S/MIME send pipeline: build raw MIME → sign → encrypt → sendRawEmail
+      // S/MIME send pipeline: build raw MIME → sign → encrypt → sendRawEmail.
+      // Dynamic import keeps pkijs/asn1js/mime-builder off the composer's
+      // first-paint chunk for the common case (no S/MIME).
       if ((smimeSign_ || smimeEncrypt_) && client && currentIdentity?.id) {
+        const [mimeBuilder, smimeSignMod, smimeEncryptMod] = await Promise.all([
+          import("@/lib/smime/mime-builder"),
+          import("@/lib/smime/smime-sign"),
+          import("@/lib/smime/smime-encrypt"),
+        ]);
+        const { buildMimeMessage, wrapCmsAsSmimeMessage } = mimeBuilder;
+        const { smimeSign } = smimeSignMod;
+        const { smimeEncrypt } = smimeEncryptMod;
         // 1. Resolve S/MIME key
         if (smimeSign_ && !smimeKeyRecord) {
           throw new Error('No S/MIME key bound to this identity');
