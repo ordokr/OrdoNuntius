@@ -78,7 +78,16 @@ const TotpReauthDialog = dynamic(
 );
 import { DragDropProvider } from "@/contexts/drag-drop-context";
 import { isFilterEmpty, activeFilterCount } from "@/lib/jmap/search-utils";
-import { WelcomeBanner } from "@/components/ui/welcome-banner";
+// WelcomeBanner only mounts for users who haven't dismissed onboarding.
+// Gated by a synchronous localStorage read below so returning users
+// (the majority) never fetch the chunk. First-time users get the banner
+// after a ~50ms async hop — acceptable because the banner is supplemental,
+// not blocking.
+const WelcomeBanner = dynamic(
+  () => import("@/components/ui/welcome-banner").then(m => ({ default: m.WelcomeBanner })),
+  { ssr: false, loading: () => null }
+);
+const WELCOME_ONBOARDING_KEY = "onboarding_completed";
 import { NavigationRail } from "@/components/layout/navigation-rail";
 // Lazy modal: opens only on sidebar-apps reorder.
 const SidebarAppsModal = dynamic(
@@ -120,6 +129,13 @@ export default function Home() {
   const { appName } = useConfig();
   const mailLayout = useSettingsStore((state) => state.mailLayout);
   const [showComposer, setShowComposer] = useState(false);
+  // Returning users have ONBOARDING_KEY in localStorage — never mount the
+  // dynamic welcome-banner chunk for them. First-render lazy initializer
+  // so the localStorage read runs once and stays stable across renders.
+  const [shouldMaybeShowWelcome] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try { return !localStorage.getItem(WELCOME_ONBOARDING_KEY); } catch { return false; }
+  });
   const [composerMode, setComposerMode] = useState<'compose' | 'reply' | 'replyAll' | 'forward'>('compose');
   const [composerDraftText, setComposerDraftText] = useState("");
   const [pendingDraft, setPendingDraft] = useState<ComposerDraftData | null>(null);
@@ -2476,7 +2492,7 @@ export default function Home() {
             )}
 
             <div className="flex-1 min-h-0 flex flex-col">
-            <WelcomeBanner />
+            {shouldMaybeShowWelcome && <WelcomeBanner />}
 
             <ErrorBoundary fallback={EmailListErrorFallback}>
               <EmailList
