@@ -27,9 +27,14 @@ function isValidContext(payload: unknown): payload is StalwartAuthContext {
     && typeof candidate.authHeader === 'string';
 }
 
+// Cookie options sans maxAge — built once. Was destructuring the shared
+// options object on every passthrough that re-stamps the context.
+const SESSION_COOKIE_OPTIONS = (() => {
+  const { maxAge: _maxAge, ...rest } = getCookieOptions();
+  return rest;
+})();
 function getSessionCookieOptions() {
-  const { maxAge: _maxAge, ...cookieOptions } = getCookieOptions();
-  return cookieOptions;
+  return SESSION_COOKIE_OPTIONS;
 }
 
 export function readStalwartAuthContextFromStore(
