@@ -30,7 +30,14 @@ const ContactGroupForm = dynamic(
   () => import("@/components/contacts/contact-group-form").then(m => ({ default: m.ContactGroupForm })),
   { ssr: false, loading: () => null }
 );
-import { ContactGroupDetail } from "@/components/contacts/contact-group-detail";
+// ContactGroupDetail (116 LOC + Avatar + 4 lucide icons + contact-store
+// helpers) only renders when `view === "group-detail"`. Initial view is
+// "list", so dynamic-importing ties the chunk fetch to the first group
+// open — same pattern as ContactDetail above.
+const ContactGroupDetail = dynamic(
+  () => import("@/components/contacts/contact-group-detail").then(m => ({ default: m.ContactGroupDetail })),
+  { ssr: false, loading: () => null }
+);
 import { ContactsSidebar, type ContactCategory } from "@/components/contacts/contacts-sidebar";
 // ContactImportDialog only mounts on Import click — it pulls vcard.ts (~30KB).
 const ContactImportDialog = dynamic(
