@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations, useMessages } from 'next-intl';
 import {
@@ -38,33 +39,42 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { AppearanceSettings } from '@/components/settings/appearance-settings';
-import { LayoutSettings } from '@/components/settings/layout-settings';
-import { LanguageSettings } from '@/components/settings/language-settings';
-import { ReadingSettings } from '@/components/settings/reading-settings';
-import { ComposingSettings } from '@/components/settings/composing-settings';
-import { ContentSendersSettings } from '@/components/settings/content-senders-settings';
-import { AccountSettings } from '@/components/settings/account-settings';
-import { IdentitySettings } from '@/components/settings/identity-settings';
-import { VacationSettings } from '@/components/settings/vacation-settings';
-import { CalendarSettings } from '@/components/settings/calendar-settings';
-import { CalendarManagementSettings } from '@/components/settings/calendar-management-settings';
-import { AddressBookManagementSettings } from '@/components/settings/address-book-management-settings';
-import { FilterSettings } from '@/components/settings/filter-settings';
-import { TemplateSettings } from '@/components/settings/template-settings';
-import { AboutDataSettings } from '@/components/settings/about-data-settings';
-import { DebugSettings } from '@/components/settings/debug-settings';
-import { FolderSettings } from '@/components/settings/folder-settings';
-import { KeywordSettings } from '@/components/settings/keyword-settings';
-import { AccountSecuritySettings } from '@/components/settings/account-security-settings';
-import { FilesSettingsComponent } from '@/components/settings/files-settings';
-import { ContactsSettings } from '@/components/settings/contacts-settings';
-import { SmimeSettings } from '@/components/settings/smime-settings';
-import { SidebarAppsSettings } from '@/components/settings/sidebar-apps-settings';
-import { NotificationSettings } from '@/components/settings/notification-settings';
-import { ThemesSettings } from '@/components/settings/themes-settings';
-import { PluginsSettings } from '@/components/settings/plugins-settings';
-import { ProtocolHandlerSettings } from '@/components/settings/protocol-handler-settings';
+// Settings panels render one-at-a-time based on the active tab. Lazy each so
+// only the active panel's chunk loads — was statically importing all 27.
+// Heavy panels (identity → DOMPurify, smime → pkijs/asn1js, plugins →
+// runtime, themes → compiler) were bundled together into the route's
+// initial chunk; with dynamic() each lives in its own chunk loaded on tab
+// click.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const dyn = (loader: () => Promise<{ default: React.ComponentType<any> }>) =>
+  dynamic(loader, { ssr: false, loading: () => null });
+const AppearanceSettings = dyn(() => import('@/components/settings/appearance-settings').then(m => ({ default: m.AppearanceSettings })));
+const LayoutSettings = dyn(() => import('@/components/settings/layout-settings').then(m => ({ default: m.LayoutSettings })));
+const LanguageSettings = dyn(() => import('@/components/settings/language-settings').then(m => ({ default: m.LanguageSettings })));
+const ReadingSettings = dyn(() => import('@/components/settings/reading-settings').then(m => ({ default: m.ReadingSettings })));
+const ComposingSettings = dyn(() => import('@/components/settings/composing-settings').then(m => ({ default: m.ComposingSettings })));
+const ContentSendersSettings = dyn(() => import('@/components/settings/content-senders-settings').then(m => ({ default: m.ContentSendersSettings })));
+const AccountSettings = dyn(() => import('@/components/settings/account-settings').then(m => ({ default: m.AccountSettings })));
+const IdentitySettings = dyn(() => import('@/components/settings/identity-settings').then(m => ({ default: m.IdentitySettings })));
+const VacationSettings = dyn(() => import('@/components/settings/vacation-settings').then(m => ({ default: m.VacationSettings })));
+const CalendarSettings = dyn(() => import('@/components/settings/calendar-settings').then(m => ({ default: m.CalendarSettings })));
+const CalendarManagementSettings = dyn(() => import('@/components/settings/calendar-management-settings').then(m => ({ default: m.CalendarManagementSettings })));
+const AddressBookManagementSettings = dyn(() => import('@/components/settings/address-book-management-settings').then(m => ({ default: m.AddressBookManagementSettings })));
+const FilterSettings = dyn(() => import('@/components/settings/filter-settings').then(m => ({ default: m.FilterSettings })));
+const TemplateSettings = dyn(() => import('@/components/settings/template-settings').then(m => ({ default: m.TemplateSettings })));
+const AboutDataSettings = dyn(() => import('@/components/settings/about-data-settings').then(m => ({ default: m.AboutDataSettings })));
+const DebugSettings = dyn(() => import('@/components/settings/debug-settings').then(m => ({ default: m.DebugSettings })));
+const FolderSettings = dyn(() => import('@/components/settings/folder-settings').then(m => ({ default: m.FolderSettings })));
+const KeywordSettings = dyn(() => import('@/components/settings/keyword-settings').then(m => ({ default: m.KeywordSettings })));
+const AccountSecuritySettings = dyn(() => import('@/components/settings/account-security-settings').then(m => ({ default: m.AccountSecuritySettings })));
+const FilesSettingsComponent = dyn(() => import('@/components/settings/files-settings').then(m => ({ default: m.FilesSettingsComponent })));
+const ContactsSettings = dyn(() => import('@/components/settings/contacts-settings').then(m => ({ default: m.ContactsSettings })));
+const SmimeSettings = dyn(() => import('@/components/settings/smime-settings').then(m => ({ default: m.SmimeSettings })));
+const SidebarAppsSettings = dyn(() => import('@/components/settings/sidebar-apps-settings').then(m => ({ default: m.SidebarAppsSettings })));
+const NotificationSettings = dyn(() => import('@/components/settings/notification-settings').then(m => ({ default: m.NotificationSettings })));
+const ThemesSettings = dyn(() => import('@/components/settings/themes-settings').then(m => ({ default: m.ThemesSettings })));
+const PluginsSettings = dyn(() => import('@/components/settings/plugins-settings').then(m => ({ default: m.PluginsSettings })));
+const ProtocolHandlerSettings = dyn(() => import('@/components/settings/protocol-handler-settings').then(m => ({ default: m.ProtocolHandlerSettings })));
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore, redirectToLogin } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
