@@ -10,7 +10,7 @@ import {
   SUPPORTED_SUB_ADDRESS_DELIMITERS,
   isSupportedSubAddressDelimiter,
   isValidSubAddressDelimiter,
-} from '@/lib/sub-addressing';
+} from '@/lib/sub-address-delimiter';
 
 const CUSTOM_DELIMITER_SENTINEL = '__custom__';
 const DEFAULT_CUSTOM_DELIMITER = '~';

@@ -14,24 +14,22 @@ const TAG_CHARS_REGEX = /^[a-zA-Z0-9-]+$/;
 // Module-scope — was allocated as a literal /[^a-zA-Z0-9-]/g inside generateSubAddress.
 const TAG_SANITIZE_REGEX = /[^a-zA-Z0-9-]/g;
 
-export const DEFAULT_SUB_ADDRESS_DELIMITER = '+';
-export const SUPPORTED_SUB_ADDRESS_DELIMITERS = ['+', '-', '.', '='] as const;
-export type SubAddressDelimiterPreset = (typeof SUPPORTED_SUB_ADDRESS_DELIMITERS)[number];
-// Set-backed membership — O(1) vs O(n) Array.includes.
-const SUPPORTED_DELIMITER_SET = new Set<string>(SUPPORTED_SUB_ADDRESS_DELIMITERS);
-
-export function isSupportedSubAddressDelimiter(value: string): value is SubAddressDelimiterPreset {
-  return SUPPORTED_DELIMITER_SET.has(value);
-}
-
-// RFC 5321 atext "special" characters, minus alphanumerics and "@". A custom
-// delimiter must be exactly one of these - they're safe to embed in a local
-// part and unambiguously separate the user from the tag.
-const VALID_DELIMITER_REGEX = /^[!#$%&'*+\-./=?^_`{|}~]$/;
-
-export function isValidSubAddressDelimiter(value: unknown): value is string {
-  return typeof value === 'string' && VALID_DELIMITER_REGEX.test(value);
-}
+// Delimiter primitives moved to lib/sub-address-delimiter.ts so settings-store
+// can pull them without dragging the full parse/generate machinery below.
+// Re-exported here so existing consumers keep working unchanged.
+import {
+  DEFAULT_SUB_ADDRESS_DELIMITER,
+  SUPPORTED_SUB_ADDRESS_DELIMITERS,
+  isSupportedSubAddressDelimiter,
+  isValidSubAddressDelimiter,
+} from './sub-address-delimiter';
+export {
+  DEFAULT_SUB_ADDRESS_DELIMITER,
+  SUPPORTED_SUB_ADDRESS_DELIMITERS,
+  isSupportedSubAddressDelimiter,
+  isValidSubAddressDelimiter,
+};
+export type { SubAddressDelimiterPreset } from './sub-address-delimiter';
 
 export type TagValidationErrorCode =
   | 'EMPTY'

@@ -4,10 +4,12 @@ import { useThemeStore } from './theme-store';
 import { useLocaleStore } from './locale-store';
 import type { NotificationSoundChoice } from '@/lib/notification-sound';
 import { apiFetch } from '@/lib/browser-navigation';
+// Delimiter primitives only — the full sub-addressing module (parse/generate,
+// tag validation, RFC 5321 atext) is lazy through the email-composer chunk.
 import {
   DEFAULT_SUB_ADDRESS_DELIMITER,
   isValidSubAddressDelimiter,
-} from '@/lib/sub-addressing';
+} from '@/lib/sub-address-delimiter';
 
 // Use console directly to avoid circular dependency with lib/debug.ts
 // (debug.ts imports useSettingsStore for debugMode check)
