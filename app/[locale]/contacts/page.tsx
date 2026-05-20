@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { ArrowLeft, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,13 +9,25 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { ContactList } from "@/components/contacts/contact-list";
 import { ContactDetail } from "@/components/contacts/contact-detail";
-import { ContactForm } from "@/components/contacts/contact-form";
-import { ContactGroupForm } from "@/components/contacts/contact-group-form";
+// ContactForm (~50KB) only mounts in create/edit views and bundles a large
+// vcard helper tree; defer past initial paint.
+const ContactForm = dynamic(
+  () => import("@/components/contacts/contact-form").then(m => ({ default: m.ContactForm })),
+  { ssr: false, loading: () => null }
+);
+// ContactGroupForm only mounts in group-create/edit; defer.
+const ContactGroupForm = dynamic(
+  () => import("@/components/contacts/contact-group-form").then(m => ({ default: m.ContactGroupForm })),
+  { ssr: false, loading: () => null }
+);
 import { ContactGroupDetail } from "@/components/contacts/contact-group-detail";
 import { ContactsSidebar, type ContactCategory } from "@/components/contacts/contacts-sidebar";
-import { ContactImportDialog } from "@/components/contacts/contact-import-dialog";
+// ContactImportDialog only mounts on Import click — it pulls vcard.ts (~30KB).
+const ContactImportDialog = dynamic(
+  () => import("@/components/contacts/contact-import-dialog").then(m => ({ default: m.ContactImportDialog })),
+  { ssr: false, loading: () => null }
+);
 import { RenameDialog } from "@/components/files/rename-dialog";
-import { exportContacts } from "@/components/contacts/contact-export";
 import { useShallow } from "zustand/react/shallow";
 import { useContactStore, getContactDisplayName, countActiveGroupMembers, contactByIdLookup } from "@/stores/contact-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
@@ -29,7 +42,11 @@ import { ResizeHandle } from "@/components/layout/resize-handle";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
 import type { ContactCard, AddressBook, AddressBookRights } from "@/lib/jmap/types";
-import { ShareCollectionDialog } from "@/components/settings/share-collection-dialog";
+// ShareCollectionDialog only mounts on Share click.
+const ShareCollectionDialog = dynamic(
+  () => import("@/components/settings/share-collection-dialog").then(m => ({ default: m.ShareCollectionDialog })),
+  { ssr: false, loading: () => null }
+);
 
 type View =
   | "list"
@@ -581,9 +598,12 @@ export default function ContactsPage() {
     setView("bulk-add-to-group");
   };
 
-  const handleBulkExport = () => {
+  const handleBulkExport = async () => {
     const toExport = contacts.filter(c => selectedContactIds.has(c.id));
     if (toExport.length > 0) {
+      // Dynamic import: contact-export pulls vcard.ts (~30KB) which the
+      // contacts route doesn't need until the user actually exports.
+      const { exportContacts } = await import("@/components/contacts/contact-export");
       exportContacts(toExport);
       toast.success(t("export.success", { count: toExport.length }));
       clearSelection();

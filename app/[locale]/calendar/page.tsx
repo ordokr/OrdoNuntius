@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo, type TouchEvent as ReactTouchEvent } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
@@ -27,20 +28,46 @@ import { CalendarDayView } from "@/components/calendar/calendar-day-view";
 import { CalendarAgendaView } from "@/components/calendar/calendar-agenda-view";
 import { TaskListView } from "@/components/calendar/task-list-view";
 import { TaskToolbar } from "@/components/calendar/task-toolbar";
-import { TaskModal } from "@/components/calendar/task-modal";
+// TaskModal mounts only on task create/edit click; defer past first paint.
+const TaskModal = dynamic(
+  () => import("@/components/calendar/task-modal").then(m => ({ default: m.TaskModal })),
+  { ssr: false, loading: () => null }
+);
 import { MiniCalendar } from "@/components/calendar/mini-calendar";
 import { CalendarSidebarPanel } from "@/components/calendar/calendar-sidebar-panel";
-import { EventModal, type PendingEventPreview } from "@/components/calendar/event-modal";
+import type { PendingEventPreview } from "@/components/calendar/event-modal";
+// EventModal is the biggest cold UI on this route (~45KB src) — only
+// mounts when the user clicks Create/Edit/Quick-create.
+const EventModal = dynamic(
+  () => import("@/components/calendar/event-modal").then(m => ({ default: m.EventModal })),
+  { ssr: false, loading: () => null }
+);
 import { EventDetailPopover } from "@/components/calendar/event-detail-popover";
 import { EventContextMenu } from "@/components/calendar/event-context-menu";
 import { EmptySpaceContextMenu } from "@/components/calendar/empty-space-context-menu";
 import { useContextMenu } from "@/hooks/use-context-menu";
 import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
-import { downloadEventICS } from "@/lib/calendar-ics-export";
-import { ICalImportModal } from "@/components/calendar/ical-import-modal";
-import { ICalSubscriptionModal } from "@/components/calendar/ical-subscription-modal";
-import { ProtocolAccountPicker } from "@/components/protocol/protocol-account-picker";
-import { RecurrenceScopeDialog, type RecurrenceEditScope } from "@/components/calendar/recurrence-scope-dialog";
+// downloadEventICS is dynamic-imported at the Export click site.
+// iCal import + subscription modals open from toolbar dropdown actions.
+const ICalImportModal = dynamic(
+  () => import("@/components/calendar/ical-import-modal").then(m => ({ default: m.ICalImportModal })),
+  { ssr: false, loading: () => null }
+);
+const ICalSubscriptionModal = dynamic(
+  () => import("@/components/calendar/ical-subscription-modal").then(m => ({ default: m.ICalSubscriptionModal })),
+  { ssr: false, loading: () => null }
+);
+// ProtocolAccountPicker mounts only when handling a webcal: launch link.
+const ProtocolAccountPicker = dynamic(
+  () => import("@/components/protocol/protocol-account-picker").then(m => ({ default: m.ProtocolAccountPicker })),
+  { ssr: false, loading: () => null }
+);
+// RecurrenceScopeDialog mounts only on edit/delete of a recurring event.
+import type { RecurrenceEditScope } from "@/components/calendar/recurrence-scope-dialog";
+const RecurrenceScopeDialog = dynamic(
+  () => import("@/components/calendar/recurrence-scope-dialog").then(m => ({ default: m.RecurrenceScopeDialog })),
+  { ssr: false, loading: () => null }
+);
 import { NavigationRail } from "@/components/layout/navigation-rail";
 import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
 import { InlineAppView } from "@/components/layout/inline-app-view";
@@ -52,10 +79,18 @@ import { useTaskStore } from "@/stores/task-store";
 import { useContactStore } from "@/stores/contact-store";
 import { cn, hasAnyKey } from "@/lib/utils";
 import type { Calendar, CalendarEvent, CalendarParticipant, CalendarRights } from "@/lib/jmap/types";
-import { ShareCollectionDialog } from "@/components/settings/share-collection-dialog";
+// ShareCollectionDialog only mounts on Share click.
+const ShareCollectionDialog = dynamic(
+  () => import("@/components/settings/share-collection-dialog").then(m => ({ default: m.ShareCollectionDialog })),
+  { ssr: false, loading: () => null }
+);
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
-import { CreateCalendarModal } from "@/components/calendar/create-calendar-modal";
+// CreateCalendarModal only mounts when adding a new calendar.
+const CreateCalendarModal = dynamic(
+  () => import("@/components/calendar/create-calendar-modal").then(m => ({ default: m.CreateCalendarModal })),
+  { ssr: false, loading: () => null }
+);
 import { getUserParticipantId } from "@/lib/calendar-participants";
 import { generateBirthdayEvents, createBirthdayCalendar, BIRTHDAY_CALENDAR_ID } from "@/lib/birthday-calendar";
 import { debug, isDebugEnabled } from "@/lib/debug";
@@ -987,8 +1022,11 @@ export default function CalendarPage() {
     }
   }, [client, createEvent, openEditModal, t]);
 
-  const handleExportICS = useCallback((event: CalendarEvent) => {
+  const handleExportICS = useCallback(async (event: CalendarEvent) => {
     try {
+      // Lazy import: ICS export bundles calendar serialization helpers
+      // not needed until the user clicks Export.
+      const { downloadEventICS } = await import("@/lib/calendar-ics-export");
       downloadEventICS(event);
       toast.success(t("notifications.event_exported"));
     } catch {
