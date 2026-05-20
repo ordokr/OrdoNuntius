@@ -25,9 +25,20 @@ import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { CalendarMonthView } from "@/components/calendar/calendar-month-view";
 import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
 import { CalendarDayView } from "@/components/calendar/calendar-day-view";
-import { CalendarAgendaView } from "@/components/calendar/calendar-agenda-view";
-import { TaskListView } from "@/components/calendar/task-list-view";
-import { TaskToolbar } from "@/components/calendar/task-toolbar";
+// Agenda + tasks views are only rendered when viewMode flips to 'agenda'
+// or 'tasks'. Default views (month/week/day) never need them — defer.
+const CalendarAgendaView = dynamic(
+  () => import("@/components/calendar/calendar-agenda-view").then(m => ({ default: m.CalendarAgendaView })),
+  { ssr: false, loading: () => null }
+);
+const TaskListView = dynamic(
+  () => import("@/components/calendar/task-list-view").then(m => ({ default: m.TaskListView })),
+  { ssr: false, loading: () => null }
+);
+const TaskToolbar = dynamic(
+  () => import("@/components/calendar/task-toolbar").then(m => ({ default: m.TaskToolbar })),
+  { ssr: false, loading: () => null }
+);
 // TaskModal mounts only on task create/edit click; defer past first paint.
 const TaskModal = dynamic(
   () => import("@/components/calendar/task-modal").then(m => ({ default: m.TaskModal })),
