@@ -15,6 +15,11 @@ import { useCalendarStore } from "@/stores/calendar-store";
 import type { PendingEventPreview } from "./event-modal";
 import { toast } from "@/stores/toast-store";
 
+// Constant — hoisted out of render so the literal isn't reallocated
+// per CalendarMonthView render. Order depends on firstDayOfWeek (0 = Sun).
+const DAY_HEADERS_SUNDAY_FIRST = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+const DAY_HEADERS_MONDAY_FIRST = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+
 interface CalendarMonthViewProps {
   selectedDate: Date;
   events: CalendarEvent[];
@@ -86,9 +91,7 @@ export function CalendarMonthView({
     return map;
   }, [events]);
 
-  const dayHeaders = firstDayOfWeek === 0
-    ? ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const
-    : ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+  const dayHeaders = firstDayOfWeek === 0 ? DAY_HEADERS_SUNDAY_FIRST : DAY_HEADERS_MONDAY_FIRST;
 
   const weeks = useMemo(() => {
     const result: Date[][] = [];
