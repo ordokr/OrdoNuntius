@@ -2,6 +2,15 @@ import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
 import { parseCertificateDer } from './certificate-utils';
 
+// Lazy module-level CryptoEngine — was reconstructed per sign call.
+let _webcryptoEngine: pkijs.CryptoEngine | null = null;
+function getWebcryptoEngine(): pkijs.CryptoEngine {
+  if (!_webcryptoEngine) {
+    _webcryptoEngine = new pkijs.CryptoEngine({ crypto, subtle: crypto.subtle, name: 'webcrypto' });
+  }
+  return _webcryptoEngine;
+}
+
 /**
  * Produce an opaque CMS SignedData wrapping the given MIME content.
  *
@@ -17,8 +26,12 @@ export async function smimeSign(
   // Parse signer certificate
   const signerCert = parseCertificateDer(signerCertDer);
 
-  // Parse chain certificates
-  const chainCerts = chainCertsDer.map((der) => parseCertificateDer(der));
+  // Pre-sized certs array: [signer, ...chain] without spread alloc.
+  const certificates: pkijs.Certificate[] = new Array(chainCertsDer.length + 1);
+  certificates[0] = signerCert;
+  for (let i = 0; i < chainCertsDer.length; i++) {
+    certificates[i + 1] = parseCertificateDer(chainCertsDer[i]);
+  }
 
   // Build CMS SignedData
   const cmsSigned = new pkijs.SignedData({
@@ -36,7 +49,7 @@ export async function smimeSign(
         }),
       }),
     ],
-    certificates: [signerCert, ...chainCerts],
+    certificates,
   });
 
   // Determine signing algorithm from the key
@@ -52,12 +65,8 @@ export async function smimeSign(
     _signAlg = 'RSASSA-PKCS1-v1_5';
   }
 
-  // Sign
-  await cmsSigned.sign(privateKey, 0, hashAlgorithm, undefined, new pkijs.CryptoEngine({
-    crypto: crypto,
-    subtle: crypto.subtle,
-    name: 'webcrypto',
-  }));
+  // Sign — reuse module-level engine.
+  await cmsSigned.sign(privateKey, 0, hashAlgorithm, undefined, getWebcryptoEngine());
 
   // Wrap in ContentInfo
   const cms = new pkijs.ContentInfo({

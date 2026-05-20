@@ -9,12 +9,20 @@ const PLACEHOLDER_REGEX = /\{\{(\w+)\}\}/g;
 const PLACEHOLDER_TEST_REGEX = /\{\{(\w+)\}\}/;
 const MAX_TEMPLATE_NAME_LENGTH = 200;
 const STRIP_HTML_CONFIG = { ALLOWED_TAGS: [] as string[], ALLOWED_ATTR: [] as string[] };
+// Set-backed membership check — O(1) vs O(n) Array.includes scan per call.
+const BUILT_IN_PLACEHOLDER_SET = new Set<string>(BUILT_IN_PLACEHOLDERS);
 
 export function extractPlaceholders(text: string): string[] {
-  // `matchAll` is stateless — no `new RegExp(...)` allocation per call.
-  const matches = new Set<string>();
-  for (const m of text.matchAll(PLACEHOLDER_REGEX)) matches.add(m[1]);
-  return Array.from(matches);
+  // Push-on-first-see — drops the Set→Array spread copy by deduping in place.
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const m of text.matchAll(PLACEHOLDER_REGEX)) {
+    const name = m[1];
+    if (seen.has(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  return out;
 }
 
 export function substitutePlaceholders(
@@ -67,17 +75,24 @@ export function getPlaceholdersFromTemplate(template: EmailTemplate): string[] {
 }
 
 export function isBuiltInPlaceholder(name: string): boolean {
-  return (BUILT_IN_PLACEHOLDERS as readonly string[]).includes(name);
+  return BUILT_IN_PLACEHOLDER_SET.has(name);
 }
 
 export function filterTemplates(templates: EmailTemplate[], query: string): EmailTemplate[] {
   const lower = query.toLowerCase();
-  return templates.filter(
-    (t) =>
+  // Direct push loop — drops the .filter() callback frame allocation per template.
+  const out: EmailTemplate[] = [];
+  for (let i = 0; i < templates.length; i++) {
+    const t = templates[i];
+    if (
       t.name.toLowerCase().includes(lower) ||
       t.subject.toLowerCase().includes(lower) ||
       t.category.toLowerCase().includes(lower)
-  );
+    ) {
+      out.push(t);
+    }
+  }
+  return out;
 }
 
 function sanitizeText(value: unknown): string {

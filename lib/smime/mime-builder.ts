@@ -189,31 +189,39 @@ function formatHeader(name: string, value: string): string {
   return parts.join(CRLF);
 }
 
+// Pre-computed uppercase hex pairs for RFC 2047 Q-encoding.
+const HEX_PAIRS_UPPER = Array.from({ length: 256 }, (_, i) => i.toString(16).toUpperCase().padStart(2, '0'));
+
 function encodeHeaderValue(value: string): string {
   // Use RFC 2047 encoded-word if non-ASCII
   if (/^[\x20-\x7e]*$/.test(value)) return value;
-  const encoded = Array.from(new TextEncoder().encode(value))
-    .map((b) => {
-      if (
-        (b >= 0x30 && b <= 0x39) || // 0-9
-        (b >= 0x41 && b <= 0x5a) || // A-Z
-        (b >= 0x61 && b <= 0x7a)    // a-z
-      ) {
-        return String.fromCharCode(b);
-      }
-      return '=' + b.toString(16).toUpperCase().padStart(2, '0');
-    })
-    .join('');
+  // Single-pass build — was Array.from + .map + .join (3 array allocs).
+  const bytes = new TextEncoder().encode(value);
+  let encoded = '';
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i];
+    if (
+      (b >= 0x30 && b <= 0x39) || // 0-9
+      (b >= 0x41 && b <= 0x5a) || // A-Z
+      (b >= 0x61 && b <= 0x7a)    // a-z
+    ) {
+      encoded += String.fromCharCode(b);
+    } else {
+      encoded += '=' + HEX_PAIRS_UPPER[b];
+    }
+  }
   return `=?UTF-8?Q?${encoded}?=`;
 }
 
+// Module-level — was rebuilt on every formatDate call.
+const RFC5322_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const RFC5322_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 function formatDate(date: Date): string {
   // RFC 5322 date format
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const d = days[date.getUTCDay()];
+  const d = RFC5322_DAYS[date.getUTCDay()];
   const dd = date.getUTCDate();
-  const m = months[date.getUTCMonth()];
+  const m = RFC5322_MONTHS[date.getUTCMonth()];
   const y = date.getUTCFullYear();
   const hh = date.getUTCHours().toString().padStart(2, '0');
   const mm = date.getUTCMinutes().toString().padStart(2, '0');

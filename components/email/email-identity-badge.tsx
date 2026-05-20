@@ -46,9 +46,9 @@ function EmailIdentityBadgeImpl({
 
   // Check if email was sent TO a sub-address (received email)
   let receivedToTag: string | null = null;
-  if (!matchingIdentity) {
-    // Check all TO addresses for sub-address tags matching user's identities
-    for (const recipient of email.to || []) {
+  if (!matchingIdentity && email.to) {
+    // Skip the `|| []` literal allocation; guard at the if.
+    for (const recipient of email.to) {
       const parsedTo = parseSubAddress(recipient.email, subAddressDelimiter);
       if (parsedTo.tag) {
         // Check if this base email matches any of the user's identities

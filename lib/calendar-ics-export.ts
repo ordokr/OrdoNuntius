@@ -65,9 +65,13 @@ function pushFrequencyRule(lines: string[], event: CalendarEvent): void {
   if (rule.count != null) parts.push(`COUNT=${rule.count}`);
   if (rule.until) parts.push(`UNTIL=${stripDateSeparators(rule.until)}`);
   if (rule.byDay?.length) {
-    const days = rule.byDay
-      .map((d) => `${d.nthOfPeriod ?? ""}${d.day.toUpperCase()}`)
-      .join(",");
+    // Single-pass concat — drops the intermediate map array.
+    let days = '';
+    for (let i = 0; i < rule.byDay.length; i++) {
+      const d = rule.byDay[i];
+      if (i > 0) days += ',';
+      days += `${d.nthOfPeriod ?? ''}${d.day.toUpperCase()}`;
+    }
     parts.push(`BYDAY=${days}`);
   }
   if (rule.byMonthDay?.length) parts.push(`BYMONTHDAY=${rule.byMonthDay.join(",")}`);
@@ -178,7 +182,14 @@ export function eventToICS(event: CalendarEvent): string {
   lines.push("END:VEVENT");
   lines.push("END:VCALENDAR");
 
-  return lines.map(foldLine).join("\r\n") + "\r\n";
+  // Single concat — was lines.map(foldLine).join — drops the intermediate
+  // folded-lines array (N strings) for the final serialisation.
+  let out = '';
+  for (let i = 0; i < lines.length; i++) {
+    if (i > 0) out += '\r\n';
+    out += foldLine(lines[i]);
+  }
+  return out + '\r\n';
 }
 
 function sanitizeFilename(name: string): string {

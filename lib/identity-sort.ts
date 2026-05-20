@@ -55,10 +55,16 @@ export function sortIdentities(
   for (let i = 0; i < decorated.length; i++) sorted[i] = decorated[i].id;
 
   if (preferredPrimaryId) {
-    const idx = sorted.findIndex(id => id.id === preferredPrimaryId);
+    // Manual shift — drops splice's leaked-array return and unshift's
+    // re-index of every element. Single linear scan + N-1 in-place moves.
+    let idx = -1;
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].id === preferredPrimaryId) { idx = i; break; }
+    }
     if (idx > 0) {
-      const [preferred] = sorted.splice(idx, 1);
-      sorted.unshift(preferred);
+      const preferred = sorted[idx];
+      for (let i = idx; i > 0; i--) sorted[i] = sorted[i - 1];
+      sorted[0] = preferred;
     }
   }
 

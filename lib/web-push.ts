@@ -34,9 +34,11 @@ const PUSH_TYPES = ['EmailDelivery'] as const;
 
 function sameTypes(a: readonly string[] | null | undefined, b: readonly string[]): boolean {
   if (!a || a.length !== b.length) return false;
-  const sortedA = [...a].sort();
-  const sortedB = [...b].sort();
-  return sortedA.every((t, i) => t === sortedB[i]);
+  // Set-based comparison — drops two spread copies + two sorts + every-callback.
+  // O(n) instead of O(n log n) and zero array allocation.
+  const set = new Set(a);
+  for (let i = 0; i < b.length; i++) if (!set.has(b[i])) return false;
+  return true;
 }
 
 export interface EnableWebPushParams {

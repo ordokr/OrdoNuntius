@@ -73,24 +73,35 @@ function rdnToString(rdn: pkijs.RelativeDistinguishedNames): string {
     .join(', ');
 }
 
+// Module-level — was rebuilt per RDN typesAndValues entry.
+const OID_NAME_MAP: Record<string, string> = {
+  '2.5.4.3': 'CN',
+  '2.5.4.6': 'C',
+  '2.5.4.7': 'L',
+  '2.5.4.8': 'ST',
+  '2.5.4.10': 'O',
+  '2.5.4.11': 'OU',
+  '1.2.840.113549.1.9.1': 'E',
+};
+
 function oidToName(oid: string): string {
-  const map: Record<string, string> = {
-    '2.5.4.3': 'CN',
-    '2.5.4.6': 'C',
-    '2.5.4.7': 'L',
-    '2.5.4.8': 'ST',
-    '2.5.4.10': 'O',
-    '2.5.4.11': 'OU',
-    '1.2.840.113549.1.9.1': 'E',
-  };
-  return map[oid] ?? oid;
+  return OID_NAME_MAP[oid] ?? oid;
+}
+
+// Pre-computed byte → hex lookup — drops the Array.from + map + join chain
+// (two N-sized intermediate arrays) for each fingerprint.
+const HEX_PAIRS = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
+
+function bytesToColonHex(bytes: Uint8Array): string {
+  if (bytes.length === 0) return '';
+  let s = HEX_PAIRS[bytes[0]];
+  for (let i = 1; i < bytes.length; i++) s += ':' + HEX_PAIRS[bytes[i]];
+  return s;
 }
 
 export async function computeFingerprint(der: ArrayBuffer): Promise<string> {
   const hash = await crypto.subtle.digest('SHA-256', new Uint8Array(der));
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join(':');
+  return bytesToColonHex(new Uint8Array(hash));
 }
 
 function extractAlgorithm(cert: pkijs.Certificate): string {
@@ -113,17 +124,19 @@ function extractAlgorithm(cert: pkijs.Certificate): string {
     const params = cert.subjectPublicKeyInfo.algorithm.algorithmParams;
     if (params instanceof asn1js.ObjectIdentifier) {
       const curveOid = params.valueBlock.toString();
-      const curves: Record<string, string> = {
-        '1.2.840.10045.3.1.7': 'ECDSA-P256',
-        '1.3.132.0.34': 'ECDSA-P384',
-        '1.3.132.0.35': 'ECDSA-P521',
-      };
-      return curves[curveOid] ?? 'ECDSA';
+      return ECDSA_CURVES[curveOid] ?? 'ECDSA';
     }
     return 'ECDSA';
   }
   return algOid;
 }
+
+// Module-level curve table — was rebuilt per extractAlgorithm call.
+const ECDSA_CURVES: Record<string, string> = {
+  '1.2.840.10045.3.1.7': 'ECDSA-P256',
+  '1.3.132.0.34': 'ECDSA-P384',
+  '1.3.132.0.35': 'ECDSA-P521',
+};
 
 function extractKeyUsage(cert: pkijs.Certificate): string[] | undefined {
   const ext = cert.extensions?.find((e) => e.extnID === '2.5.29.15');
@@ -247,9 +260,7 @@ export async function extractCertificateInfo(
     subject: rdnToString(cert.subject),
     issuer: rdnToString(cert.issuer),
     serialNumber: cert.serialNumber.valueBlock.valueHexView
-      ? Array.from(new Uint8Array(cert.serialNumber.valueBlock.valueHexView))
-          .map((b) => b.toString(16).padStart(2, '0'))
-          .join(':')
+      ? bytesToColonHex(new Uint8Array(cert.serialNumber.valueBlock.valueHexView))
       : cert.serialNumber.valueBlock.toString(),
     notBefore: cert.notBefore.value.toISOString(),
     notAfter: cert.notAfter.value.toISOString(),

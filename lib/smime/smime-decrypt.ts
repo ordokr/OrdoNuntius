@@ -329,6 +329,18 @@ function findMatchingKeyRecords(
   return matches;
 }
 
+// Pre-computed byte → hex lookup. Avoids Buffer.from + toString('hex')
+// alloc per recipient match (Buffer wraps + decodes the view).
+const HEX_PAIRS = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
+function bytesToHex(view: ArrayBuffer | ArrayBufferView): string {
+  const bytes = view instanceof ArrayBuffer
+    ? new Uint8Array(view)
+    : new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) hex += HEX_PAIRS[bytes[i]];
+  return hex;
+}
+
 function matchesKeyTransRecipient(
   recipientInfo: pkijs.KeyTransRecipientInfo,
   keyRecord: SmimeKeyRecord,
@@ -342,9 +354,9 @@ function matchesKeyTransRecipient(
       if (certAsn1.offset === -1) return false;
       const cert = new pkijs.Certificate({ schema: certAsn1.result });
 
-      // Compare serial numbers
-      const ridSerial = Buffer.from(rid.serialNumber.valueBlock.valueHexView).toString('hex');
-      const certSerial = Buffer.from(cert.serialNumber.valueBlock.valueHexView).toString('hex');
+      // Compare serial numbers via lookup-table hex (drop Buffer.from alloc)
+      const ridSerial = bytesToHex(rid.serialNumber.valueBlock.valueHexView);
+      const certSerial = bytesToHex(cert.serialNumber.valueBlock.valueHexView);
       if (ridSerial !== certSerial) return false;
 
       // Compare issuers (compare DER encoding)

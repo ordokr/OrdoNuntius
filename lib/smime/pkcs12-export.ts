@@ -74,30 +74,24 @@ export async function exportPkcs12(
     ],
   });
 
-  // Create cert bags
-  const certBags = [
-    new pkijs.SafeBag({
-      bagId: '1.2.840.113549.1.12.10.1.3', // certBag
-      bagValue: new pkijs.CertBag({
-        parsedValue: leafCert,
+  // Create cert bags — pre-sized push loop drops the spread + .map intermediate array.
+  const certBags: pkijs.SafeBag[] = new Array(chainCerts.length + 1);
+  certBags[0] = new pkijs.SafeBag({
+    bagId: '1.2.840.113549.1.12.10.1.3', // certBag
+    bagValue: new pkijs.CertBag({ parsedValue: leafCert }),
+    bagAttributes: [
+      new pkijs.Attribute({
+        type: '1.2.840.113549.1.9.20',
+        values: [new asn1js.BmpString({ value: record.email })],
       }),
-      bagAttributes: [
-        new pkijs.Attribute({
-          type: '1.2.840.113549.1.9.20',
-          values: [new asn1js.BmpString({ value: record.email })],
-        }),
-      ],
-    }),
-    ...chainCerts.map(
-      (cert) =>
-        new pkijs.SafeBag({
-          bagId: '1.2.840.113549.1.12.10.1.3',
-          bagValue: new pkijs.CertBag({
-            parsedValue: cert,
-          }),
-        }),
-    ),
-  ];
+    ],
+  });
+  for (let i = 0; i < chainCerts.length; i++) {
+    certBags[i + 1] = new pkijs.SafeBag({
+      bagId: '1.2.840.113549.1.12.10.1.3',
+      bagValue: new pkijs.CertBag({ parsedValue: chainCerts[i] }),
+    });
+  }
 
   // Build authenticated safe with two SafeContents:
   // 1. Key bag (password-encrypted)

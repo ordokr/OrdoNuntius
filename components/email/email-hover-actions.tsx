@@ -87,9 +87,11 @@ function EmailHoverActionsImpl({
   if (isMobile) return null;
   if (hoverActions.length === 0) return null;
 
-  const handleAction = (e: React.MouseEvent, action: HoverAction) => {
+  // Single delegated handler reads data-action; avoids N per-button closure allocations per render.
+  const handleAction = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     e.preventDefault();
+    const action = e.currentTarget.dataset.action as HoverAction | undefined;
     switch (action) {
       case "delete":
         onDelete?.();
@@ -126,7 +128,8 @@ function EmailHoverActionsImpl({
     return (
       <button
         key={actionId}
-        onClick={(e) => handleAction(e, actionId)}
+        data-action={actionId}
+        onClick={handleAction}
         title={t(config.titleKey)}
         className={cn(
           "p-1.5 rounded-md transition-colors duration-100 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10",

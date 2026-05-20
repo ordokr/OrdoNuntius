@@ -2,6 +2,12 @@ import { splitTrimmed } from '@/lib/utils';
 
 type RGB = { r: number; g: number; b: number; a?: number };
 
+// Module-scope regexes — color funcs run per inline-style prop per email.
+const HEX_REGEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+const RGB_REGEX = /^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/;
+const HSL_REGEX = /^hsla?\((\d+),\s*([\d.]+)%,\s*([\d.]+)%(?:,\s*([\d.]+))?\)$/;
+const BG_COLOR_MATCH_REGEX = /#[0-9a-f]{3,6}|rgba?\([^)]+\)|hsla?\([^)]+\)|[a-z]+/i;
+
 const namedColors: Record<string, string> = {
   transparent: 'rgba(0,0,0,0)',
   black: '#000000',
@@ -44,7 +50,7 @@ export function parseColor(colorString: string): RGB | null {
     return { r: 0, g: 0, b: 0, a: 0 };
   }
 
-  const hexMatch = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  const hexMatch = color.match(HEX_REGEX);
   if (hexMatch) {
     const hex = hexMatch[1];
     if (hex.length === 3) {
@@ -61,7 +67,7 @@ export function parseColor(colorString: string): RGB | null {
     };
   }
 
-  const rgbMatch = color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/);
+  const rgbMatch = color.match(RGB_REGEX);
   if (rgbMatch) {
     const r = parseInt(rgbMatch[1], 10);
     const g = parseInt(rgbMatch[2], 10);
@@ -78,7 +84,7 @@ export function parseColor(colorString: string): RGB | null {
     return { r, g, b, a };
   }
 
-  const hslMatch = color.match(/^hsla?\((\d+),\s*([\d.]+)%,\s*([\d.]+)%(?:,\s*([\d.]+))?\)$/);
+  const hslMatch = color.match(HSL_REGEX);
   if (hslMatch) {
     const h = parseInt(hslMatch[1], 10) / 360;
     const s = parseFloat(hslMatch[2]) / 100;
@@ -108,12 +114,14 @@ export function parseColor(colorString: string): RGB | null {
   return null;
 }
 
+// Hot path — was allocating a 3-element tmp array + map per call.
+function srgbChannel(c: number): number {
+  const val = c / 255;
+  return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
+}
+
 export function getLuminance(r: number, g: number, b: number): number {
-  const [rs, gs, bs] = [r, g, b].map((c) => {
-    const val = c / 255;
-    return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+  return 0.2126 * srgbChannel(r) + 0.7152 * srgbChannel(g) + 0.0722 * srgbChannel(b);
 }
 
 export function isDarkColor(colorString: string): boolean {
@@ -173,47 +181,47 @@ export function transformInlineStyles(cssText: string, theme: 'light' | 'dark'):
 
   const styleProps = splitTrimmed(cssText, ';');
 
-  const transformedProps = styleProps.map((prop) => {
+  // Pre-sized array — drop the .map() callback frame overhead.
+  // Merged color/border-color branches — identical bodies.
+  const transformedProps: string[] = new Array(styleProps.length);
+  for (let i = 0; i < styleProps.length; i++) {
+    const prop = styleProps[i];
     const colonIndex = prop.indexOf(':');
-    if (colonIndex === -1) return prop;
+    if (colonIndex === -1) { transformedProps[i] = prop; continue; }
 
     const property = prop.slice(0, colonIndex).trim();
     const value = prop.slice(colonIndex + 1).trim();
 
-    if (property === 'color') {
+    if (property === 'color' || property === 'border-color') {
       const hasImportant = value.includes('!important');
       const colorValue = value.replace('!important', '').trim();
       const transformed = transformColorForDarkMode(colorValue);
-      return `${property}: ${transformed}${hasImportant ? ' !important' : ''}`;
+      transformedProps[i] = `${property}: ${transformed}${hasImportant ? ' !important' : ''}`;
+      continue;
     }
 
     if (property === 'background-color') {
       const hasImportant = value.includes('!important');
       const colorValue = value.replace('!important', '').trim();
       const transformed = transformBgColorForDarkMode(colorValue);
-      return `${property}: ${transformed}${hasImportant ? ' !important' : ''}`;
+      transformedProps[i] = `${property}: ${transformed}${hasImportant ? ' !important' : ''}`;
+      continue;
     }
 
     if (property === 'background' && !value.includes('url(')) {
-      const colorMatch = value.match(/#[0-9a-f]{3,6}|rgba?\([^)]+\)|hsla?\([^)]+\)|[a-z]+/i);
+      const colorMatch = value.match(BG_COLOR_MATCH_REGEX);
       if (colorMatch) {
         const hasImportant = value.includes('!important');
         const originalColor = colorMatch[0];
         const transformed = transformBgColorForDarkMode(originalColor);
         const newValue = value.replace(originalColor, transformed);
-        return `${property}: ${newValue.replace('!important', '').trim()}${hasImportant ? ' !important' : ''}`;
+        transformedProps[i] = `${property}: ${newValue.replace('!important', '').trim()}${hasImportant ? ' !important' : ''}`;
+        continue;
       }
     }
 
-    if (property === 'border-color') {
-      const hasImportant = value.includes('!important');
-      const colorValue = value.replace('!important', '').trim();
-      const transformed = transformColorForDarkMode(colorValue);
-      return `${property}: ${transformed}${hasImportant ? ' !important' : ''}`;
-    }
-
-    return prop;
-  });
+    transformedProps[i] = prop;
+  }
 
   return transformedProps.join('; ');
 }

@@ -345,10 +345,13 @@ function getMethodFromEmail(email?: Pick<Email, 'headers' | 'attachments' | 'tex
     }
   }
 
-  for (const bodyPart of [findCalendarBodyPart(email?.textBody), findCalendarBodyPart(email?.htmlBody)]) {
-    const method = extractMethodFromContentType(bodyPart?.type);
-    if (method !== 'unknown') return method;
-  }
+  // Sequential checks — drops the 2-element array literal allocated per call.
+  const textPart = findCalendarBodyPart(email?.textBody);
+  const textMethod = extractMethodFromContentType(textPart?.type);
+  if (textMethod !== 'unknown') return textMethod;
+  const htmlPart = findCalendarBodyPart(email?.htmlBody);
+  const htmlMethod = extractMethodFromContentType(htmlPart?.type);
+  if (htmlMethod !== 'unknown') return htmlMethod;
 
   return extractMethodFromContentType(getHeaderValue(email?.headers, 'Content-Type'));
 }

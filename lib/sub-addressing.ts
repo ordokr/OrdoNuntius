@@ -9,13 +9,19 @@
 // Constants for tag validation
 const MAX_TAG_LENGTH = 30;
 const TAG_REGEX = /^[a-zA-Z0-9-]{1,30}$/;
+// Module-scope — was a per-call `new RegExp` allocation inside getTagValidationError.
+const TAG_CHARS_REGEX = /^[a-zA-Z0-9-]+$/;
+// Module-scope — was allocated as a literal /[^a-zA-Z0-9-]/g inside generateSubAddress.
+const TAG_SANITIZE_REGEX = /[^a-zA-Z0-9-]/g;
 
 export const DEFAULT_SUB_ADDRESS_DELIMITER = '+';
 export const SUPPORTED_SUB_ADDRESS_DELIMITERS = ['+', '-', '.', '='] as const;
 export type SubAddressDelimiterPreset = (typeof SUPPORTED_SUB_ADDRESS_DELIMITERS)[number];
+// Set-backed membership — O(1) vs O(n) Array.includes.
+const SUPPORTED_DELIMITER_SET = new Set<string>(SUPPORTED_SUB_ADDRESS_DELIMITERS);
 
 export function isSupportedSubAddressDelimiter(value: string): value is SubAddressDelimiterPreset {
-  return (SUPPORTED_SUB_ADDRESS_DELIMITERS as readonly string[]).includes(value);
+  return SUPPORTED_DELIMITER_SET.has(value);
 }
 
 // RFC 5321 atext "special" characters, minus alphanumerics and "@". A custom
@@ -118,7 +124,7 @@ export function generateSubAddress(
     : localPart.substring(0, existingDelimiterIndex);
 
   // Sanitize tag (alphanumeric and dash only)
-  const cleanTag = tag.replace(/[^a-zA-Z0-9-]/g, '').toLowerCase();
+  const cleanTag = tag.replace(TAG_SANITIZE_REGEX, '').toLowerCase();
 
   if (!cleanTag) {
     return baseEmail;
@@ -139,43 +145,48 @@ export function extractDomain(email: string): string | null {
   return email.slice(at + 1).toLowerCase();
 }
 
+// Module-scope lookup — was being rebuilt as a 19-entry object literal on every call.
+const DOMAIN_TAG_SUGGESTIONS: Record<string, string[]> = {
+  'amazon.com': ['amazon', 'shopping', 'orders'],
+  'amazon.fr': ['amazon', 'shopping', 'orders'],
+  'amazon.de': ['amazon', 'shopping', 'orders'],
+  'amazon.co.uk': ['amazon', 'shopping', 'orders'],
+  'ebay.com': ['ebay', 'shopping'],
+  'ebay.fr': ['ebay', 'shopping'],
+  'paypal.com': ['paypal', 'payments'],
+  'facebook.com': ['facebook', 'social'],
+  'twitter.com': ['twitter', 'social'],
+  'x.com': ['twitter', 'social'],
+  'linkedin.com': ['linkedin', 'professional'],
+  'github.com': ['github', 'dev', 'notifications'],
+  'gitlab.com': ['gitlab', 'dev', 'notifications'],
+  'stackoverflow.com': ['stackoverflow', 'dev'],
+  'reddit.com': ['reddit', 'social'],
+  'netflix.com': ['netflix', 'entertainment'],
+  'spotify.com': ['spotify', 'music'],
+  'steam.com': ['steam', 'gaming'],
+  'discord.com': ['discord', 'gaming'],
+};
+
 /**
  * Suggest tags based on recipient domain
  */
 export function suggestTagsForDomain(domain: string): string[] {
   const domainLower = domain.toLowerCase();
 
-  // Common domain-based suggestions
-  const suggestions: Record<string, string[]> = {
-    'amazon.com': ['amazon', 'shopping', 'orders'],
-    'amazon.fr': ['amazon', 'shopping', 'orders'],
-    'amazon.de': ['amazon', 'shopping', 'orders'],
-    'amazon.co.uk': ['amazon', 'shopping', 'orders'],
-    'ebay.com': ['ebay', 'shopping'],
-    'ebay.fr': ['ebay', 'shopping'],
-    'paypal.com': ['paypal', 'payments'],
-    'facebook.com': ['facebook', 'social'],
-    'twitter.com': ['twitter', 'social'],
-    'x.com': ['twitter', 'social'],
-    'linkedin.com': ['linkedin', 'professional'],
-    'github.com': ['github', 'dev', 'notifications'],
-    'gitlab.com': ['gitlab', 'dev', 'notifications'],
-    'stackoverflow.com': ['stackoverflow', 'dev'],
-    'reddit.com': ['reddit', 'social'],
-    'netflix.com': ['netflix', 'entertainment'],
-    'spotify.com': ['spotify', 'music'],
-    'steam.com': ['steam', 'gaming'],
-    'discord.com': ['discord', 'gaming'],
-  };
-
   // Check for exact domain match
-  if (suggestions[domainLower]) {
-    return suggestions[domainLower];
-  }
+  const direct = DOMAIN_TAG_SUGGESTIONS[domainLower];
+  if (direct) return direct;
 
-  // Extract main domain (e.g., "mail.google.com" -> "google")
-  const parts = domainLower.split('.');
-  const mainDomain = parts.length >= 2 ? parts[parts.length - 2] : parts[0];
+  // Extract main domain (e.g., "mail.google.com" -> "google") without split allocation.
+  const lastDot = domainLower.lastIndexOf('.');
+  let mainDomain: string;
+  if (lastDot === -1) {
+    mainDomain = domainLower;
+  } else {
+    const prevDot = domainLower.lastIndexOf('.', lastDot - 1);
+    mainDomain = prevDot === -1 ? domainLower.slice(0, lastDot) : domainLower.slice(prevDot + 1, lastDot);
+  }
 
   // Generic suggestions based on domain name
   return [mainDomain, 'newsletter', 'registration'];
@@ -201,7 +212,7 @@ export function getTagValidationError(tag: string): TagValidationErrorCode {
     return 'TOO_LONG';
   }
 
-  if (!/^[a-zA-Z0-9-]+$/.test(tag)) {
+  if (!TAG_CHARS_REGEX.test(tag)) {
     return 'INVALID_CHARS';
   }
 

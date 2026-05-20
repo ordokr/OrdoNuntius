@@ -43,9 +43,14 @@ export function sanitizeEmailHtml(html: string): string {
  * attribute (no allow-scripts). Use ONLY for iframe-rendered content –
  * never for content rendered into the main DOM.
  */
+// Inline filter — module-scope literal avoids a runtime .filter() pass at import.
 export const EMAIL_IFRAME_SANITIZE_CONFIG = {
   ...EMAIL_SANITIZE_CONFIG,
-  FORBID_TAGS: EMAIL_SANITIZE_CONFIG.FORBID_TAGS.filter((t) => t !== 'style'),
+  FORBID_TAGS: [
+    'script', 'iframe', 'object', 'embed', 'form',
+    'input', 'button', 'meta', 'link', 'base',
+    'svg', 'math',
+  ],
 };
 
 /**
@@ -145,6 +150,9 @@ export function plainTextToSafeHtml(text: string, linkClass = ''): string {
   return result;
 }
 
+// Hoisted whitespace regex used per-img inside collapseBlockedImageContainers.
+const WHITESPACE_NBSP_REGEX = /[\s\u00A0]+/g;
+
 /**
  * Collapse empty containers left behind when external images are blocked.
  * Walks up from each blocked img to find the nearest table cell or wrapper div
@@ -158,7 +166,7 @@ export function collapseBlockedImageContainers(html: string): string {
     let el: HTMLElement | null = img.parentElement;
     while (el && el !== doc.body) {
       if (el.tagName === 'TD' || el.tagName === 'TH' || (el.tagName === 'DIV' && el.parentElement?.tagName === 'TD')) {
-        const hasVisibleText = el.textContent?.replace(/[\s\u00A0]+/g, '').trim();
+        const hasVisibleText = el.textContent?.replace(WHITESPACE_NBSP_REGEX, '').trim();
         const hasVisibleMedia = el.querySelector('img:not([data-blocked-src]), video, canvas');
         const hasLinks = el.querySelector('a[href]');
         if (!hasVisibleText && !hasVisibleMedia && !hasLinks) {

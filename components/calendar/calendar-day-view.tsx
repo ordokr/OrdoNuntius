@@ -126,13 +126,18 @@ export function CalendarDayView({
     isMobile,
   });
 
-  const formatHour = (h: number): string => {
-    if (timeFormat === "12h") {
+  // Precompute all 24 hour labels once per timeFormat change; was 48 Date+intl calls per render.
+  const hourLabels = useMemo(() => {
+    const labels = new Array<string>(24);
+    for (let h = 0; h < 24; h++) {
       const d = new Date(2000, 0, 1, h);
-      return intlFormatter.dateTime(d, { hour: "numeric", minute: "2-digit", hour12: true });
+      labels[h] = timeFormat === "12h"
+        ? intlFormatter.dateTime(d, { hour: "numeric", minute: "2-digit", hour12: true })
+        : format(d, "HH:mm");
     }
-    return format(new Date(2000, 0, 1, h), "HH:mm");
-  };
+    return labels;
+  }, [timeFormat, intlFormatter]);
+  const formatHour = (h: number): string => hourLabels[h];
 
   const layouted = useMemo(() => layoutOverlappingEvents(timedEvents, selectedDate), [timedEvents, selectedDate]);
 

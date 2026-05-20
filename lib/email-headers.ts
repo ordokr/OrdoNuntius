@@ -1,6 +1,12 @@
 import { AuthenticationResults } from './jmap/types';
 import { parseUnsubscribeUrls } from './validation';
 
+// Module-scope regexes — hoisted to avoid recompilation per call.
+const SPF_REGEX = /spf=(\w+)(?:\s+\([^)]*\))?\s+(?:smtp\.(?:mailfrom|helo)=([^\s;]+))?/;
+const DKIM_REGEX = /dkim=(\w+)(?:\s+header\.d=([^\s]+))?(?:\s+header\.s=([^\s]+))?/;
+const DMARC_REGEX = /dmarc=(\w+)(?:\s+header\.from=([^\s]+))?(?:\s+policy\.dmarc=(\w+))?/;
+const IPREV_REGEX = /iprev=(\w+)(?:\s+policy\.iprev=([\d.]+))?/;
+
 /**
  * Parse Authentication-Results header to extract SPF, DKIM, DMARC results
  */
@@ -12,8 +18,7 @@ export function parseAuthenticationResults(header: string): AuthenticationResult
   type DmarcResult = 'pass' | 'fail' | 'none';
   type DmarcPolicy = 'reject' | 'quarantine' | 'none';
 
-  // Parse SPF
-  const spfMatch = header.match(/spf=(\w+)(?:\s+\([^)]*\))?\s+(?:smtp\.(?:mailfrom|helo)=([^\s;]+))?/);
+  const spfMatch = header.match(SPF_REGEX);
   if (spfMatch) {
     results.spf = {
       result: spfMatch[1] as SpfResult,
@@ -21,8 +26,7 @@ export function parseAuthenticationResults(header: string): AuthenticationResult
     };
   }
 
-  // Parse DKIM
-  const dkimMatch = header.match(/dkim=(\w+)(?:\s+header\.d=([^\s]+))?(?:\s+header\.s=([^\s]+))?/);
+  const dkimMatch = header.match(DKIM_REGEX);
   if (dkimMatch) {
     results.dkim = {
       result: dkimMatch[1] as DkimResult,
@@ -31,8 +35,7 @@ export function parseAuthenticationResults(header: string): AuthenticationResult
     };
   }
 
-  // Parse DMARC
-  const dmarcMatch = header.match(/dmarc=(\w+)(?:\s+header\.from=([^\s]+))?(?:\s+policy\.dmarc=(\w+))?/);
+  const dmarcMatch = header.match(DMARC_REGEX);
   if (dmarcMatch) {
     results.dmarc = {
       result: dmarcMatch[1] as DmarcResult,
@@ -41,8 +44,7 @@ export function parseAuthenticationResults(header: string): AuthenticationResult
     };
   }
 
-  // Parse IP reverse lookup
-  const iprevMatch = header.match(/iprev=(\w+)(?:\s+policy\.iprev=([\d.]+))?/);
+  const iprevMatch = header.match(IPREV_REGEX);
   if (iprevMatch) {
     results.iprev = {
       result: iprevMatch[1] as 'pass' | 'fail',
@@ -53,12 +55,15 @@ export function parseAuthenticationResults(header: string): AuthenticationResult
   return results;
 }
 
+// Module-scope spam-score regexes.
+const SPAM_STATUS_REGEX = /^(Yes|No),?\s+score=([-\d.]+)/i;
+const SPAM_SCORE_REGEX = /score[=:]?\s*([-\d.]+)/i;
+
 /**
  * Parse spam score from X-Spam-Result or X-Spam-Status headers
  */
 export function parseSpamScore(header: string): { score: number; status: string } | null {
-  // Try X-Spam-Status format: "No, score=-0.25"
-  const statusMatch = header.match(/^(Yes|No),?\s+score=([-\d.]+)/i);
+  const statusMatch = header.match(SPAM_STATUS_REGEX);
   if (statusMatch) {
     return {
       status: statusMatch[1].toLowerCase(),
@@ -66,8 +71,7 @@ export function parseSpamScore(header: string): { score: number; status: string 
     };
   }
 
-  // Try to extract just the score
-  const scoreMatch = header.match(/score[=:]?\s*([-\d.]+)/i);
+  const scoreMatch = header.match(SPAM_SCORE_REGEX);
   if (scoreMatch) {
     const score = parseFloat(scoreMatch[1]);
     return {
@@ -90,15 +94,22 @@ interface ReceivedHeaderInfo {
   id?: string;
 }
 
+// Hoisted per-iteration regexes — re-allocating inside the loop was wasted work.
+const RECEIVED_FROM_REGEX = /from\s+([^\s]+)(?:\s+\([^)]+\))?/;
+const RECEIVED_BY_REGEX = /by\s+([^\s]+)/;
+const RECEIVED_DATE_REGEX = /;\s+(.+)$/;
+const RECEIVED_PROTO_REGEX = /with\s+(\w+)/;
+const RECEIVED_ID_REGEX = /id\s+([^\s;]+)/;
+
 export function parseReceivedHeaders(headers: string[]): ReceivedHeaderInfo[] {
   const path: ReceivedHeaderInfo[] = [];
 
   for (const header of headers) {
-    const fromMatch = header.match(/from\s+([^\s]+)(?:\s+\([^)]+\))?/);
-    const byMatch = header.match(/by\s+([^\s]+)/);
-    const dateMatch = header.match(/;\s+(.+)$/);
-    const protoMatch = header.match(/with\s+(\w+)/);
-    const idMatch = header.match(/id\s+([^\s;]+)/);
+    const fromMatch = header.match(RECEIVED_FROM_REGEX);
+    const byMatch = header.match(RECEIVED_BY_REGEX);
+    const dateMatch = header.match(RECEIVED_DATE_REGEX);
+    const protoMatch = header.match(RECEIVED_PROTO_REGEX);
+    const idMatch = header.match(RECEIVED_ID_REGEX);
 
     if (fromMatch || byMatch) {
       path.push({
@@ -172,6 +183,9 @@ export function getSecurityStatus(result?: string): {
   }
 }
 
+// Module-scope LLM verdict regex.
+const SPAM_LLM_REGEX = /^(LEGITIMATE|SPAM|SUSPICIOUS)\s*\((.+)\)\s*$/i;
+
 /**
  * Parse X-Spam-LLM header to extract AI verdict and explanation
  */
@@ -179,7 +193,7 @@ export function parseSpamLLM(header: string): { verdict: string; explanation: st
   // Format: "LEGITIMATE (explanation)" or "SPAM (explanation)"
   // Trim the header first to remove any leading/trailing whitespace
   const trimmed = header.trim();
-  const match = trimmed.match(/^(LEGITIMATE|SPAM|SUSPICIOUS)\s*\((.+)\)\s*$/i);
+  const match = trimmed.match(SPAM_LLM_REGEX);
 
   if (match) {
     return {

@@ -29,12 +29,19 @@ const RICH_BODY_SELECTOR = [
   'ul', 'ol', 'blockquote', 'br',
 ].join(', ');
 
+// Module-scope regexes \u2014 hoisted out of the per-call hot path.
+const SIG_CRLF_REGEX = /\r\n?/g;
+const SIG_NBSP_REGEX = /\u00a0/g;
+const SIG_TRAILING_WS_REGEX = /[ \t]+\n/g;
+const SIG_MULTI_NEWLINE_REGEX = /\n{3,}/g;
+const SIG_WHITESPACE_REGEX = /\s+/g;
+
 function normalizeSignatureLineBreaks(value: string): string {
   return value
-    .replace(/\r\n?/g, '\n')
-    .replace(/\u00a0/g, ' ')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(SIG_CRLF_REGEX, '\n')
+    .replace(SIG_NBSP_REGEX, ' ')
+    .replace(SIG_TRAILING_WS_REGEX, '\n')
+    .replace(SIG_MULTI_NEWLINE_REGEX, '\n\n')
     .trim();
 }
 
@@ -44,7 +51,7 @@ function htmlToPlainText(html: string): string {
 
   const appendText = (value: string) => {
     if (!value) return;
-    const normalized = value.replace(/\s+/g, ' ');
+    const normalized = value.replace(SIG_WHITESPACE_REGEX, ' ');
     if (!normalized.trim()) return;
     const previous = chunks[chunks.length - 1];
     if (previous && !previous.endsWith('\n') && !previous.endsWith(' ')) {
@@ -79,7 +86,7 @@ function htmlToPlainText(html: string): string {
     }
 
     if (tagName === 'a') {
-      const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+      const text = element.textContent?.replace(SIG_WHITESPACE_REGEX, ' ').trim() || '';
       const href = element.getAttribute('href')?.trim() || '';
       const normalizedHref = href.replace(/^mailto:/i, '');
       if (text && normalizedHref && text === normalizedHref) {

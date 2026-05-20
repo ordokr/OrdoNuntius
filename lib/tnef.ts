@@ -40,6 +40,10 @@ const PT_I8 = 0x0014;
 // Multi-value flag
 const MV_FLAG = 0x1000;
 
+// Module-scope decoders — TextDecoder construction allocates; reuse.
+const UTF8_DECODER = new TextDecoder('utf-8');
+const UTF16LE_DECODER = new TextDecoder('utf-16le');
+
 // MAPI property IDs
 const PR_BODY = 0x1000;
 const PR_BODY_HTML = 0x1013;
@@ -156,13 +160,13 @@ function decodeMAPIString(data: Uint8Array, propType: number): string {
     if (len >= 2 && data[len - 1] === 0 && data[len - 2] === 0) {
       len -= 2;
     }
-    return new TextDecoder('utf-16le').decode(data.subarray(0, len));
+    return UTF16LE_DECODER.decode(data.subarray(0, len));
   }
   let len = data.byteLength;
   if (len >= 1 && data[len - 1] === 0) {
     len -= 1;
   }
-  return new TextDecoder('utf-8').decode(data.subarray(0, len));
+  return UTF8_DECODER.decode(data.subarray(0, len));
 }
 
 /** Parse MAPI properties from a raw attribute data block */
@@ -280,7 +284,7 @@ export function parseTnef(data: Uint8Array): TnefResult {
 
     if (level === LVL_MESSAGE) {
       if (attrID === attBody) {
-        result.body = new TextDecoder('utf-8').decode(attrData);
+        result.body = UTF8_DECODER.decode(attrData);
         debug.log('email', '  → Extracted plain text body (' + result.body.length + ' chars)');
       } else if (attrID === attMAPIProps) {
         const props = parseMAPIProps(attrData);
@@ -301,7 +305,7 @@ export function parseTnef(data: Uint8Array): TnefResult {
           if (baseType === PT_STRING8 || baseType === PT_UNICODE) {
             result.htmlBody = decodeMAPIString(htmlProp.value, baseType);
           } else {
-            result.htmlBody = new TextDecoder('utf-8').decode(htmlProp.value);
+            result.htmlBody = UTF8_DECODER.decode(htmlProp.value);
           }
           debug.log('email', '  → Extracted HTML body (' + result.htmlBody.length + ' chars)');
         } else {
@@ -335,7 +339,7 @@ export function parseTnef(data: Uint8Array): TnefResult {
       } else if (attrID === attAttachTitle && curAttach) {
         let len = attrData.byteLength;
         if (len > 0 && attrData[len - 1] === 0) len--;
-        curAttach.name = new TextDecoder('utf-8').decode(attrData.subarray(0, len));
+        curAttach.name = UTF8_DECODER.decode(attrData.subarray(0, len));
         debug.log('email', '  → Attachment short name:', curAttach.name);
       } else if (attrID === attAttachData && curAttach) {
         curAttach.data = attrData;
@@ -383,8 +387,15 @@ export function parseTnef(data: Uint8Array): TnefResult {
   }
 
   debug.log('email', 'TNEF parsing complete - body:', !!result.body, ', htmlBody:', !!result.htmlBody, ', attachments:', result.attachments.length);
-  if (result.attachments.length > 0) {
-    debug.table(result.attachments.map(a => ({ name: a.name, mimeType: a.mimeType, size: a.data.byteLength })), 'email');
+  // Gate the .map() allocation behind the debug flag — was building a tmp
+  // array of plain summaries even when nothing consumes it.
+  if (result.attachments.length > 0 && isDebugEnabled('email')) {
+    const summary = new Array(result.attachments.length);
+    for (let i = 0; i < result.attachments.length; i++) {
+      const a = result.attachments[i];
+      summary[i] = { name: a.name, mimeType: a.mimeType, size: a.data.byteLength };
+    }
+    debug.table(summary, 'email');
   }
   debug.groupEnd();
 

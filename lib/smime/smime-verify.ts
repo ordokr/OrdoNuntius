@@ -10,6 +10,15 @@ import * as asn1js from 'asn1js';
 import { extractCertificateInfo } from './certificate-utils';
 import type { SmimeStatus, SmimePublicCert } from './types';
 
+// Lazy module-level CryptoEngine — was constructed per verify call.
+let _webcryptoEngine: pkijs.CryptoEngine | null = null;
+function getWebcryptoEngine(): pkijs.CryptoEngine {
+  if (!_webcryptoEngine) {
+    _webcryptoEngine = new pkijs.CryptoEngine({ crypto, subtle: crypto.subtle, name: 'webcrypto' });
+  }
+  return _webcryptoEngine;
+}
+
 export interface VerificationResult {
   /** The inner MIME bytes extracted from the opaque SignedData */
   mimeBytes: Uint8Array;
@@ -52,18 +61,12 @@ export async function smimeVerify(
   let signatureError: string | undefined;
 
   try {
-    const cryptoEngine = new pkijs.CryptoEngine({
-      crypto: crypto,
-      subtle: crypto.subtle,
-      name: 'webcrypto',
-    });
-
     const verifyResult = await signedData.verify(
       {
         signer: 0,
         checkChain: true,
       },
-      cryptoEngine,
+      getWebcryptoEngine(),
     );
     signatureValid = verifyResult;
   } catch (err) {
@@ -152,16 +155,19 @@ function extractInnerContent(signedData: pkijs.SignedData): Uint8Array {
   }
 
   if (eContent instanceof asn1js.OctetString) {
-    // Constructed OCTET STRING: data lives in child OctetStrings
+    // Constructed OCTET STRING: data lives in child OctetStrings.
+    // Single-pass total then write — drops the intermediate chunks-map + reduce
+    // (two walks, two array allocs) for the wrapper Uint8Array views.
     const children = (eContent.valueBlock as unknown as { value?: asn1js.OctetString[] }).value;
     if (children?.length) {
-      const chunks = children.map(c => new Uint8Array(c.valueBlock.valueHexView));
-      const total = chunks.reduce((sum, c) => sum + c.length, 0);
+      let total = 0;
+      for (const c of children) total += c.valueBlock.valueHexView.byteLength;
       const result = new Uint8Array(total);
       let offset = 0;
-      for (const chunk of chunks) {
-        result.set(chunk, offset);
-        offset += chunk.length;
+      for (const c of children) {
+        const view = new Uint8Array(c.valueBlock.valueHexView);
+        result.set(view, offset);
+        offset += view.length;
       }
       return result;
     }
