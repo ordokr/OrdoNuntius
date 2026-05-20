@@ -10,7 +10,7 @@ import {
   startOfDay, format, parseISO,
 } from "date-fns";
 import { useShallow } from "zustand/react/shallow";
-import { useCalendarStore } from "@/stores/calendar-store";
+import { useCalendarStore, eventByIdLookup } from "@/stores/calendar-store";
 import { isCalendarViewMode } from "@/stores/calendar-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
@@ -198,7 +198,7 @@ export default function CalendarPage() {
   // Keep detailEvent in sync with store events (e.g. after update + refetch)
   useEffect(() => {
     if (detailEvent) {
-      const updated = events.find(e => e.id === detailEvent.id);
+      const updated = eventByIdLookup(events).get(detailEvent.id);
       if (updated && updated !== detailEvent) {
         setDetailEvent(updated);
       }
@@ -712,7 +712,7 @@ export default function CalendarPage() {
 
   const handleDeleteEvent = useCallback(async (id: string, sendSchedulingMessages?: boolean) => {
     if (!client) { toast.error(t("notifications.event_error")); return; }
-    const eventToDelete = events.find(e => e.id === id) || editEvent;
+    const eventToDelete = eventByIdLookup(events).get(id) || editEvent;
     if (eventToDelete && isRecurringEvent(eventToDelete)) {
       setPendingScopeAction({
         type: "delete",

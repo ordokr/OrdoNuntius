@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Check, Plus, LogOut, Star, ChevronDown, AlertCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useAccountStore, type AccountEntry } from "@/stores/account-store";
+import { useAccountStore, accountByIdLookup, type AccountEntry } from "@/stores/account-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { getMaxAccounts } from "@/lib/account-utils";
 import { cn } from "@/lib/utils";
@@ -44,7 +44,7 @@ export function AccountSwitcher({ variant = "rail", className }: AccountSwitcher
   // session (primaryIdentity, JMAP client). accountStore.activeAccountId is a separate
   // persisted copy that can drift out of sync across hydration / partial persist writes.
   const activeAccountId = useAuthStore((s) => s.activeAccountId);
-  const activeAccount = accounts.find((a) => a.id === activeAccountId);
+  const activeAccount = activeAccountId ? accountByIdLookup(accounts).get(activeAccountId) : undefined;
   const switchAccount = useAuthStore((s) => s.switchAccount);
   const logout = useAuthStore((s) => s.logout);
   const logoutAll = useAuthStore((s) => s.logoutAll);

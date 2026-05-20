@@ -28,7 +28,7 @@ function calendarByIdLookup(calendars: readonly Calendar[]): Map<string, Calenda
   return m;
 }
 const _eventByIdCache = new WeakMap<readonly CalendarEvent[], Map<string, CalendarEvent>>();
-function eventByIdLookup(events: readonly CalendarEvent[]): Map<string, CalendarEvent> {
+export function eventByIdLookup(events: readonly CalendarEvent[]): Map<string, CalendarEvent> {
   let m = _eventByIdCache.get(events);
   if (!m) {
     m = new Map<string, CalendarEvent>();

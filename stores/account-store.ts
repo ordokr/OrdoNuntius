@@ -9,7 +9,7 @@ import { generateAccountId, generateAvatarColor, getMaxAccounts } from '@/lib/ac
 // array reference; replaced when zustand swaps the accounts array on
 // set(). Lazy build so we don't pay for the Map when no lookup happens.
 const _accountByIdCache = new WeakMap<readonly AccountEntry[], Map<string, AccountEntry>>();
-function accountByIdLookup(accounts: readonly AccountEntry[]): Map<string, AccountEntry> {
+export function accountByIdLookup(accounts: readonly AccountEntry[]): Map<string, AccountEntry> {
   let m = _accountByIdCache.get(accounts);
   if (!m) {
     m = new Map<string, AccountEntry>();
