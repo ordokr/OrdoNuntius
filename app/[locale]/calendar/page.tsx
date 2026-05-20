@@ -139,7 +139,31 @@ const CreateCalendarModal = dynamic(
 import { getUserParticipantId } from "@/lib/calendar-participants";
 import { generateBirthdayEvents, createBirthdayCalendar, BIRTHDAY_CALENDAR_ID } from "@/lib/birthday-calendar";
 import { debug, isDebugEnabled } from "@/lib/debug";
-import { consumePendingWebcal, hasPendingWebcal, subscribeToPendingWebcal } from "@/lib/protocol-handlers/session";
+// protocol-handlers/session (~357 LOC) used to be eagerly imported here
+// for hasPendingWebcal + consumePendingWebcal + subscribeToPendingWebcal.
+// Two of those (consume/subscribe) are only used inside the post-mount
+// useEffect below — dynamic-imported there.
+// The third (hasPendingWebcal) is called inside another useEffect to
+// decide whether to redirect to the inbox; inlined as `hasPendingWebcalSync`
+// below since it's just a sessionStorage TTL check, avoiding any need to
+// pull the full module on the calendar cold-load.
+const WEBCAL_PENDING_KEY = "ordonuntius:pending-webcal";
+const WEBCAL_PENDING_TTL_MS = 5 * 60 * 1000;
+function hasPendingWebcalSync(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = sessionStorage.getItem(WEBCAL_PENDING_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { createdAt?: unknown };
+    if (typeof parsed.createdAt !== "number" || Date.now() - parsed.createdAt > WEBCAL_PENDING_TTL_MS) {
+      sessionStorage.removeItem(WEBCAL_PENDING_KEY);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 import type { ParsedWebcal } from "@/lib/protocol-handlers/webcal";
 
 type PendingScopeAction =
@@ -310,7 +334,7 @@ export default function CalendarPage() {
     if (initialCheckDone && !isAuthenticated && !authLoading) {
       try { sessionStorage.setItem('redirect_after_login', window.location.pathname); } catch { /* ignore */ }
       redirectToLogin();
-    } else if (client && !supportsCalendar && !pendingWebcalAccountChoice && !isProtocolAccountSwitching && !pendingSubscription && !showWebcalActionChoice && !hasPendingWebcal()) {
+    } else if (client && !supportsCalendar && !pendingWebcalAccountChoice && !isProtocolAccountSwitching && !pendingSubscription && !showWebcalActionChoice && !hasPendingWebcalSync()) {
       router.push("/");
     }
   }, [initialCheckDone, isAuthenticated, authLoading, client, supportsCalendar, pendingWebcalAccountChoice, isProtocolAccountSwitching, pendingSubscription, showWebcalActionChoice, router]);
@@ -388,15 +412,24 @@ export default function CalendarPage() {
   useEffect(() => {
     if (!isAuthenticated || !client) return;
 
-    const openPendingWebcal = () => {
-      const pending = consumePendingWebcal();
-      if (!pending) return;
+    let cleanup: (() => void) | undefined;
+    let mounted = true;
 
-      handleWebcalProtocolRequest(pending);
+    void import("@/lib/protocol-handlers/session").then(({ consumePendingWebcal, subscribeToPendingWebcal }) => {
+      if (!mounted) return;
+      const openPendingWebcal = () => {
+        const pending = consumePendingWebcal();
+        if (!pending) return;
+        handleWebcalProtocolRequest(pending);
+      };
+      openPendingWebcal();
+      cleanup = subscribeToPendingWebcal(openPendingWebcal);
+    });
+
+    return () => {
+      mounted = false;
+      cleanup?.();
     };
-
-    openPendingWebcal();
-    return subscribeToPendingWebcal(openPendingWebcal);
   }, [isAuthenticated, client, handleWebcalProtocolRequest]);
 
   useEffect(() => {
