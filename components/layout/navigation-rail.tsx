@@ -3,8 +3,13 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Mail, Calendar, BookUser, HardDrive, Settings, Keyboard, Plus, Shield, LogOut, Check } from "lucide-react";
+import dynamic from "next/dynamic";
 import { AccountSwitcher } from "./account-switcher";
-import { icons as lucideIcons, type LucideIcon } from "lucide-react";
+// Dynamic so the full Lucide icon registry (1544 icons, ~556KB) only
+// loads when the user actually has custom sidebar apps configured. The
+// authenticated app shell ships on every route — eager import leaks the
+// registry into every initial page bundle.
+const SidebarAppIcon = dynamic(() => import("./sidebar-app-icon"), { ssr: false, loading: () => null });
 import { useConfig } from "@/hooks/use-config";
 import { useThemeStore } from "@/stores/theme-store";
 import { usePathname, Link, useRouter } from "@/i18n/navigation";
@@ -320,7 +325,6 @@ export function NavigationRail({
 
         {/* Custom sidebar apps (per-app mobile visibility) */}
         {mobileSidebarApps.map((app) => {
-          const AppIcon = lucideIcons[app.icon as keyof typeof lucideIcons] as LucideIcon | undefined;
           const isActive = activeAppId === app.id;
           return (
             <button
@@ -343,7 +347,7 @@ export function NavigationRail({
               )}
             >
               <div className="relative">
-                {AppIcon ? <AppIcon className="w-5 h-5" /> : null}
+                <SidebarAppIcon name={app.icon} className="w-5 h-5" />
                 {isActive && (
                   <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-primary" />
                 )}
@@ -483,7 +487,6 @@ export function NavigationRail({
           />
         )}
         {visibleSidebarApps.map((app) => {
-          const AppIcon = lucideIcons[app.icon as keyof typeof lucideIcons] as LucideIcon | undefined;
           const isActive = activeAppId === app.id;
           return (
             <button
@@ -510,7 +513,7 @@ export function NavigationRail({
               title={collapsed ? app.name : undefined}
               style={collapsed ? undefined : { paddingBlock: 'var(--density-sidebar-py)' }}
             >
-              {AppIcon ? <AppIcon className={cn("w-[18px] h-[18px] flex-shrink-0", isActive && "text-primary")} /> : null}
+              <SidebarAppIcon name={app.icon} className={cn("w-[18px] h-[18px] flex-shrink-0", isActive && "text-primary")} />
               {!collapsed && <span className="truncate">{app.name}</span>}
             </button>
           );
