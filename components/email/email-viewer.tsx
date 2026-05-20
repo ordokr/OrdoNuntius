@@ -81,7 +81,13 @@ import { EmailIdentityBadge } from "./email-identity-badge";
 import { UnsubscribeBanner } from "./unsubscribe-banner";
 import { CalendarInvitationBanner } from "./calendar-invitation-banner";
 import { useTour } from "@/components/tour/tour-provider";
-import { SmimePassphraseDialog } from "@/components/settings/smime-passphrase-dialog";
+import dynamic from "next/dynamic";
+// SmimePassphraseDialog only mounts when the user opens an encrypted
+// email whose key needs an unlock prompt — rare per-email-open path.
+const SmimePassphraseDialog = dynamic(
+  () => import("@/components/settings/smime-passphrase-dialog").then(m => ({ default: m.SmimePassphraseDialog })),
+  { ssr: false, loading: () => null }
+);
 import { findCalendarAttachment, isCalendarMimeType } from "@/lib/calendar-invitation";
 import { RecipientPopover } from "./recipient-popover";
 import { isFilePreviewable } from "@/lib/file-preview";
@@ -100,7 +106,9 @@ type SmimeDecryptMod = typeof import("@/lib/smime/smime-decrypt");
 type SmimeVerifyMod = typeof import("@/lib/smime/smime-verify");
 import { useSmimeStore } from "@/stores/smime-store";
 import type { SmimeStatus } from "@/lib/smime/types";
-import { parseTnef, isTnefAttachment } from "@/lib/tnef";
+import { isTnefAttachment } from "@/lib/tnef-detect";
+// parseTnef is dynamic-imported below — the 13 KB binary parser only
+// loads when the user has a winmail.dat to extract.
 import { debug, isDebugEnabled } from "@/lib/debug";
 import type { TnefAttachment } from "@/lib/tnef";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
@@ -1956,6 +1964,9 @@ export function EmailViewer({
 
         const tnefData = new Uint8Array(blobBytes);
         debug.time('TNEF parse', 'email');
+        // Dynamic import: the TNEF binary parser (~13 KB) ships only when
+        // a winmail.dat attachment is actually being extracted.
+        const { parseTnef } = await import("@/lib/tnef");
         const parsed = parseTnef(tnefData);
         debug.timeEnd('TNEF parse', 'email');
 
