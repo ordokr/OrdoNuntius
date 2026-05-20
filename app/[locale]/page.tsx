@@ -95,9 +95,12 @@ const FilePreviewModal = dynamic(
   { ssr: false, loading: () => null }
 );
 import { isFilePreviewable } from "@/lib/file-preview";
-import { appendPlainTextSignature } from "@/lib/signature-utils";
-import { computeReplyThreadingHeaders } from "@/lib/email-threading";
-import { resolveReplyFrom } from "@/lib/reply-identity";
+// Reply-action helpers are only used inside handleQuickReply below. The
+// three modules total ~400 LOC (signature-utils, email-threading,
+// reply-identity); none are needed for the cold-load inbox render.
+// Parallel `await Promise.all` of dynamic imports inside the async
+// handler keeps them off the eager inbox bundle. RTT cost is masked by
+// the user's reply action itself (which already does a network send).
 import { Search, Filter, ChevronDown, X, Paperclip, Star, Mail, MailOpen, RotateCcw, PenSquare, PenLine, CheckSquare, Square, AlertTriangle } from "lucide-react";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { Button } from "@/components/ui/button";
@@ -1858,6 +1861,17 @@ export default function Home() {
     if (!sender?.email) {
       throw new Error("No sender email found");
     }
+
+    // Parallel-fetch the three reply helpers off the cold-load path.
+    const [
+      { resolveReplyFrom },
+      { appendPlainTextSignature },
+      { computeReplyThreadingHeaders },
+    ] = await Promise.all([
+      import("@/lib/reply-identity"),
+      import("@/lib/signature-utils"),
+      import("@/lib/email-threading"),
+    ]);
 
     const primaryIdentity = identities[0];
     const autoSelectReplyIdentity = useSettingsStore.getState().autoSelectReplyIdentity;
