@@ -22,9 +22,23 @@ import { toast } from "@/stores/toast-store";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { Button } from "@/components/ui/button";
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
-import { CalendarMonthView } from "@/components/calendar/calendar-month-view";
-import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
-import { CalendarDayView } from "@/components/calendar/calendar-day-view";
+// Month/Week/Day views are mutually exclusive — only the active viewMode
+// ever renders. Loading all three eagerly meant the calendar route paid
+// ~1300 lines of view code (plus DnD context, time-grid hook for
+// week/day, and event-card transitive pulls) for two views that never
+// mount. Dynamic each one; the active view's chunk loads on first paint.
+const CalendarMonthView = dynamic(
+  () => import("@/components/calendar/calendar-month-view").then(m => ({ default: m.CalendarMonthView })),
+  { ssr: false, loading: () => null }
+);
+const CalendarWeekView = dynamic(
+  () => import("@/components/calendar/calendar-week-view").then(m => ({ default: m.CalendarWeekView })),
+  { ssr: false, loading: () => null }
+);
+const CalendarDayView = dynamic(
+  () => import("@/components/calendar/calendar-day-view").then(m => ({ default: m.CalendarDayView })),
+  { ssr: false, loading: () => null }
+);
 // Agenda + tasks views are only rendered when viewMode flips to 'agenda'
 // or 'tasks'. Default views (month/week/day) never need them — defer.
 const CalendarAgendaView = dynamic(
