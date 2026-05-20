@@ -21,6 +21,8 @@ interface LoginsFile {
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+// Hoisted: was rebuilt per normalizeServer call (every login).
+const TRAILING_SLASH_RE = /\/+$/;
 
 let cache: LoginsFile | null = null;
 
@@ -58,7 +60,7 @@ async function saveFile(file: LoginsFile): Promise<void> {
 }
 
 function normalizeServer(serverUrl: string): string {
-  return serverUrl.trim().replace(/\/+$/, '').toLowerCase();
+  return serverUrl.trim().replace(TRAILING_SLASH_RE, '').toLowerCase();
 }
 
 async function hashIdentity(username: string, serverUrl: string): Promise<string> {

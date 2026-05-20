@@ -10,6 +10,10 @@ import { useContactStore, getContactDisplayName, findContactByEmail } from "@/st
 import { toast } from "@/stores/toast-store";
 import type { ContactCard } from "@/lib/jmap/types";
 
+// Hoisted: viewport-clamp constants used by every handleOpen invocation.
+const POPOVER_WIDTH = 300;
+const POPOVER_HEIGHT = 250;
+
 interface RecipientPopoverProps {
   name?: string;
   email: string;
@@ -46,19 +50,17 @@ export function RecipientPopover({ name, email, displayLabel, onViewContact, cla
   const handleOpen = () => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    const popoverWidth = 300;
-    const popoverHeight = 250;
 
     let top = rect.bottom + 4;
     let left = rect.left;
 
     // Keep within viewport
-    if (left + popoverWidth > window.innerWidth - 8) {
-      left = window.innerWidth - popoverWidth - 8;
+    if (left + POPOVER_WIDTH > window.innerWidth - 8) {
+      left = window.innerWidth - POPOVER_WIDTH - 8;
     }
     if (left < 8) left = 8;
-    if (top + popoverHeight > window.innerHeight - 8) {
-      top = rect.top - popoverHeight - 4;
+    if (top + POPOVER_HEIGHT > window.innerHeight - 8) {
+      top = rect.top - POPOVER_HEIGHT - 4;
     }
 
     setPosition({ top, left });

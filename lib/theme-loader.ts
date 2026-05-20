@@ -6,6 +6,11 @@ const THEME_STYLE_ID = 'active-theme';
 const THEME_SKIN_STYLE_ID = 'active-theme-skin';
 const THEME_SKIN_BODY_ATTR = 'data-theme-skin';
 
+// Pre-compile global variants once so sanitize* doesn't allocate a new RegExp per match.
+const DISALLOWED_CSS_PATTERNS_GLOBAL = DISALLOWED_CSS_PATTERNS.map(
+  (p) => new RegExp(p.source, 'gi'),
+);
+
 /**
  * Sanitize theme CSS: strip dangerous patterns like @import, external url(),
  * JavaScript expressions, and -moz-binding. Returns cleaned CSS.
@@ -14,10 +19,11 @@ export function sanitizeThemeCSS(css: string): { css: string; warnings: string[]
   const warnings: string[] = [];
   let cleaned = css;
 
-  for (const pattern of DISALLOWED_CSS_PATTERNS) {
+  for (let i = 0; i < DISALLOWED_CSS_PATTERNS.length; i++) {
+    const pattern = DISALLOWED_CSS_PATTERNS[i];
     if (pattern.test(cleaned)) {
       warnings.push(`Removed disallowed pattern: ${pattern.source}`);
-      cleaned = cleaned.replace(new RegExp(pattern.source, 'gi'), '/* [removed] */');
+      cleaned = cleaned.replace(DISALLOWED_CSS_PATTERNS_GLOBAL[i], '/* [removed] */');
     }
   }
 
@@ -133,10 +139,11 @@ export function sanitizeSkinCSS(css: string): { css: string; warnings: string[] 
   const warnings: string[] = [];
   let cleaned = css;
 
-  for (const pattern of DISALLOWED_CSS_PATTERNS) {
+  for (let i = 0; i < DISALLOWED_CSS_PATTERNS.length; i++) {
+    const pattern = DISALLOWED_CSS_PATTERNS[i];
     if (pattern.test(cleaned)) {
       warnings.push(`Skin: removed disallowed pattern: ${pattern.source}`);
-      cleaned = cleaned.replace(new RegExp(pattern.source, 'gi'), '/* [removed] */');
+      cleaned = cleaned.replace(DISALLOWED_CSS_PATTERNS_GLOBAL[i], '/* [removed] */');
     }
   }
 

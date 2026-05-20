@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { logger } from '@/lib/logger';
 import { getConfigDir, assertWritable } from './paths';
+import { hasAnyKey } from '@/lib/utils';
 
 function getPluginConfigDir(): string {
   return path.join(getConfigDir(), 'plugin-config');
@@ -59,7 +60,8 @@ export async function deletePluginConfigKey(pluginId: string, key: string): Prom
   const config = await getPluginConfig(pluginId);
   delete config[key];
 
-  if (Object.keys(config).length === 0) {
+  // hasAnyKey skips Object.keys allocation.
+  if (!hasAnyKey(config)) {
     try { await unlink(configPath(pluginId)); } catch { /* ok if missing */ }
     return;
   }

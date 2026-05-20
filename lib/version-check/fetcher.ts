@@ -4,6 +4,8 @@ import type { UpdateStatus, UpdateSeverity } from './types';
 const SEVERITIES: ReadonlySet<UpdateSeverity> = new Set([
   'normal', 'security', 'deprecated', 'none', 'unknown',
 ]);
+// Hoisted: was rebuilt per parseStatus call.
+const HTTP_URL_RE = /^https?:\/\//i;
 
 function isString(v: unknown): v is string {
   return typeof v === 'string';
@@ -30,7 +32,7 @@ export function parseStatus(raw: unknown): UpdateStatus | null {
 
   // Only http(s) URLs are renderable; reject anything else so we don't end
   // up with a javascript: link in the banner.
-  if (r.url && !/^https?:\/\//i.test(r.url)) return null;
+  if (r.url && !HTTP_URL_RE.test(r.url)) return null;
 
   return {
     schema: 1,

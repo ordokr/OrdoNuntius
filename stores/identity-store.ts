@@ -87,11 +87,16 @@ export const useIdentityStore = create<IdentityStore>()(
       }),
 
       addRecentTag: (tag) => set((state) => {
-        const recent = [tag, ...state.subAddress.recentTags.filter(t => t !== tag)];
+        // Single pass: tag at head, then existing tags minus duplicate, capped at MAX_RECENT_TAGS.
+        const prev = state.subAddress.recentTags;
+        const recent: string[] = [tag];
+        for (let i = 0; i < prev.length && recent.length < MAX_RECENT_TAGS; i++) {
+          if (prev[i] !== tag) recent.push(prev[i]);
+        }
         return {
           subAddress: {
             ...state.subAddress,
-            recentTags: recent.slice(0, MAX_RECENT_TAGS),
+            recentTags: recent,
           }
         };
       }),

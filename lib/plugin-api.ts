@@ -32,6 +32,10 @@ import { apiFetch } from '@/lib/browser-navigation';
 
 // --- Permission helpers --------------------------------------
 
+// Shared no-op disposable - avoids allocating a new {dispose: noop} per
+// permission-denied hook registration or slot registration.
+const NOOP_DISPOSABLE: Disposable = { dispose: () => {} };
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getPluginExternals(): any {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,7 +63,7 @@ function guardedHook<T extends (...args: never[]) => unknown>(
   order: number = 100,
 ): Disposable {
   if (!hasPermission(plugin, perm)) {
-    return { dispose: () => {} };
+    return NOOP_DISPOSABLE;
   }
   return bus.register(plugin.id, handler, order);
 }
@@ -609,7 +613,7 @@ function registerSlot(
 ): Disposable {
   if (!registerSlotFn) {
     console.warn(`[plugin:${pluginId}] Slot registration not available yet`);
-    return { dispose: () => {} };
+    return NOOP_DISPOSABLE;
   }
   return registerSlotFn(slotName, { pluginId, component, order });
 }
@@ -630,7 +634,7 @@ export function createPluginAPI(plugin: InstalledPlugin): PluginAPI {
     if (hookName === 'onInterval') {
       // Special: onInterval takes (handler, intervalMs)
       (hooks as unknown as Record<string, unknown>)[hookName] = (handler: () => void, intervalMs: number) => {
-        if (!hasPermission(plugin, perm)) return { dispose: () => {} };
+        if (!hasPermission(plugin, perm)) return NOOP_DISPOSABLE;
         const safeMs = Math.max(intervalMs, 60_000); // min 60s
         const id = setInterval(handler, safeMs);
         return { dispose: () => clearInterval(id) };

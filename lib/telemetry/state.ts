@@ -14,6 +14,9 @@ function getDir(): string {
 function statePath(): string { return path.join(getDir(), 'state.json'); }
 function idPath(): string { return path.join(getDir(), '.telemetry-id'); }
 
+// Hoisted: was rebuilt per getInstanceId call.
+const INSTANCE_ID_RE = /^[0-9a-f-]{36}$/i;
+
 function envOverride(): ConsentState | null {
   const v = (process.env.ORDO_NUNTIUS_TELEMETRY ?? '').toLowerCase();
   if (v === 'off' || v === 'false' || v === '0' || v === 'no') return 'off';
@@ -32,7 +35,7 @@ export async function getInstanceId(): Promise<string> {
   await ensureDir();
   try {
     const id = (await readFile(idPath(), 'utf8')).trim();
-    if (/^[0-9a-f-]{36}$/i.test(id)) return id;
+    if (INSTANCE_ID_RE.test(id)) return id;
   } catch { /* generate fresh */ }
   const fresh = randomUUID();
   const tmp = idPath() + '.tmp';

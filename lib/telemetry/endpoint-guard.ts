@@ -51,6 +51,8 @@ const BAD_HOSTS = new Set([
   'ip6-localhost',
   'ip6-loopback',
 ]);
+// Hoisted: was rebuilt every validateEndpointUrl/resolveEndpointAllowed call.
+const HOST_BRACKETS_RE = /^\[|\]$/g;
 
 function bypassEnabled(): boolean {
   return process.env.ORDO_NUNTIUS_TELEMETRY_ALLOW_PRIVATE === '1';
@@ -71,7 +73,7 @@ export function validateEndpointUrl(raw: string): EndpointCheck {
   }
   if (bypassEnabled()) return { ok: true };
 
-  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  const host = url.hostname.toLowerCase().replace(HOST_BRACKETS_RE, '');
   if (!host) return { ok: false, reason: 'host required' };
   if (BAD_HOSTS.has(host)) {
     return { ok: false, reason: 'localhost endpoints are not allowed' };
@@ -94,7 +96,7 @@ export async function resolveEndpointAllowed(raw: string): Promise<EndpointCheck
   if (!initial.ok) return initial;
   if (bypassEnabled()) return { ok: true };
 
-  const host = new URL(raw).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  const host = new URL(raw).hostname.toLowerCase().replace(HOST_BRACKETS_RE, '');
   if (isIP(host)) return { ok: true };
 
   try {

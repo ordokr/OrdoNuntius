@@ -87,16 +87,21 @@ export function apiFetch(input: string, init?: RequestInit): Promise<Response> {
 }
 
 
+// Locale doesn't change for the session. Cache it like getPathPrefix above.
+let memoizedLocale: string | null = null;
+
 /**
  * Extracts the locale from the current URL, skipping any mount prefix.
  * Falls back to 'en' when no known locale segment is found.
  */
 export function getLocaleFromPath(): string {
   if (typeof window === 'undefined') return 'en';
+  if (memoizedLocale !== null) return memoizedLocale;
 
   const segments = window.location.pathname.split('/').filter(Boolean);
   const locale = segments.find(s =>
     (locales as readonly string[]).includes(s)
   );
-  return locale || 'en';
+  memoizedLocale = locale || 'en';
+  return memoizedLocale;
 }

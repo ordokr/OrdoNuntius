@@ -18,12 +18,15 @@ const TEXT_MIME_TYPES = new Set([
 ]);
 
 function normalizeMimeType(type?: string): string {
-  return type?.split(';')[0]?.trim().toLowerCase() || '';
+  if (!type) return '';
+  const semi = type.indexOf(';');
+  return (semi === -1 ? type : type.slice(0, semi)).trim().toLowerCase();
 }
 
 function getExtension(name?: string): string {
-  const parts = name?.toLowerCase().split('.') || [];
-  return parts.length > 1 ? parts.pop() || '' : '';
+  if (!name) return '';
+  const dot = name.lastIndexOf('.');
+  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toLowerCase() : '';
 }
 
 export function getFilePreviewKind(name?: string, type?: string): FilePreviewKind {

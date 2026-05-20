@@ -10,6 +10,11 @@ export const NOTIFICATION_SOUNDS: { id: NotificationSoundChoice; file?: string }
   { id: 'relax', file: '/notification/relax-message-tone.mp3' },
 ];
 
+// Pre-indexed lookup so playNotificationSound doesn't scan the array per call.
+const NOTIFICATION_SOUND_BY_ID = new Map<NotificationSoundChoice, string | undefined>(
+  NOTIFICATION_SOUNDS.map((s) => [s.id, s.file]),
+);
+
 function playBeep() {
   const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
   const oscillator = audioContext.createOscillator();
@@ -38,11 +43,9 @@ function playFile(file: string) {
 
 export function playNotificationSound(sound?: NotificationSoundChoice) {
   try {
-    const choice = sound ?? 'default';
-    const entry = NOTIFICATION_SOUNDS.find((s) => s.id === choice);
-
-    if (entry?.file) {
-      playFile(entry.file);
+    const file = NOTIFICATION_SOUND_BY_ID.get(sound ?? 'default');
+    if (file) {
+      playFile(file);
     } else {
       playBeep();
     }

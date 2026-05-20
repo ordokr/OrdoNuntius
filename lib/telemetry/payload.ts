@@ -75,6 +75,9 @@ async function readFeatures(): Promise<TelemetryFeatures> {
 }
 
 const STALWART_VERSION_TTL_MS = 24 * 60 * 60 * 1000;
+// Hoisted: was rebuilt per detectStalwartVersion call.
+const STALWART_VERSION_RE = /(\d+\.\d+\.\d+(?:-[\w.]+)?)/;
+const TRAILING_SLASH_RE = /\/+$/;
 let stalwartVersionCache: { version: string | null; fetchedAt: number } | null = null;
 
 // Stalwart returns the version in the Server response header
@@ -94,7 +97,7 @@ async function detectStalwartVersion(): Promise<string | null> {
     stalwartVersionCache = { version: null, fetchedAt: Date.now() };
     return null;
   }
-  const wellKnown = `${serverUrl.replace(/\/+$/, '')}/.well-known/jmap`;
+  const wellKnown = `${serverUrl.replace(TRAILING_SLASH_RE, '')}/.well-known/jmap`;
   // Reuse the SSRF guard so a misconfigured JMAP_SERVER_URL pointing at an
   // internal host doesn't get probed from telemetry context either.
   const guard = await resolveEndpointAllowed(wellKnown);
@@ -108,7 +111,7 @@ async function detectStalwartVersion(): Promise<string | null> {
       signal: AbortSignal.timeout(3000),
     });
     const server = res.headers.get('server') ?? '';
-    const m = server.match(/(\d+\.\d+\.\d+(?:-[\w.]+)?)/);
+    const m = server.match(STALWART_VERSION_RE);
     const version = m?.[1] ?? null;
     stalwartVersionCache = { version, fetchedAt: Date.now() };
     return version;

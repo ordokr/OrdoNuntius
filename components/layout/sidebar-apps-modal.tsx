@@ -4,15 +4,17 @@ import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { X, Plus, Pencil, Trash2, ExternalLink, PanelRight } from 'lucide-react';
 import { icons as lucideIcons, type LucideIcon } from 'lucide-react';
-import { cn, generateUUID } from '@/lib/utils';
+import { cn, generateUUID, hasAnyKey } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { IconPicker } from './icon-picker';
-import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore, type SidebarApp } from '@/stores/settings-store';
 import { useFocusTrap } from '@/hooks/use-focus-trap';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+
+// Hoisted: avoid allocating the protocol allow-list array on every validate() call.
+const ALLOWED_URL_PROTOCOLS = new Set(['http:', 'https:']);
 
 interface SidebarAppFormData {
   name: string;
@@ -53,7 +55,7 @@ function SidebarAppForm({
     } else {
       try {
         const parsed = new URL(formData.url);
-        if (!['http:', 'https:'].includes(parsed.protocol)) {
+        if (!ALLOWED_URL_PROTOCOLS.has(parsed.protocol)) {
           newErrors.url = t('url_invalid');
         }
       } catch {
@@ -64,7 +66,8 @@ function SidebarAppForm({
       newErrors.icon = t('icon_required');
     }
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    // hasAnyKey: walks at most one key vs Object.keys allocating a full array.
+    return !hasAnyKey(newErrors);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -189,13 +192,11 @@ interface SidebarAppsModalProps {
 
 export function SidebarAppsModal({ isOpen, onClose }: SidebarAppsModalProps) {
   const t = useTranslations('sidebar_apps');
-  // useShallow narrows the subscription to the 4 fields actually consumed.
-  const { sidebarApps, addSidebarApp, updateSidebarApp, removeSidebarApp } = useSettingsStore(useShallow(s => ({
-    sidebarApps: s.sidebarApps,
-    addSidebarApp: s.addSidebarApp,
-    updateSidebarApp: s.updateSidebarApp,
-    removeSidebarApp: s.removeSidebarApp,
-  })));
+  // Per-field selectors: subscribe to sidebarApps only; zustand actions are stable refs.
+  const sidebarApps = useSettingsStore(s => s.sidebarApps);
+  const addSidebarApp = useSettingsStore(s => s.addSidebarApp);
+  const updateSidebarApp = useSettingsStore(s => s.updateSidebarApp);
+  const removeSidebarApp = useSettingsStore(s => s.removeSidebarApp);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();

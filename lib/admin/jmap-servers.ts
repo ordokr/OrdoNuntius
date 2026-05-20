@@ -28,9 +28,11 @@ export interface PublicJmapServerEntry {
 }
 
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
+// Hoisted: was rebuilt per trimUrl/normalizeUrl call (hot in SSR bootstrap).
+const TRAILING_SLASH_RE = /\/+$/;
 
 function trimUrl(url: string): string {
-  return url.trim().replace(/\/+$/, '');
+  return url.trim().replace(TRAILING_SLASH_RE, '');
 }
 
 function isHttpUrl(url: string): boolean {
@@ -122,7 +124,7 @@ export function findServerById(servers: JmapServerEntry[], id: string | null | u
 function normalizeUrl(url: string): string {
   try {
     const u = new URL(trimUrl(url));
-    return `${u.protocol}//${u.host.toLowerCase()}${u.pathname.replace(/\/+$/, '')}`;
+    return `${u.protocol}//${u.host.toLowerCase()}${u.pathname.replace(TRAILING_SLASH_RE, '')}`;
   } catch {
     return trimUrl(url).toLowerCase();
   }

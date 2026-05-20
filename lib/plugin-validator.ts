@@ -39,6 +39,12 @@ export interface PluginExtractionResult extends ValidationResult {
 
 // ─── Manifest Validation ─────────────────────────────────────
 
+// Hoisted - was re-built per validate call.
+const VALID_PLUGIN_PERMS: Set<string> = new Set(ALL_PERMISSIONS as readonly string[]);
+const MANIFEST_ID_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+const VALID_THEME_VARIANTS: Set<string> = new Set(['light', 'dark']);
+const VALID_THEME_DENSITIES: Set<string> = new Set(['compact', 'normal', 'touch']);
+
 function validateBaseManifest(manifest: Record<string, unknown>): string[] {
   const errors: string[] = [];
 
@@ -49,7 +55,7 @@ function validateBaseManifest(manifest: Record<string, unknown>): string[] {
   if (!manifest.type || typeof manifest.type !== 'string') errors.push('Missing or invalid "type"');
 
   // Validate ID format (alphanumeric + hyphens)
-  if (manifest.id && typeof manifest.id === 'string' && !/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(manifest.id)) {
+  if (manifest.id && typeof manifest.id === 'string' && !MANIFEST_ID_RE.test(manifest.id)) {
     errors.push('ID must be lowercase alphanumeric with hyphens, min 2 chars');
   }
 
@@ -66,7 +72,7 @@ function validateThemeManifest(manifest: Record<string, unknown>): { result: The
   if (!manifest.variants || !Array.isArray(manifest.variants) || manifest.variants.length === 0) {
     errors.push('Missing or empty "variants" array (must be ["light"], ["dark"], or ["light","dark"])');
   } else {
-    const valid = manifest.variants.every((v: unknown) => v === 'light' || v === 'dark');
+    const valid = manifest.variants.every((v: unknown) => VALID_THEME_VARIANTS.has(v as string));
     if (!valid) errors.push('Variants must be "light" or "dark"');
   }
 
@@ -80,7 +86,7 @@ function validateThemeManifest(manifest: Record<string, unknown>): { result: The
   if (manifest.tokens !== undefined && (typeof manifest.tokens !== 'object' || manifest.tokens === null)) {
     errors.push('"tokens" must be an object with optional "common"/"light"/"dark" maps');
   }
-  if (manifest.density !== undefined && !['compact', 'normal', 'touch'].includes(manifest.density as string)) {
+  if (manifest.density !== undefined && !VALID_THEME_DENSITIES.has(manifest.density as string)) {
     errors.push('"density" must be "compact", "normal", or "touch"');
   }
   if (manifest.derive !== undefined && typeof manifest.derive !== 'boolean') {
@@ -114,9 +120,17 @@ function validatePluginManifest(manifest: Record<string, unknown>): { result: Pl
   }
 
   if (manifest.permissions && Array.isArray(manifest.permissions)) {
-    const validPerms = new Set(ALL_PERMISSIONS as readonly string[]);
-    const unknown = (manifest.permissions as string[]).filter(p => !validPerms.has(p));
-    if (unknown.length > 0) {
+    // Single push-loop instead of .filter() that allocates an intermediate
+    // array even on the common (no unknown perms) case.
+    const perms = manifest.permissions as string[];
+    let unknown: string[] | null = null;
+    for (let i = 0; i < perms.length; i++) {
+      if (!VALID_PLUGIN_PERMS.has(perms[i])) {
+        if (unknown === null) unknown = [];
+        unknown.push(perms[i]);
+      }
+    }
+    if (unknown !== null) {
       errors.push(`Unknown permissions: ${unknown.join(', ')}`);
     }
   }
@@ -134,12 +148,14 @@ function validatePluginManifest(manifest: Record<string, unknown>): { result: Pl
 
 // ─── JS Security Checks ─────────────────────────────────────
 
+// Dropped the /g flag - .test() with /g needs lastIndex housekeeping;
+// without /g each .test() runs independently and we save the reset.
 const SUSPICIOUS_JS_PATTERNS = [
-  { pattern: /\beval\s*\(/g, label: 'eval()' },
-  { pattern: /\bnew\s+Function\s*\(/g, label: 'new Function()' },
-  { pattern: /document\.cookie/g, label: 'document.cookie' },
-  { pattern: /document\.write/g, label: 'document.write' },
-  { pattern: /innerHTML\s*=/g, label: 'innerHTML assignment' },
+  { pattern: /\beval\s*\(/, label: 'eval()' },
+  { pattern: /\bnew\s+Function\s*\(/, label: 'new Function()' },
+  { pattern: /document\.cookie/, label: 'document.cookie' },
+  { pattern: /document\.write/, label: 'document.write' },
+  { pattern: /innerHTML\s*=/, label: 'innerHTML assignment' },
 ];
 
 function checkJSSecurity(code: string): string[] {
@@ -148,7 +164,6 @@ function checkJSSecurity(code: string): string[] {
     if (pattern.test(code)) {
       warnings.push(`Contains ${label} - review for security`);
     }
-    pattern.lastIndex = 0; // reset regex
   }
   return warnings;
 }
@@ -330,8 +345,11 @@ export async function extractPlugin(file: File): Promise<PluginExtractionResult>
 
   const root = findZipRoot(zip);
 
-  // Check for disallowed file extensions
-  for (const [path, entry] of Object.entries(zip.files)) {
+  // Check for disallowed file extensions. for...in skips the Object.entries
+  // tuples-array allocation - one pass over the zip's file table.
+  const files = zip.files;
+  for (const path in files) {
+    const entry = files[path];
     if (entry.dir) continue;
     const ext = getExtension(path);
     if (ext && !ALLOWED_PLUGIN_FILES.has(ext)) {

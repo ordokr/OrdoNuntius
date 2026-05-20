@@ -38,9 +38,12 @@ export function clearPluginI18nTranslations(pluginId: string): void {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
+// Hoisted - re-created per t() call before. Hot path: every plugin render.
+const INTERPOLATE_RE = /\{(\w+)\}/g;
+
 function interpolate(template: string, params?: Record<string, string | number>): string {
   if (!params) return template;
-  return template.replace(/\{(\w+)\}/g, (_, key) => String(params[key] ?? `{${key}}`));
+  return template.replace(INTERPOLATE_RE, (_, key) => String(params[key] ?? `{${key}}`));
 }
 
 function resolve(pluginId: string, key: string): string | undefined {

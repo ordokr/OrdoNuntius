@@ -23,6 +23,8 @@ import { getPluginRegistry } from './plugin-registry';
 //   - bare wildcards (`https://*`)
 const FRAME_ORIGIN_RE =
   /^https:\/\/(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?))*\.(?:[a-z](?:[a-z0-9-]*[a-z0-9])?)(?::[0-9]{1,5})?$/i;
+// Hoisted: was rebuilt per call.
+const FRAME_ORIGIN_CTRL_RE = /[\s'"`;,()]/;
 
 export function isValidFrameOrigin(origin: unknown): origin is string {
   if (typeof origin !== 'string') return false;
@@ -30,7 +32,7 @@ export function isValidFrameOrigin(origin: unknown): origin is string {
   if (!FRAME_ORIGIN_RE.test(origin)) return false;
   // Reject control characters / whitespace as a final safeguard against
   // anything that would let an attacker break out of the directive.
-  if (/[\s'"`;,()]/.test(origin)) return false;
+  if (FRAME_ORIGIN_CTRL_RE.test(origin)) return false;
   return true;
 }
 

@@ -23,8 +23,10 @@ export interface ReplyThreadingHeaders {
   references: string[];
 }
 
+// Single-pass strip: one trim, one regex over angle brackets (vs trim+2 replace+trim).
+const ANGLE_BRACKETS_EDGES = /^<+|>+$/g;
 export function stripMessageIdBrackets(id: string): string {
-  return id.trim().replace(/^<+/, '').replace(/>+$/, '').trim();
+  return id.trim().replace(ANGLE_BRACKETS_EDGES, '');
 }
 
 export function computeReplyThreadingHeaders(

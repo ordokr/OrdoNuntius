@@ -97,18 +97,25 @@ function isSafeTokenKey(key: string): boolean {
   return SAFE_KEY_PATTERN.test(key);
 }
 
+// Hoisted: called per token, several times per theme compile.
+const UNSAFE_VALUE_CHARS = /[{}<>]/;
+const UNSAFE_URL_SCHEME = /url\s*\(\s*['"]?(https?|data|javascript):/i;
+const UNSAFE_EXPRESSION = /expression\s*\(/i;
+const UNSAFE_MOZ_BINDING = /-moz-binding/i;
+const UNSAFE_JAVASCRIPT_SCHEME = /javascript\s*:/i;
+
 /**
  * Token values are emitted verbatim into CSS, so they must not contain
  * anything that could break out of the declaration (`{`, `}`, `;`,
  * `<`/`>`) or pull in remote/scripted content.
  */
 function isSafeTokenValue(value: string): boolean {
-  if (/[{}<>]/.test(value)) return false;
+  if (UNSAFE_VALUE_CHARS.test(value)) return false;
   if (value.includes(';')) return false;
-  if (/url\s*\(\s*['"]?(https?|data|javascript):/i.test(value)) return false;
-  if (/expression\s*\(/i.test(value)) return false;
-  if (/-moz-binding/i.test(value)) return false;
-  if (/javascript\s*:/i.test(value)) return false;
+  if (UNSAFE_URL_SCHEME.test(value)) return false;
+  if (UNSAFE_EXPRESSION.test(value)) return false;
+  if (UNSAFE_MOZ_BINDING.test(value)) return false;
+  if (UNSAFE_JAVASCRIPT_SCHEME.test(value)) return false;
   return true;
 }
 

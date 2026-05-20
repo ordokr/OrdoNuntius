@@ -11,6 +11,8 @@ const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
 
 const MIN_SECRET_LENGTH = 32;
+// Resolved once — NODE_ENV doesn't flip at runtime.
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 function getKey(): Buffer {
   const secret = getSessionSecret();
@@ -109,7 +111,7 @@ export async function setAdminSessionCookie(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(ADMIN_SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: IS_PROD,
     sameSite: 'lax',
     path: '/',
     maxAge: getSessionTTL(),

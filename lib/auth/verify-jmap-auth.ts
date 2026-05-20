@@ -2,6 +2,9 @@ import { isPublicHttpUrl } from '@/lib/security/url-guard';
 
 const VERIFY_TIMEOUT_MS = 10000;
 const MAX_REDIRECTS = 3;
+// Hoisted: was rebuilt per validateProxyAuthHeader call (every auth verify).
+const PROXY_AUTH_RE = /^(?:Basic|Bearer)\s+\S+$/i;
+const TRAILING_SLASH_RE = /\/+$/;
 
 export class JmapAuthVerificationError extends Error {
   status: number;
@@ -31,11 +34,11 @@ export function normalizeJmapServerUrl(serverUrl: string): string {
 
   url.hash = '';
   url.search = '';
-  return url.toString().replace(/\/+$/, '');
+  return url.toString().replace(TRAILING_SLASH_RE, '');
 }
 
 export function validateProxyAuthHeader(authHeader: string): void {
-  if (!/^(?:Basic|Bearer)\s+\S+$/i.test(authHeader)) {
+  if (!PROXY_AUTH_RE.test(authHeader)) {
     throw new JmapAuthVerificationError('Invalid Authorization header', 400);
   }
 }

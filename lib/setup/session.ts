@@ -3,6 +3,8 @@ import { verifySetupToken } from './token';
 
 export const SETUP_COOKIE = 'ordonuntius_setup_token';
 const COOKIE_MAX_AGE = 60 * 60; // 1 hour, matches token TTL
+// Resolved once at module load — NODE_ENV doesn't flip at runtime.
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 /**
  * The wizard "session" is just the setup token itself, set as an HttpOnly
@@ -26,7 +28,7 @@ export function buildSessionCookieAttributes() {
     name: SETUP_COOKIE,
     httpOnly: true,
     sameSite: 'lax' as const,
-    secure: process.env.NODE_ENV === 'production',
+    secure: IS_PROD,
     path: '/',
     maxAge: COOKIE_MAX_AGE,
   };
