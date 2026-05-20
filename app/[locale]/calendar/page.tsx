@@ -67,9 +67,24 @@ const EventModal = dynamic(
   () => import("@/components/calendar/event-modal").then(m => ({ default: m.EventModal })),
   { ssr: false, loading: () => null }
 );
-import { EventDetailPopover } from "@/components/calendar/event-detail-popover";
-import { EventContextMenu } from "@/components/calendar/event-context-menu";
-import { EmptySpaceContextMenu } from "@/components/calendar/empty-space-context-menu";
+// EventDetailPopover (638 LOC) only mounts after the user clicks/hovers
+// an event tile; the render below is already gated on `detailEvent &&
+// detailAnchorRect`. EventContextMenu and EmptySpaceContextMenu are
+// right-click only and gated on `.data &&` already, so deferring fetches
+// the chunk on first interaction — no UX delay, since the menu only
+// appears after the click that triggers the fetch.
+const EventDetailPopover = dynamic(
+  () => import("@/components/calendar/event-detail-popover").then(m => ({ default: m.EventDetailPopover })),
+  { ssr: false, loading: () => null }
+);
+const EventContextMenu = dynamic(
+  () => import("@/components/calendar/event-context-menu").then(m => ({ default: m.EventContextMenu })),
+  { ssr: false, loading: () => null }
+);
+const EmptySpaceContextMenu = dynamic(
+  () => import("@/components/calendar/empty-space-context-menu").then(m => ({ default: m.EmptySpaceContextMenu })),
+  { ssr: false, loading: () => null }
+);
 import { useContextMenu } from "@/hooks/use-context-menu";
 import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
 // downloadEventICS is dynamic-imported at the Export click site.
