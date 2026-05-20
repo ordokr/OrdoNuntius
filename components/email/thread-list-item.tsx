@@ -148,6 +148,13 @@ const SingleEmailItemImpl = React.forwardRef<HTMLDivElement, SingleEmailItemProp
       }
     };
 
+    // Hover prefetch: kick off the body fetch when the pointer enters the
+    // row so by the time the user clicks the email is already in cache.
+    // Idempotent + dedupes via the store; cheap to call repeatedly.
+    const handleMouseEnter = () => {
+      useEmailStore.getState().prefetchEmailById(email.id);
+    };
+
     return (
       <div
         ref={ref}
@@ -172,6 +179,7 @@ const SingleEmailItemImpl = React.forwardRef<HTMLDivElement, SingleEmailItemProp
         )}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        onMouseEnter={handleMouseEnter}
         style={{ minHeight: isFocusedMailLayout ? undefined : 'var(--list-item-height)' }}
       >
         <div
@@ -590,6 +598,12 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
       onContextMenu?.(e, latestEmail);
     };
 
+    // Hover prefetches the latest email's body (that's what opens on
+    // single-click of the collapsed header).
+    const handleThreadMouseEnter = () => {
+      useEmailStore.getState().prefetchEmailById(latestEmail.id);
+    };
+
     return (
       <div ref={ref} className={cn("border-b border-border", isThreadDragging && "opacity-50 scale-[0.98] ring-2 ring-primary/30")}>
         <div
@@ -613,6 +627,7 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
           )}
           onClick={handleHeaderClick}
           onContextMenu={handleContextMenu}
+          onMouseEnter={handleThreadMouseEnter}
           style={{ minHeight: isFocusedMailLayout ? undefined : 'var(--list-item-height)' }}
         >
           <div

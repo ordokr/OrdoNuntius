@@ -1960,8 +1960,6 @@ export default function Home() {
       selectEmail(listEmail);
     }
 
-    setLoadingEmail(true);
-
     // On mobile, switch to viewer
     if (isMobile) {
       setActiveView("viewer");
@@ -1971,6 +1969,17 @@ export default function Home() {
     if (isTablet) {
       setTabletListVisible(false);
     }
+
+    // Cache hit (populated by a previous open or a hover prefetch): render
+    // the cached body merged with the latest list-row keywords/mailboxIds
+    // and skip the JMAP round-trip entirely.
+    const cached = useEmailStore.getState().getCachedFullEmail(email.id);
+    if (cached && listEmail) {
+      selectEmail({ ...cached, keywords: listEmail.keywords, mailboxIds: listEmail.mailboxIds });
+      return;
+    }
+
+    setLoadingEmail(true);
 
     // Fetch the full content
     try {
@@ -1997,6 +2006,7 @@ export default function Home() {
           fullEmail.accountLabel = listEmail?.accountLabel;
         }
         selectEmail(fullEmail);
+        useEmailStore.getState().cacheFullEmail(fullEmail);
         // Mark-as-read logic is now handled by useEffect
       }
     } catch (error) {

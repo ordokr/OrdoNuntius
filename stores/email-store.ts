@@ -74,6 +74,20 @@ interface EmailStore extends UnifiedSlice, ThreadSlice, SpamSlice, SearchSlice, 
   prefetchInitialData: (client: IJMAPClient) => Promise<void>;
   loadMoreEmails: (client: IJMAPClient) => Promise<void>;
   fetchEmailContent: (client: IJMAPClient, emailId: string) => Promise<Email | null>;
+  // In-memory LRU cache of full Email objects (body + attachments + headers)
+  // keyed by id. Populated on every successful getEmail; consulted before
+  // re-fetching the same email. Mutated in place — no component subscribes,
+  // it's an imperative cache.
+  fullEmailCache: Map<string, Email>;
+  // Set of email ids whose body fetch is currently in flight via
+  // prefetchFullEmail. Used to dedupe rapid hover events.
+  pendingPrefetchIds: Set<string>;
+  cacheFullEmail: (email: Email) => void;
+  getCachedFullEmail: (emailId: string) => Email | undefined;
+  // Background prefetch of an email's body, e.g. on row hover. Idempotent:
+  // no-op if already cached, no-op if already in-flight. Resolves the
+  // right client + accountId from current state (unified-view aware).
+  prefetchEmailById: (emailId: string) => void;
   fetchQuota: (client: IJMAPClient) => Promise<void>;
   sendEmail: (client: IJMAPClient, to: string[], subject: string, body: string, cc?: string[], bcc?: string[], identityId?: string, fromEmail?: string, draftId?: string, fromName?: string, htmlBody?: string, attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>, inReplyTo?: string[], references?: string[], envelopeMailFrom?: string) => Promise<void>;
   sendRawEmail: (client: IJMAPClient, rawMimeBlob: Blob, identityId: string) => Promise<void>;
@@ -689,6 +703,7 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
 
       if (email) {
         set({ selectedEmail: email });
+        get().cacheFullEmail(email);
       }
       return email;
     } catch (error) {
@@ -697,6 +712,58 @@ export const useEmailStore = create<EmailStore>((set, get, store) => ({
       });
       return null;
     }
+  },
+
+  // Imperative LRU cache (cap 30). Map.set with delete-first to bump the
+  // entry to the most-recent slot; drop the oldest when over capacity.
+  // No `set()` call: mutating the Map in place is fine because no
+  // component subscribes to it via a selector. The cache is consumed by
+  // handleEmailSelect / prefetchFullEmail synchronously via getState().
+  fullEmailCache: new Map(),
+  pendingPrefetchIds: new Set(),
+  cacheFullEmail: (email) => {
+    const cache = get().fullEmailCache;
+    if (cache.has(email.id)) cache.delete(email.id);
+    cache.set(email.id, email);
+    if (cache.size > 30) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
+  },
+  getCachedFullEmail: (emailId) => get().fullEmailCache.get(emailId),
+  prefetchEmailById: (emailId) => {
+    const state = get();
+    if (state.fullEmailCache.has(emailId)) return;
+    if (state.pendingPrefetchIds.has(emailId)) return;
+
+    // Resolve which client + accountId to use. Mirrors handleEmailSelect.
+    const listEmail = state.emails.find(e => e.id === emailId);
+    const emailAccountId = state.isUnifiedView ? listEmail?.accountId : undefined;
+    const auth = useAuthStore.getState();
+    const perAccountClient = emailAccountId ? auth.getClientForAccount(emailAccountId) : undefined;
+    const fetchClient = perAccountClient ?? auth.client;
+    if (!fetchClient) return;
+    const mailbox = mailboxByIdLookup(state.mailboxes).get(state.selectedMailbox);
+    const accountId = perAccountClient ? undefined : (mailbox?.isShared ? mailbox.accountId : undefined);
+
+    state.pendingPrefetchIds.add(emailId);
+    void fetchClient.getEmail(emailId, accountId).then(
+      (email) => {
+        get().pendingPrefetchIds.delete(emailId);
+        if (email) {
+          if (emailAccountId) {
+            email.accountId = emailAccountId;
+            email.accountLabel = listEmail?.accountLabel;
+          }
+          get().cacheFullEmail(email);
+        }
+      },
+      () => {
+        // Best-effort; swallow failures (the click handler will refetch
+        // if the user actually opens this email).
+        get().pendingPrefetchIds.delete(emailId);
+      },
+    );
   },
 
   fetchQuota: async (client) => {
