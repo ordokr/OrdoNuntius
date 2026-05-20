@@ -60,7 +60,11 @@ import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { usePromptDialog } from "@/hooks/use-prompt-dialog";
 import { useBrowserNavigation, type NavSnapshot } from "@/hooks/use-browser-navigation";
 import { debug } from "@/lib/debug";
-import { playNotificationSound } from "@/lib/notification-sound";
+// notification-sound is loaded lazily inside the new-email useEffect
+// below — it ships an AudioContext setup + the choice map and only runs
+// when a push event delivers a new email. No need on the cold-load
+// path; the dynamic chunk fetch races against the user-visible push
+// arriving (typically minutes after page load).
 import { cn } from "@/lib/utils";
 import {
   ErrorBoundary,
@@ -1081,7 +1085,9 @@ export default function Home() {
     if (newEmailNotification) {
       const { emailNotificationsEnabled, emailNotificationSound, notificationSoundChoice } = useSettingsStore.getState();
       if (emailNotificationsEnabled && emailNotificationSound) {
-        playNotificationSound(notificationSoundChoice);
+        void import("@/lib/notification-sound").then(({ playNotificationSound }) => {
+          playNotificationSound(notificationSoundChoice);
+        });
       }
       debug.log('email', 'New email received:', newEmailNotification.subject);
       clearNewEmailNotification();
