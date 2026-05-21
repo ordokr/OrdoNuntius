@@ -54,6 +54,23 @@ export default [
     },
   },
   {
+    // Node scripts that drive a browser (Playwright) — globals from both
+    // environments are legitimate. Don't enforce no-empty since the perf
+    // scripts intentionally swallow PerformanceObserver feature-detection
+    // errors with empty catches.
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+      },
+    },
+    rules: {
+      "no-empty": "off",
+      "no-undef": "off",
+    },
+  },
+  {
     files: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
     languageOptions: {
       globals: {
