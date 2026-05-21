@@ -182,8 +182,15 @@ function KeywordEditForm({
 
 export function KeywordSettings() {
   const t = useTranslations("settings.keywords");
-  const { emailKeywords, addKeyword, updateKeyword, renameKeyword, removeKeyword, reorderKeywords } =
-    useSettingsStore();
+  // Granular selectors: subscribing to the whole store re-rendered this panel
+  // on every settings mutation. Actions are stable in zustand → safe to pull
+  // individually without changing render identity.
+  const emailKeywords = useSettingsStore(s => s.emailKeywords);
+  const addKeyword = useSettingsStore(s => s.addKeyword);
+  const updateKeyword = useSettingsStore(s => s.updateKeyword);
+  const renameKeyword = useSettingsStore(s => s.renameKeyword);
+  const removeKeyword = useSettingsStore(s => s.removeKeyword);
+  const reorderKeywords = useSettingsStore(s => s.reorderKeywords);
   const client = useAuthStore(s => s.client);
   const fetchTagCounts = useEmailStore(s => s.fetchTagCounts);
   const [editingId, setEditingId] = useState<string | null>(null);

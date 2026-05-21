@@ -55,8 +55,14 @@ export function AboutDataSettings() {
   // silently failed (returned the raw key path). Cross-namespace
   // resolution needs its own translator scoped to the target.
   const tSettings = useTranslations('settings');
-  const { settingsSyncDisabled, updateSetting, resetToDefaults, exportSettings, importSettings } =
-    useSettingsStore();
+  // Granular selectors: subscribing to the whole store re-rendered this panel
+  // on every settings mutation. Actions are stable in zustand → safe to pull
+  // individually without changing render identity.
+  const settingsSyncDisabled = useSettingsStore(s => s.settingsSyncDisabled);
+  const updateSetting = useSettingsStore(s => s.updateSetting);
+  const resetToDefaults = useSettingsStore(s => s.resetToDefaults);
+  const exportSettings = useSettingsStore(s => s.exportSettings);
+  const importSettings = useSettingsStore(s => s.importSettings);
   const { settingsSyncEnabled } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
