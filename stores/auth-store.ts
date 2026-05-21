@@ -2,11 +2,17 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { JMAPClient as JMAPClientCtor, RateLimitError as RateLimitErrorCtor } from '@/lib/jmap/client';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
+// identity-store stays eagerly imported because syncIdentities is a
+// public sync action that's reachable from a fresh (unauthenticated)
+// state — unlike the other sync paths (logout, switchAccount) which
+// only fire post-login after an async action awaited
+// ensureLazyAuthDeps(). identity-store at ~138 LOC is the smallest of
+// the 5 feature stores; the lazy treatment is reserved for the four
+// heavier ones (contact / vacation / calendar / filter, ~2300 LOC
+// combined). The original eager imports for those four were value-
+// only — no type-position references remain in this file — so no
+// `import type` aliases are needed here.
 import { useIdentityStore } from './identity-store';
-import { useContactStore } from './contact-store';
-import { useVacationStore } from './vacation-store';
-import { useCalendarStore } from './calendar-store';
-import { useFilterStore } from './filter-store';
 import { useSettingsStore } from './settings-store';
 import { useAccountStore } from './account-store';
 import { fetchConfig } from '@/hooks/use-config';
@@ -19,19 +25,24 @@ import { sortIdentities } from '@/lib/identity-sort';
 
 // ─── Lazy deps ─────────────────────────────────────────────────────
 //
-// JMAPClient (~5841 LOC, ~167K minified) and lib/account-state-manager
-// (which transitively pulls calendar/contact/smime/filter/identity/
-// vacation/email stores) are dynamic-imported and cached at module
-// scope so they stay out of every authenticated route's cold-load.
+// JMAPClient (~5841 LOC), lib/account-state-manager, and four of the
+// feature stores (contact / vacation / calendar / filter, ~2300 LOC
+// combined) are dynamic-imported and cached at module scope so they
+// stay out of every authenticated route's cold-load bundle.
+// account-state-manager transitively pulls calendar/contact/smime/
+// filter/identity/vacation/email stores, so the per-store imports
+// here ride the same lazy chunk — the bundler dedupes.
+// identity-store (~138 LOC) is the one feature store kept eager —
+// see the import comment above for the syncIdentities rationale.
 //
 // `ensureLazyAuthDeps()` is fire-and-forget-kicked-off at module load
 // so the chunks fetch in parallel with the rest of page rendering.
-// A follow-up commit will additionally `await ensureLazyAuthDeps()` at
-// the top of every async action (login*, checkAuth, switchAccount,
-// refreshAccessToken), closing the load-before-use loop. Sync entry
-// points (logout, logoutAll, performFullLogout) only run AFTER one of
-// those async paths authenticated the user, so by that time the
-// modules will be loaded.
+// Every async action (login*, checkAuth, switchAccount,
+// refreshAccessToken) awaits `ensureLazyAuthDeps()` as its first
+// statement, closing the load-before-use loop. Sync entry points
+// (logout, logoutAll, performFullLogout) only run AFTER one of those
+// async paths authenticated the user, so by that time the modules
+// are loaded.
 //
 // The sync proxy functions (snapshotAccount etc.) defensively log +
 // no-op if the module reference is somehow null — covering the
@@ -39,20 +50,45 @@ import { sortIdentities } from '@/lib/identity-sort';
 
 type JmapClientModule = typeof import('@/lib/jmap/client');
 type AsmModule = typeof import('@/lib/account-state-manager');
+type ContactStoreModule = typeof import('./contact-store');
+type VacationStoreModule = typeof import('./vacation-store');
+type CalendarStoreModule = typeof import('./calendar-store');
+type FilterStoreModule = typeof import('./filter-store');
 
 let _jmapClientMod: JmapClientModule | null = null;
 let _asmMod: AsmModule | null = null;
+let _contactStoreMod: ContactStoreModule | null = null;
+let _vacationStoreMod: VacationStoreModule | null = null;
+let _calendarStoreMod: CalendarStoreModule | null = null;
+let _filterStoreMod: FilterStoreModule | null = null;
 let _depsPromise: Promise<void> | null = null;
 
 function ensureLazyAuthDeps(): Promise<void> {
-  if (_jmapClientMod && _asmMod) return Promise.resolve();
+  if (
+    _jmapClientMod &&
+    _asmMod &&
+    _contactStoreMod &&
+    _vacationStoreMod &&
+    _calendarStoreMod &&
+    _filterStoreMod
+  ) {
+    return Promise.resolve();
+  }
   if (_depsPromise) return _depsPromise;
   _depsPromise = Promise.all([
     import('@/lib/jmap/client'),
     import('@/lib/account-state-manager'),
-  ]).then(([jc, asm]) => {
+    import('./contact-store'),
+    import('./vacation-store'),
+    import('./calendar-store'),
+    import('./filter-store'),
+  ]).then(([jc, asm, contact, vacation, cal, filter]) => {
     _jmapClientMod = jc;
     _asmMod = asm;
+    _contactStoreMod = contact;
+    _vacationStoreMod = vacation;
+    _calendarStoreMod = cal;
+    _filterStoreMod = filter;
   });
   return _depsPromise;
 }
@@ -124,6 +160,36 @@ function getJMAPClientCtor(): JmapClientModule['JMAPClient'] {
 }
 function getRateLimitErrorCtor(): JmapClientModule['RateLimitError'] | null {
   return _jmapClientMod?.RateLimitError ?? null;
+}
+
+// Feature-store accessors — assume ensureLazyAuthDeps() has resolved.
+// All call sites in this file live inside initializeFeatureStores,
+// which is only called from async actions that already awaited deps.
+// The null-branch throws (matching getJMAPClientCtor) so a programming
+// error surfaces loudly rather than silently inconsistent state.
+function getContactStore(): ContactStoreModule['useContactStore'] {
+  if (!_contactStoreMod) {
+    throw new Error('contact-store not loaded — async action must await ensureLazyAuthDeps() first');
+  }
+  return _contactStoreMod.useContactStore;
+}
+function getVacationStore(): VacationStoreModule['useVacationStore'] {
+  if (!_vacationStoreMod) {
+    throw new Error('vacation-store not loaded — async action must await ensureLazyAuthDeps() first');
+  }
+  return _vacationStoreMod.useVacationStore;
+}
+function getCalendarStore(): CalendarStoreModule['useCalendarStore'] {
+  if (!_calendarStoreMod) {
+    throw new Error('calendar-store not loaded — async action must await ensureLazyAuthDeps() first');
+  }
+  return _calendarStoreMod.useCalendarStore;
+}
+function getFilterStore(): FilterStoreModule['useFilterStore'] {
+  if (!_filterStoreMod) {
+    throw new Error('filter-store not loaded — async action must await ensureLazyAuthDeps() first');
+  }
+  return _filterStoreMod.useFilterStore;
 }
 
 interface AuthState {
@@ -316,15 +382,15 @@ function markSessionExpired(): void {
 
 function initializeFeatureStores(client: IJMAPClient): void {
   if (client.supportsContacts()) {
-    const contactStore = useContactStore.getState();
+    const contactStore = getContactStore().getState();
     contactStore.setSupportsSync(true);
     contactStore.fetchAddressBooks(client).catch((err) => debug.error('Failed to fetch address books:', err));
     contactStore.fetchContacts(client).catch((err) => debug.error('Failed to fetch contacts:', err));
   } else {
-    useContactStore.getState().setSupportsSync(false);
+    getContactStore().getState().setSupportsSync(false);
   }
 
-  const vacationStore = useVacationStore.getState();
+  const vacationStore = getVacationStore().getState();
   if (client.supportsVacationResponse()) {
     vacationStore.setSupported(true);
     vacationStore.fetchVacationResponse(client).catch((err) => debug.error('Failed to fetch vacation response:', err));
@@ -333,13 +399,13 @@ function initializeFeatureStores(client: IJMAPClient): void {
   }
 
   if (client.supportsCalendars()) {
-    const calendarStore = useCalendarStore.getState();
+    const calendarStore = getCalendarStore().getState();
     calendarStore.setSupported(true);
     calendarStore.fetchCalendars(client).catch((err) => debug.error('Failed to fetch calendars:', err));
   }
 
   if (client.supportsSieve()) {
-    const filterStore = useFilterStore.getState();
+    const filterStore = getFilterStore().getState();
     filterStore.setSupported(true);
     filterStore.fetchFilters(client).catch((err) => debug.error('Failed to fetch filters:', err));
   }
