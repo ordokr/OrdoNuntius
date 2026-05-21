@@ -43,7 +43,6 @@ function EmailListItemImpl({ email, selected, currentMailboxRole: currentMailbox
   const isChecked = useEmailStore(s => s.selectedEmailIds.has(email.id));
   const hasSelection = useEmailStore(s => s.selectedEmailIds.size > 0);
   const selectedMailbox = useEmailStore(s => s.selectedMailbox);
-  const mailboxes = useEmailStore(s => s.mailboxes);
   const showPreview = useSettingsStore((state) => state.showPreview);
   const density = useSettingsStore((state) => state.density);
   const mailLayout = useSettingsStore((state) => state.mailLayout);
@@ -57,7 +56,10 @@ function EmailListItemImpl({ email, selected, currentMailboxRole: currentMailbox
   const isForwarded = email.keywords?.$forwarded;
   // Prefer the hoisted prop (computed once by EmailList for the whole list);
   // fall back to a local scan only when a standalone consumer didn't thread it.
-  const currentMailboxRole = currentMailboxRoleProp ?? (selectedMailbox ? mailboxByIdLookup(mailboxes).get(selectedMailbox)?.role : undefined);
+  const currentMailboxRole = currentMailboxRoleProp
+    ?? (selectedMailbox
+      ? mailboxByIdLookup(useEmailStore.getState().mailboxes).get(selectedMailbox)?.role
+      : undefined);
   const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
   const sender = showRecipient ? (email.to?.[0] ?? email.from?.[0]) : email.from?.[0];
   const isFocusedMailLayout = mailLayout === 'focus';
