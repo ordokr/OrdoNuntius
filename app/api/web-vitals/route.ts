@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { appendFile } from 'node:fs/promises';
 import { getClientIP } from '@/lib/admin/session';
 import { logger } from '@/lib/logger';
 
@@ -6,11 +7,14 @@ import { logger } from '@/lib/logger';
 // operational data, kept on the operator's own server. Disable by setting
 // WEB_VITALS_BEACON=off in the service env.
 //
-// Records are emitted via logger.info('web-vitals', {...}) so they flow through
-// the existing JSON-log pipeline. View with:
-//   journalctl -u ordonuntius -f --output=cat | grep '"web-vitals"'
+// Records are appended to WEB_VITALS_LOG_PATH (default
+// /var/log/ordonuntius/web-vitals.jsonl) as one JSON line per metric. View
+// with: `tail -F /var/log/ordonuntius/web-vitals.jsonl`. The dedicated file
+// dodges Node's pipe-buffered stdout, which can swallow console.log output
+// from a Next.js standalone server for indefinite periods.
 
 const ENABLED = process.env.WEB_VITALS_BEACON?.toLowerCase() !== 'off';
+const LOG_PATH = process.env.WEB_VITALS_LOG_PATH || '/var/log/ordonuntius/web-vitals.jsonl';
 
 // Tiny in-memory token bucket per IP. The user is essentially the only
 // real user; this is a DoS guard, not a real quota.
@@ -96,7 +100,8 @@ export async function POST(request: NextRequest) {
   const path = typeof body.path === 'string' ? body.path.slice(0, 128) : undefined;
   const connection = typeof body.connection === 'string' ? body.connection.slice(0, 32) : undefined;
 
-  logger.info('web-vitals', {
+  const entry = {
+    ts: new Date().toISOString(),
     metric: name,
     value: Math.round(value * 100) / 100,
     rating,
@@ -106,6 +111,17 @@ export async function POST(request: NextRequest) {
     path,
     connection,
     ua: request.headers.get('user-agent')?.slice(0, 128),
+  };
+
+  // Fire-and-forget append. If the file write fails (path unwritable, disk
+  // full), fall back to logger so the metric isn't silently lost — even if
+  // logger output is currently invisible in journal due to stdout buffering,
+  // it'll surface if the operator switches log shipping.
+  appendFile(LOG_PATH, JSON.stringify(entry) + '\n').catch((err) => {
+    logger.warn('web-vitals: appendFile failed', {
+      error: err instanceof Error ? err.message : String(err),
+      path: LOG_PATH,
+    });
   });
 
   // 204 No Content keeps sendBeacon happy with the minimum response.
