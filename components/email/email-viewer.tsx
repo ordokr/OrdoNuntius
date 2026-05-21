@@ -4570,7 +4570,7 @@ export function EmailViewer({
                       >
                         {thumbUrl && (
                           <div className="w-full h-16 bg-background/40 flex items-center justify-center overflow-hidden">
-                            <img src={thumbUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                            <img src={thumbUrl} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                           </div>
                         )}
                         <div className={cn(
@@ -4946,6 +4946,7 @@ export function EmailViewer({
                         alt=""
                         className="w-full h-full object-cover"
                         loading="lazy"
+                        decoding="async"
                       />
                     </div>
                   )}
@@ -5084,7 +5085,7 @@ export function EmailViewer({
                   >
                     {thumbUrl && (
                       <div className="w-full h-20 bg-background/40 flex items-center justify-center overflow-hidden">
-                        <img src={thumbUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        <img src={thumbUrl} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       </div>
                     )}
                     <div className={cn(

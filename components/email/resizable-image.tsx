@@ -75,6 +75,7 @@ function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps)
           title={node.attrs.title || undefined}
           style={{ width: "100%", height: "auto", display: "block" }}
           draggable={false}
+          decoding="async"
         />
         {selected && (
           <>

@@ -267,7 +267,7 @@ function Thumbnail({ name, getImageUrl: fetchUrl, size = "sm" }: {
     ? "w-5 h-5 rounded object-cover"
     : "w-10 h-10 rounded object-cover";
 
-  return <img src={src} alt={name} className={cls} loading="lazy" />;
+  return <img src={src} alt={name} className={cls} loading="lazy" decoding="async" />;
 }
 
 function formatDate(dateString: string): string {
