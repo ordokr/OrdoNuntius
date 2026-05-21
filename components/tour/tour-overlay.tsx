@@ -205,10 +205,10 @@ export function TourOverlay() {
       });
     };
     window.addEventListener("resize", handler);
-    window.addEventListener("scroll", handler, true);
+    window.addEventListener("scroll", handler, { capture: true, passive: true });
     return () => {
       window.removeEventListener("resize", handler);
-      window.removeEventListener("scroll", handler, true);
+      window.removeEventListener("scroll", handler, { capture: true });
       if (rafId) cancelAnimationFrame(rafId);
     };
   }, [visible, updatePosition]);

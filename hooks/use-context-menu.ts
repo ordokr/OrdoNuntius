@@ -108,7 +108,7 @@ export function useContextMenu<T>(): UseContextMenuReturn<T> {
     const timeoutId = setTimeout(() => {
       document.addEventListener("keydown", handleEscape);
       document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("scroll", handleScroll, true);
+      document.addEventListener("scroll", handleScroll, { capture: true, passive: true });
       window.addEventListener("blur", handleBlur);
     }, 0);
 
@@ -116,7 +116,7 @@ export function useContextMenu<T>(): UseContextMenuReturn<T> {
       clearTimeout(timeoutId);
       document.removeEventListener("keydown", handleEscape);
       document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("scroll", handleScroll, true);
+      document.removeEventListener("scroll", handleScroll, { capture: true });
       window.removeEventListener("blur", handleBlur);
     };
   }, [contextMenu.isOpen, closeContextMenu]);

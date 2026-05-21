@@ -103,10 +103,10 @@ export function RecipientPopover({ name, email, displayLabel, onViewContact, cla
   useEffect(() => {
     if (!isOpen) return;
     const handler = () => handleClose();
-    document.addEventListener("scroll", handler, true);
+    document.addEventListener("scroll", handler, { capture: true, passive: true });
     window.addEventListener("resize", handler);
     return () => {
-      document.removeEventListener("scroll", handler, true);
+      document.removeEventListener("scroll", handler, { capture: true });
       window.removeEventListener("resize", handler);
     };
   }, [isOpen]);

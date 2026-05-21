@@ -457,10 +457,10 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
   useEffect(() => {
     if (!showCalendarPicker) return;
     const close = () => setShowCalendarPicker(false);
-    window.addEventListener('scroll', close, true);
+    window.addEventListener('scroll', close, { capture: true, passive: true });
     window.addEventListener('resize', close);
     return () => {
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('scroll', close, { capture: true });
       window.removeEventListener('resize', close);
     };
   }, [showCalendarPicker]);
