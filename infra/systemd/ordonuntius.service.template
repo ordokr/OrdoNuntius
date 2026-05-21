@@ -22,6 +22,12 @@ Group=__GROUP__
 WorkingDirectory=__APP_DIR__
 EnvironmentFile=__ENV_FILE__
 ExecStart=__NODE__ __APP_DIR__/server.js
+# Warmup: Next.js standalone compiles each route lazily on first hit, which
+# costs the first user ~3 seconds of TTFB after every restart. Poll the two
+# most-hit page routes for up to 20s so the first real request lands warm.
+# Best-effort (leading `-` swallows failures) — if curl is missing or the
+# server takes longer than 20s to bind, we just skip the warmup.
+ExecStartPost=-/usr/bin/bash -c 'for i in 1 2 3 4 5 6 7 8 9 10; do sleep 2; /usr/bin/curl -sf -o /dev/null http://127.0.0.1:3000/en && /usr/bin/curl -sf -o /dev/null http://127.0.0.1:3000/en/login && exit 0; done; exit 0'
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65535
