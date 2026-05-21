@@ -13,16 +13,7 @@ export function WelcomeBanner() {
   const t = useTranslations("welcome");
   const router = useRouter();
   const { startTour } = useTour();
-  const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem(ONBOARDING_KEY)) {
-        setVisible(true);
-      }
-    } catch { /* localStorage unavailable */ }
-  }, []);
 
   const dismiss = useCallback(() => {
     setDismissed(true);
@@ -32,15 +23,12 @@ export function WelcomeBanner() {
   }, []);
 
   useEffect(() => {
-    if (!visible) return;
     const handle = (e: KeyboardEvent) => {
       if (e.key === "Escape") dismiss();
     };
     window.addEventListener("keydown", handle);
     return () => window.removeEventListener("keydown", handle);
-  }, [visible, dismiss]);
-
-  if (!visible) return null;
+  }, [dismiss]);
 
   return (
     <div
@@ -49,9 +37,6 @@ export function WelcomeBanner() {
       className={`border-b border-border bg-accent/30 transition-all duration-300 ease-out ${
         dismissed ? "opacity-0 scale-y-0 max-h-0 pointer-events-none" : "opacity-100 scale-y-100 max-h-96"
       }`}
-      onTransitionEnd={() => {
-        if (dismissed) setVisible(false);
-      }}
     >
       <div className="px-4 py-3">
         <div className="flex items-start justify-between gap-3">

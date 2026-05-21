@@ -88,12 +88,17 @@ import { DragDropProvider } from "@/contexts/drag-drop-context";
 import { isFilterEmpty, activeFilterCount } from "@/lib/jmap/search-utils";
 // WelcomeBanner only mounts for users who haven't dismissed onboarding.
 // Gated by a synchronous localStorage read below so returning users
-// (the majority) never fetch the chunk. First-time users get the banner
-// after a ~50ms async hop — acceptable because the banner is supplemental,
-// not blocking.
+// (the majority) never fetch the chunk. The loading slot reserves the
+// banner's height so first-time users don't see a CLS when the chunk
+// arrives and the banner pushes the email list down ~200px.
 const WelcomeBanner = dynamic(
   () => import("@/components/ui/welcome-banner").then(m => ({ default: m.WelcomeBanner })),
-  { ssr: false, loading: () => null }
+  {
+    ssr: false,
+    loading: () => (
+      <div aria-hidden className="border-b border-border bg-accent/30" style={{ minHeight: 201 }} />
+    ),
+  }
 );
 const WELCOME_ONBOARDING_KEY = "onboarding_completed";
 import { NavigationRail } from "@/components/layout/navigation-rail";
