@@ -86,11 +86,18 @@ const SingleEmailItemImpl = React.forwardRef<HTMLDivElement, SingleEmailItemProp
     const isChecked = useEmailStore(s => s.selectedEmailIds.has(email.id));
     const hasSelection = useEmailStore(s => s.selectedEmailIds.size > 0);
     const selectedMailbox = useEmailStore(s => s.selectedMailbox);
-    // Mailboxes is only consulted as a fallback for the role prop; cheap.
-    const mailboxes = useEmailStore(s => s.mailboxes);
     // Prefer the hoisted prop (computed once in EmailList for the whole virtual
-    // list); fall back to a local scan only if a caller didn't pass it through.
-    const currentMailboxRole = currentMailboxRoleProp ?? (selectedMailbox ? mailboxByIdLookup(mailboxes).get(selectedMailbox)?.role : undefined);
+    // list); fall back to a one-shot getState() read so we don't subscribe to
+    // mailboxes. EmailList always provides the prop in production — the
+    // subscription was triggering re-renders on every push event (mailboxes
+    // array reference changes) across all visible rows, even though the
+    // mailbox role lookup hadn't actually changed. Standalone consumers
+    // (tests, storybook) still get the fallback path; they don't expect
+    // reactivity to mailbox-array changes anyway.
+    const currentMailboxRole = currentMailboxRoleProp
+      ?? (selectedMailbox
+        ? mailboxByIdLookup(useEmailStore.getState().mailboxes).get(selectedMailbox)?.role
+        : undefined);
     const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
     const sender = showRecipient ? (email.to?.[0] ?? email.from?.[0]) : email.from?.[0];
     const density = useSettingsStore((state) => state.density);
@@ -439,13 +446,17 @@ const ThreadListItemImpl = React.forwardRef<HTMLDivElement, ThreadListItemProps>
     const isChecked = useEmailStore(s => thread.emails.some(e => s.selectedEmailIds.has(e.id)));
     const hasSelection = useEmailStore(s => s.selectedEmailIds.size > 0);
     const selectedMailbox = useEmailStore(s => s.selectedMailbox);
-    const mailboxes = useEmailStore(s => s.mailboxes);
     const isUnifiedView = useEmailStore(s => s.isUnifiedView);
     const getAccountById = useAccountStore((state) => state.getAccountById);
     const threadAccountColor = latestEmail.accountId ? getAccountById(latestEmail.accountId)?.avatarColor : undefined;
-    // Prefer the hoisted prop; fall back to a scan only if a caller didn't
-    // thread it through (back-compat for standalone consumers).
-    const currentMailboxRole = currentMailboxRoleProp ?? (selectedMailbox ? mailboxByIdLookup(mailboxes).get(selectedMailbox)?.role : undefined);
+    // Prefer the hoisted prop; fall back to a one-shot getState() read so we
+    // don't subscribe to mailboxes (same rationale as SingleEmailItemImpl
+    // above — the subscription re-renders every visible row on push-event
+    // mailbox-array reference changes).
+    const currentMailboxRole = currentMailboxRoleProp
+      ?? (selectedMailbox
+        ? mailboxByIdLookup(useEmailStore.getState().mailboxes).get(selectedMailbox)?.role
+        : undefined);
     const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
     // Collect up to 4 unique recipient display names. Was: flatMap (per
     // email per recipient allocations) → new Set → Array.from → slice(4).
