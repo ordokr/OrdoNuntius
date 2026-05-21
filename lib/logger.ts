@@ -1,6 +1,30 @@
+import { writeSync } from 'node:fs';
+
 type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 
 const LEVELS: Record<LogLevel, number> = { error: 0, warn: 1, info: 2, debug: 3 };
+
+// Node block-buffers stdout when it's a pipe (which it is under systemd
+// with StandardOutput=journal). console.log from a request handler sits
+// in libuv's async write queue indefinitely — verified by inspecting two
+// days of journal output: only startup banners landed, no logger.info /
+// per-request logs. Writing directly to fd 1/2 via writeSync bypasses the
+// stream layer and guarantees the bytes leave the process before we return.
+// Cost: synchronous write. For info-level traffic that's negligible.
+const HAS_WRITE_SYNC = typeof process !== 'undefined' && typeof writeSync === 'function';
+
+function emit(level: LogLevel, line: string): void {
+  const fd = level === 'error' || level === 'warn' ? 2 : 1;
+  if (HAS_WRITE_SYNC) {
+    try {
+      writeSync(fd, line + '\n');
+      return;
+    } catch {
+      // EAGAIN on pipe overflow, or fd closed; fall through to console.
+    }
+  }
+  (level === 'error' || level === 'warn' ? console.error : console.log)(line);
+}
 
 const COLORS: Record<LogLevel, string> = {
   error: '\x1b[31m',
@@ -36,12 +60,7 @@ function log(level: LogLevel, message: string, extra?: Record<string, unknown>):
       message,
       ...extra,
     };
-    const out = JSON.stringify(entry);
-    if (level === 'error' || level === 'warn') {
-      console.error(out);
-    } else {
-      console.log(out);
-    }
+    emit(level, JSON.stringify(entry));
     return;
   }
 
@@ -55,11 +74,7 @@ function log(level: LogLevel, message: string, extra?: Record<string, unknown>):
   const ts = new Date().toISOString();
   const suffix = hasExtra ? ` ${COLORS.debug}${JSON.stringify(extra)}${RESET}` : '';
 
-  if (level === 'error' || level === 'warn') {
-    console.error(`${tag} ${ts} ${message}${suffix}`);
-  } else {
-    console.log(`${tag} ${ts} ${message}${suffix}`);
-  }
+  emit(level, `${tag} ${ts} ${message}${suffix}`);
 }
 
 export const logger = {
