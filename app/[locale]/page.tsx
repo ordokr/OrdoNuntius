@@ -50,7 +50,11 @@ import { useShallow } from "zustand/react/shallow";
 import { toast } from "@/stores/toast-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useSettingsStore } from "@/stores/settings-store";
-import { useContactStore } from "@/stores/contact-store";
+// contact-store (~1046 LOC) is dynamic-imported inside the
+// trusted-senders useEffect below. The eager import previously kept it
+// on the inbox cold-load bundle for users who don't have the
+// trustedSendersAddressBook setting enabled (the dominant case).
+import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useIdentityStore } from "@/stores/identity-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useDeviceDetection } from "@/hooks/use-media-query";
@@ -189,15 +193,40 @@ export default function Home() {
   const identities = useIdentityStore(s => s.identities);
   useIdentitySync();
   const trustedSendersAddressBook = useSettingsStore((state) => state.trustedSendersAddressBook);
-  const loadTrustedSendersBook = useContactStore(s => s.loadTrustedSendersBook);
-  const trustedSendersLoaded = useContactStore(s => s.trustedSendersLoaded);
 
-  // Load trusted senders address book when feature is enabled
+  // Tracks the (client, setting) combo we last triggered the
+  // trusted-senders load for. Prevents firing twice for the same combo —
+  // replaces the previous `!trustedSendersLoaded` subscription guard
+  // without needing to subscribe to contact-store from inside the
+  // component.
+  const trustedSendersTriggeredFor = useRef<{ client: IJMAPClient | null; setting: boolean | null }>({ client: null, setting: null });
+
   useEffect(() => {
-    if (trustedSendersAddressBook && client && !trustedSendersLoaded) {
-      loadTrustedSendersBook(client);
+    if (!trustedSendersAddressBook || !client) return;
+    if (
+      trustedSendersTriggeredFor.current.client === client &&
+      trustedSendersTriggeredFor.current.setting === trustedSendersAddressBook
+    ) {
+      return;
     }
-  }, [trustedSendersAddressBook, client, trustedSendersLoaded, loadTrustedSendersBook]);
+    trustedSendersTriggeredFor.current = { client, setting: trustedSendersAddressBook };
+
+    let cancelled = false;
+    void import("@/stores/contact-store").then(({ useContactStore }) => {
+      if (cancelled) return;
+      const state = useContactStore.getState();
+      // Defensive: outer ref only dedupes within this component's lifetime;
+      // contact-store may already have trustedSendersLoaded === true from a
+      // prior mount, account-state restore, or another caller.
+      if (!state.trustedSendersLoaded) {
+        state.loadTrustedSendersBook(client);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [trustedSendersAddressBook, client]);
 
   useEffect(() => {
     if (!isRateLimited || !rateLimitUntil) {
