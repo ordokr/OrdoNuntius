@@ -6,6 +6,7 @@ import { EmbeddedBridgeProvider } from "@/components/providers/embedded-bridge-p
 import { RateLimitToastProvider } from "@/components/providers/rate-limit-toast-provider";
 import { TourProvider } from "@/components/tour/tour-provider";
 import { ProtocolLaunchHandlerProvider } from "@/components/protocol/protocol-launch-handler-provider";
+import { WebVitalsReporter } from "@/components/providers/web-vitals-reporter";
 import { locales } from "@/i18n/routing";
 
 export default async function LocaleLayout({
@@ -35,6 +36,7 @@ export default async function LocaleLayout({
               <TourProvider>
                 <ProtocolLaunchHandlerProvider>
                   {children}
+                  <WebVitalsReporter />
                 </ProtocolLaunchHandlerProvider>
               </TourProvider>
             </EmbeddedBridgeProvider>
